@@ -29,20 +29,25 @@ services:
       timeout: 5s
       retries: 5
 
-  minio:
-    image: minio/minio:latest
+  # LocalStack stands in for S3 in dev so CI and local share the same backend
+  # (the public minio/minio and bitnami/minio Docker images were both
+  # deprecated in 2025; LocalStack is the maintained S3 mock that auto-boots
+  # without a `command:` override — needed because GH Actions service
+  # containers don't accept one). The SDK is configured with
+  # `forcePathStyle: true` already, which is the only LocalStack requirement.
+  localstack:
+    image: localstack/localstack:4
     restart: unless-stopped
-    command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      SERVICES: s3
+      DEFAULT_REGION: us-east-1
+      AWS_DEFAULT_REGION: us-east-1
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # console
+      - "4566:4566"
     volumes:
-      - minio_data:/data
+      - localstack_data:/var/lib/localstack
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4566/_localstack/health | grep -q s3"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -50,4 +55,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  minio_data:
+  localstack_data:

@@ -1,6 +1,7 @@
 import {
   CreateBucketCommand,
   HeadBucketCommand,
+  PutBucketCorsCommand,
   PutBucketPolicyCommand,
 } from '@aws-sdk/client-s3'
 import type { S3Storage } from './s3-storage'
@@ -41,6 +42,28 @@ export async function ensureBucket(storage: S3Storage, bucket: string): Promise<
     new PutBucketPolicyCommand({
       Bucket: bucket,
       Policy: publicReadPolicy(bucket),
+    }),
+  )
+
+  // Browser-direct presigned PUT comes from a different origin (the Next.js
+  // dev/prod host vs the S3 host), so the bucket needs a CORS rule. MinIO
+  // historically defaulted to permissive; LocalStack and real S3 do not.
+  // We allow GET (public reads), PUT (presigned uploads), and HEAD (cache
+  // probes) from anywhere — writes are still gated by the presigned signature.
+  await client.send(
+    new PutBucketCorsCommand({
+      Bucket: bucket,
+      CORSConfiguration: {
+        CORSRules: [
+          {
+            AllowedOrigins: ['*'],
+            AllowedMethods: ['GET', 'PUT', 'HEAD'],
+            AllowedHeaders: ['*'],
+            ExposeHeaders: ['ETag'],
+            MaxAgeSeconds: 3000,
+          },
+        ],
+      },
     }),
   )
 

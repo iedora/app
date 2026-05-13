@@ -12,9 +12,7 @@ const TINY_PNG = Buffer.from(
   'base64',
 )
 
-// TODO: re-enable once LocalStack-based S3 in CI is debugged (see
-// uploads/logo.spec.ts for context).
-test.describe.skip('Uploads — item photos', () => {
+test.describe('Uploads — item photos', () => {
   test('uploads a photo from the item dialog and renders it on the public menu', async ({
     page,
     browser,
@@ -66,7 +64,7 @@ test.describe.skip('Uploads — item photos', () => {
       SELECT image_url AS "imageUrl" FROM item WHERE id = ${itemId}
     `
     expect(rows[0]?.imageUrl).toMatch(
-      new RegExp(`^http://localhost:9000/metamenu-test/r/${org.restaurantId}/items/${itemId}/`),
+      new RegExp(`^http://localhost:4566/metamenu-test/r/${org.restaurantId}/items/${itemId}/`),
     )
 
     // Close the dialog and confirm the row thumbnail shows up.

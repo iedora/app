@@ -50,11 +50,12 @@ export default defineConfig({
         'test-secret-do-not-use-in-prod-test-secret-do-not-use-in-prod',
       BETTER_AUTH_URL: BASE_URL,
       DISABLE_AUTH_RATE_LIMIT: 'true',
-      // Storage — separate bucket so tests don't collide with dev assets.
-      S3_ENDPOINT: 'http://localhost:9000',
+      // Storage — LocalStack via docker-compose. Separate bucket so tests
+      // don't collide with dev assets.
+      S3_ENDPOINT: 'http://localhost:4566',
       S3_REGION: 'us-east-1',
-      S3_ACCESS_KEY: 'minioadmin',
-      S3_SECRET_KEY: 'minioadmin',
+      S3_ACCESS_KEY: 'test',
+      S3_SECRET_KEY: 'test',
       S3_BUCKET: 'metamenu-test',
     },
   },
