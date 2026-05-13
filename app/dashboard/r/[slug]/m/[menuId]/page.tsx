@@ -1,12 +1,9 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { and, asc, eq, inArray } from 'drizzle-orm'
 import { getTranslations } from 'next-intl/server'
 import { requireRestaurantBySlug } from '@/features/auth'
-import { db } from '@/lib/db'
-import { category, item, menu, restaurant } from '@/lib/db/schema'
-import type { LanguageCode } from '@/features/i18n'
-import { MenuBuilder } from './builder'
+import { loadBuilderData } from '@/features/menu-builder'
+import { MenuBuilder } from '@/features/menu-builder/ui/builder'
 
 export default async function MenuBuilderPage({
   params,
@@ -15,49 +12,8 @@ export default async function MenuBuilderPage({
 }) {
   const { slug, menuId } = await params
   const { restaurant: r } = await requireRestaurantBySlug(slug)
-
-  const menuRows = await db
-    .select({ id: menu.id, name: menu.name, restaurantId: menu.restaurantId })
-    .from(menu)
-    .where(and(eq(menu.id, menuId), eq(menu.restaurantId, r.id)))
-    .limit(1)
-  if (menuRows.length === 0) notFound()
-  const m = menuRows[0]
-
-  // Pull i18n config for the dialog tabs.
-  const langRows = await db
-    .select({
-      defaultLanguage: restaurant.defaultLanguage,
-      supportedLanguages: restaurant.supportedLanguages,
-    })
-    .from(restaurant)
-    .where(eq(restaurant.id, r.id))
-    .limit(1)
-  const langs = langRows[0]!
-
-  const categories = await db
-    .select()
-    .from(category)
-    .where(eq(category.menuId, menuId))
-    .orderBy(asc(category.position))
-
-  const items =
-    categories.length === 0
-      ? []
-      : await db
-          .select()
-          .from(item)
-          .where(
-            inArray(
-              item.categoryId,
-              categories.map((c) => c.id),
-            ),
-          )
-          .orderBy(asc(item.position))
-
-  const itemsByCategory: Record<string, typeof items> = {}
-  for (const c of categories) itemsByCategory[c.id] = []
-  for (const it of items) itemsByCategory[it.categoryId]?.push(it)
+  const data = await loadBuilderData(r.id, menuId)
+  if (!data) notFound()
 
   const t = await getTranslations('Restaurant')
 
@@ -72,35 +28,16 @@ export default async function MenuBuilderPage({
           {r.name}
         </Link>
         <span aria-hidden="true">/</span>
-        <span className="font-semibold">{m.name}</span>
+        <span className="font-semibold">{data.menu.name}</span>
       </h1>
 
       <MenuBuilder
         slug={slug}
-        menuId={m.id}
+        menuId={data.menu.id}
         restaurantId={r.id}
-        defaultLanguage={langs.defaultLanguage as LanguageCode}
-        supportedLanguages={langs.supportedLanguages as LanguageCode[]}
-        initialCategories={categories.map((c) => ({
-          id: c.id,
-          name: c.name,
-          description: c.description,
-          nameI18n: c.nameI18n,
-          descriptionI18n: c.descriptionI18n,
-          items: (itemsByCategory[c.id] ?? []).map((it) => ({
-            id: it.id,
-            categoryId: it.categoryId,
-            name: it.name,
-            description: it.description,
-            nameI18n: it.nameI18n,
-            descriptionI18n: it.descriptionI18n,
-            priceCents: it.priceCents,
-            currency: it.currency,
-            available: it.available,
-            position: it.position,
-            imageUrl: it.imageUrl,
-          })),
-        }))}
+        defaultLanguage={data.defaultLanguage}
+        supportedLanguages={data.supportedLanguages}
+        initialCategories={data.categories}
       />
     </div>
   )

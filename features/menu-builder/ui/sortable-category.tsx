@@ -36,7 +36,7 @@ import {
   deleteCategory,
   reorderItems,
   updateCategoryName,
-} from './actions'
+} from '@/features/menu-builder/actions'
 import { CategoryTranslateDialog } from './category-translate-dialog'
 import { SortableItem } from './sortable-item'
 import type { BuilderCategory, BuilderItem } from './types'

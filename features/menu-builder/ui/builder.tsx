@@ -20,7 +20,7 @@ import {
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import type { LanguageCode } from '@/features/i18n'
-import { createCategory, reorderCategories } from './actions'
+import { createCategory, reorderCategories } from '@/features/menu-builder/actions'
 import { SortableCategory } from './sortable-category'
 import type { BuilderCategory } from './types'
 
