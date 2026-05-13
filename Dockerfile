@@ -14,8 +14,23 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+
+# Dummies para a fase "collect page data" do Next 16 — vários módulos validam env
+# vars no carregamento (lib/db, auth, redis, …) e falhariam o build sem isto.
+# Os valores reais vêm da config Kamal em runtime.
+ENV DATABASE_URL=postgres://build:build@localhost:5432/build
+ENV REDIS_URL=redis://localhost:6379
+ENV BETTER_AUTH_SECRET=build-time-placeholder
+ENV BETTER_AUTH_URL=http://localhost:3000
+ENV S3_ENDPOINT=http://localhost:4566
+ENV S3_REGION=us-east-1
+ENV S3_ACCESS_KEY=build
+ENV S3_SECRET_KEY=build
+ENV S3_BUCKET=build
+
 RUN node --run build
 
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
