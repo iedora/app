@@ -80,27 +80,31 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
-      # Bitnami's MinIO image has an entrypoint that boots `minio server`
-      # automatically — service containers on GitHub Actions don't accept a
-      # `command:` override (the official `minio/minio` image needs one to
-      # start). It also takes `MINIO_DEFAULT_BUCKETS` so the bucket the tests
-      # need exists by the time Playwright fires. The `mc` step below stays
-      # as a belt-and-braces guard in case the image's bootstrap silently
-      # changes.
-      minio:
-        image: bitnami/minio:latest
+      # LocalStack stands in for MinIO/S3 in CI because:
+      #   - GH Actions services don't accept a `command:` override, so
+      #     `minio/minio` (needs `server /data`) can't boot.
+      #   - The public `minio/minio` and `bitnami/minio` images were both
+      #     removed from Docker Hub in 2025 (MinIO 2025-10-23, Bitnami
+      #     2025-08-28 catalog collapse) — there is no current "drop-in"
+      #     MinIO image with a self-booting entrypoint.
+      # LocalStack auto-boots S3 on :4566; the SDK works as long as the
+      # client is created with `forcePathStyle: true` (it already is in
+      # `lib/storage/s3-storage.ts`). Local dev still uses the real
+      # `minio/minio` from docker-compose while its cached tag pulls.
+      localstack:
+        image: localstack/localstack:4
         env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-          MINIO_DEFAULT_BUCKETS: 'metamenu-test:download'
+          SERVICES: s3
+          DEFAULT_REGION: us-east-1
+          AWS_DEFAULT_REGION: us-east-1
         ports:
-          - '9000:9000'
-          - '9001:9001'
+          - '4566:4566'
         options: >-
-          --health-cmd "curl -fsS http://localhost:9000/minio/health/ready"
-          --health-interval 10s
+          --health-cmd "curl -fsS http://localhost:4566/_localstack/health | grep -q 's3'"
+          --health-interval 5s
           --health-timeout 5s
-          --health-retries 12
+          --health-retries 20
+          --health-start-period 10s
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/metamenu_test
@@ -108,10 +112,12 @@ jobs:
       BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
       BETTER_AUTH_URL: http://localhost:3000
       DISABLE_AUTH_RATE_LIMIT: 'true'
-      S3_ENDPOINT: http://localhost:9000
+      # LocalStack accepts any credentials; we use the conventional `test/test`
+      # pair the AWS SDK uses for local development.
+      S3_ENDPOINT: http://localhost:4566
       S3_REGION: us-east-1
-      S3_ACCESS_KEY: minioadmin
-      S3_SECRET_KEY: minioadmin
+      S3_ACCESS_KEY: test
+      S3_SECRET_KEY: test
       S3_BUCKET: metamenu-test
       NEXT_TELEMETRY_DISABLED: '1'
       CI: 'true'
@@ -163,13 +169,17 @@ jobs:
           PGPASSWORD=postgres psql -h localhost -U postgres -d postgres \
             -c "CREATE DATABASE metamenu_test;"
 
-      - name: Bootstrap MinIO bucket
+      - name: Bootstrap S3 bucket
+        # LocalStack starts with zero buckets. `aws` CLI v2 is preinstalled on
+        # ubuntu-24.04 runners; no install step needed.
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
         run: |
-          curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc
-          chmod +x /usr/local/bin/mc
-          mc alias set local http://localhost:9000 minioadmin minioadmin
-          mc mb --ignore-existing local/metamenu-test
-          mc anonymous set download local/metamenu-test
+          aws --endpoint-url=http://localhost:4566 s3 mb s3://metamenu-test
+          aws --endpoint-url=http://localhost:4566 s3api put-bucket-acl \
+            --bucket metamenu-test --acl public-read
 
       - name: Build Next.js
         # Node, not Bun — production runtime parity + AGENTS.md guidance.
