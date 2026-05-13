@@ -1,0 +1,194 @@
+# Continuous integration for meta-menu.
+#
+# Three jobs: typecheck and lint run on every push (fast, cheap, parallel);
+# e2e gates merges and only runs once the cheap jobs are green so a broken
+# branch doesn't burn ~10 min of runner time before failing.
+#
+# Runtime split (see AGENTS.md): Bun for installs and script orchestration,
+# Node for `next build` and `next start`. Bun + `next build` is unstable as
+# of 2026 (oven-sh/bun#23944), and CI must mirror production runtime anyway.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUN_VERSION: '1.3.13'
+  NODE_VERSION: '22'
+  PLAYWRIGHT_VERSION: '1.59.1'
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs: [typecheck, lint]
+
+    services:
+      # `POSTGRES_DB` stays as the default `postgres` admin DB — the e2e
+      # global-setup connects to it to CREATE the `metamenu_test` DB.
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      # The official `minio/minio` image takes its boot command as `command`
+      # in docker-compose, but GH service containers don't accept command
+      # overrides. We use the default boot (server /data) — `mc mb` below
+      # provisions the bucket the tests expect.
+      minio:
+        image: minio/minio:latest
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports:
+          - '9000:9000'
+          - '9001:9001'
+        options: >-
+          --health-cmd "curl -fsS http://localhost:9000/minio/health/ready"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/metamenu_test
+      # CI-only secret; production uses the value set in repo Secrets.
+      BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+      BETTER_AUTH_URL: http://localhost:3000
+      DISABLE_AUTH_RATE_LIMIT: 'true'
+      S3_ENDPOINT: http://localhost:9000
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: metamenu-test
+      NEXT_TELEMETRY_DISABLED: '1'
+      CI: 'true'
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Cache Next.js build output
+        uses: actions/cache@v4
+        with:
+          # Turbopack's persistent cache lives here in Next 16 — large saving
+          # on warm runs. Keying on source files invalidates when code changes.
+          path: .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('bun.lock') }}-${{ hashFiles('app/**/*.ts', 'app/**/*.tsx', 'components/**/*.ts', 'components/**/*.tsx', 'lib/**/*.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('bun.lock') }}-
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ env.PLAYWRIGHT_VERSION }}
+
+      - name: Install Playwright browsers (cold cache)
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: bunx playwright install --with-deps chromium
+
+      - name: Install Playwright system deps (warm cache)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: bunx playwright install-deps chromium
+
+      - name: Create test database
+        # The service container starts with the default `postgres` DB;
+        # globalSetup expects to be able to connect there AND have
+        # `metamenu_test` to migrate against.
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d postgres \
+            -c "CREATE DATABASE metamenu_test;"
+
+      - name: Bootstrap MinIO bucket
+        run: |
+          curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc
+          chmod +x /usr/local/bin/mc
+          mc alias set local http://localhost:9000 minioadmin minioadmin
+          mc mb --ignore-existing local/metamenu-test
+          mc anonymous set download local/metamenu-test
+
+      - name: Build Next.js
+        # Node, not Bun — production runtime parity + AGENTS.md guidance.
+        # `node --run` is the Node 22+ way to invoke a package.json script.
+        run: node --run build
+
+      - name: Run Playwright
+        # playwright.config.ts skips its own `build` step when CI=true,
+        # so this only launches `next start` + runs the suite.
+        run: bunx playwright test
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload traces, screenshots, and videos on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: test-results/
+          retention-days: 14

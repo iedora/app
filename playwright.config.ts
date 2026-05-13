@@ -33,9 +33,14 @@ export default defineConfig({
   ],
 
   webServer: {
-    // Must run a production build — Cache Components only behave correctly under
-    // `next start`, not the dev server.
-    command: 'bun run build && bun run start',
+    // Must run a production build — Cache Components only behave correctly
+    // under `next start`, not the dev server. In CI the build runs as a
+    // dedicated step (with Node, not Bun — see AGENTS.md note on
+    // oven-sh/bun#23944), so we skip the local `build` here to avoid a
+    // double-build.
+    command: process.env.CI
+      ? 'bun run start'
+      : 'bun run build && bun run start',
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 240_000,
