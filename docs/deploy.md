@@ -19,7 +19,7 @@ DNS:  menu.example.com   → tunnel UUID → http://localhost:80
       assets.example.com → tunnel UUID → http://localhost:9000
 ```
 
-**LAN access is deliberately not supported.** Hitting `http://192.168.50.53` would mean HTTP cookies which Better Auth rejects when `BETTER_AUTH_URL=https://…` (browsers refuse `Secure` cookies over HTTP). On the LAN, use the public tunnel URL — Cloudflare resolves close to you and tunnels back, ~30-80ms overhead. For real local dev, `bun run dev`.
+**LAN access is deliberately not supported.** Hitting `http://$ONPREM_HOST` directly would mean HTTP cookies which Better Auth rejects when `BETTER_AUTH_URL=https://…` (browsers refuse `Secure` cookies over HTTP). On the LAN, use the public tunnel URL — Cloudflare resolves close to you and tunnels back, ~30-80ms overhead. For real local dev, `bun run dev`.
 
 ## Prerequisites
 
