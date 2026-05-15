@@ -13,14 +13,41 @@ The same flow works identically on a homelab Ubuntu box and a fresh cloud VPS (D
 
 ---
 
-## Step 1 — Local Mac prerequisites (one-time, ever)
+## Step 1 — Local prerequisites (one-time, ever)
+
+Same tools on Mac and Linux; only the installers differ.
+
+**macOS** (Apple Silicon or Intel):
 
 ```bash
-brew install opentofu                    # IaC tool (Terraform fork)
+brew install opentofu gh                 # IaC + GitHub CLI
 sudo gem install kamal -N                # Kamal is a Ruby gem, not a brew formula
 brew install --cask orbstack             # or docker desktop — anything that runs docker
-brew install gh                          # GitHub CLI
-gh auth login                            # follow the device-code prompts
+gh auth login
+```
+
+**Linux** (Debian/Ubuntu shown; adapt for Fedora/Arch):
+
+```bash
+# Tofu — official installer (apt repos are stale)
+curl -fsSL https://get.opentofu.org/install-opentofu.sh | sh -s -- --install-method standalone
+
+# Ruby + Kamal
+sudo apt install -y ruby-full build-essential
+sudo gem install kamal -N
+
+# Docker Engine
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER && newgrp docker
+
+# GitHub CLI — official repo (apt's gh is often outdated)
+(type -p wget >/dev/null || sudo apt install -y wget) \
+  && sudo mkdir -p -m 755 /etc/apt/keyrings \
+  && wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg >/dev/null \
+  && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list \
+  && sudo apt update && sudo apt install -y gh
+gh auth login
 ```
 
 Verify each: `tofu version`, `kamal version`, `docker info`, `gh auth status`. All should succeed.
