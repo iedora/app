@@ -14,7 +14,7 @@ output "tunnel_id" {
 }
 
 output "tunnel_token" {
-  description = "Connector token for the cloudflared accessory. Goes into .kamal/secrets-common as TUNNEL_TOKEN."
+  description = "Connector token for the cloudflared accessory. Read at deploy time by .kamal/secrets via `tofu output -raw tunnel_token`."
   value       = data.cloudflare_zero_trust_tunnel_cloudflared_token.menu.token
   sensitive   = true
 }

@@ -161,15 +161,12 @@ shared/                    cross-slice infrastructure
 proxy.ts                   Next 16 proxy (was middleware)
 drizzle.config.ts
 docker-compose.yml         postgres + redis + localstack
+config/deploy.yml          Kamal 2 deploy config — app + 4 accessories (postgres, redis, minio, cloudflared)
+.kamal/secrets             shell-evaluated references: TUNNEL_TOKEN from tofu, KAMAL_REGISTRY_PASSWORD from `gh auth token`, rest from .env
 infra/
-  .env.example             single source of truth — copy to .env (gitignored), fill in 6 required values
-  deploy.sh                one entry point — load .env, generate missing secrets, tofu apply, host-init if needed, kamal deploy
+  .env.example             single source of truth — copy to .env (gitignored), fill in 7 inputs + 4 generated secrets
   tofu/                    Cloudflare tunnel + DNS + ingress (state encrypted, public_hostname from TF_VAR_)
-  kamal/                   Kamal 2 deploy config — app + 4 accessories (postgres, redis, minio, cloudflared); secrets-common is generated
 scripts/
-  host-init.sh             called by deploy.sh on first run: deploy user + SSH key + sshd hardening
-  kamal-first-deploy.sh    called by deploy.sh on first run: ordering workaround (basecamp/kamal#526)
-  k.sh                     kamal wrapper that loads infra/.env (used by `make logs`/`console`/etc.)
   migrate.mjs              Drizzle migrations under pg_advisory_lock
   check-migrations.ts      dev-time guardrail; warns when journal has pending migrations
 .github/workflows/
@@ -196,11 +193,14 @@ tests/e2e/
 - `bun run auth:generate` — sync Better Auth tables into `shared/db/schema.ts` (re-run after changing auth plugins)
 - `docker compose up -d` — start Postgres + Redis + LocalStack (S3)
 - `bunx shadcn@latest add <name>` — add a shadcn component
-- `cp infra/.env.example infra/.env` — single config file (gitignored). Fill in 6 required values; 4 secrets auto-generate on first run.
-- `make deploy` — single entry point. `infra/deploy.sh` does: load .env, generate missing secrets, `tofu apply`, write Kamal secrets, host-init on first run, `kamal-first-deploy.sh` or `kamal deploy`. Idempotent.
-- `make logs` / `make console` / `make redeploy` / `make rollback` / `make migrate` — wrap `kamal` via `scripts/k.sh` (loads `infra/.env`)
+- `cp .env.example .env` — single config file (gitignored). Fill in 7 user inputs + 4 hand-generated secrets (`openssl rand -hex 32`); no script auto-generates them.
+- **First-time setup** (once, manual): `ssh-copy-id $SSH_USER@$ONPREM_HOST`; give the SSH user NOPASSWD sudo with one paste-and-run line in `make help`; `gh auth refresh -s write:packages`; then `make setup` (= `tofu apply` + `kamal server bootstrap` + `kamal accessory boot all` + `kamal deploy`).
+- `make deploy` — `tofu apply` + `kamal deploy`. Native make recipes; no shell-script wrapper.
+- `make logs` / `make console` / `make redeploy` / `make rollback` / `make migrate` — direct `kamal` calls with .env loaded via `-include`.
 - `make destroy` — `tofu destroy`: removes Cloudflare tunnel + DNS only (does not touch the box)
 - `make help` — list every target
+
+Build + push lives on the homelab box itself (`builder.remote: ssh://$SSH_USER@$ONPREM_HOST`, native amd64). Image is pushed to **GHCR** (`ghcr.io/$GHCR_USER/meta-menu`); auth is `gh auth token` evaluated from `.kamal/secrets`. No local registry, no buildx insecure-registry config, no daemon.json mutation.
 
 ## CI
 `.github/workflows/ci.yml` runs three jobs on every push and PR:

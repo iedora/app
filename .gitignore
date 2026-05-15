@@ -34,7 +34,10 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+.env
+.env.local
+.env.production
+.env.*.local
 !.env.example
 !.env.test
 
@@ -56,8 +59,7 @@ next-env.d.ts
 .claude/settings.local.json
 .claude/
 
-# Infra — single source of truth + tofu state, neither in git
-infra/.env
+# Infra — tofu state, never in git
 infra/**/*.iso
 infra/**/.terraform/
 infra/**/terraform.tfstate
@@ -66,6 +68,5 @@ infra/**/terraform.tfstate.d/
 infra/**/terraform.tfvars
 # .terraform.lock.hcl SHOULD be committed — pins provider versions
 
-# Kamal — generated at deploy time from infra/.env
-infra/**/.kamal/secrets
-infra/**/.kamal/secrets-common
+# Kamal — .kamal/secrets is committed (only references, no values). Real
+# secret material lives in infra/.env (gitignored above).

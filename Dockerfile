@@ -23,6 +23,13 @@ ENV NODE_ENV=production
 # injected by Kamal and validated on first import then.
 ENV SKIP_ENV_VALIDATION=1
 
+# Better Auth reads process.env at module load (not via our env stub). Provide
+# placeholder values so `next build`'s page-data collection doesn't log
+# "default secret" / "Base URL could not be determined". Kamal's --env-file
+# overrides both with real values at runtime.
+ENV BETTER_AUTH_SECRET=build-placeholder-overridden-at-runtime-32chars
+ENV BETTER_AUTH_URL=http://build.local
+
 RUN node --run build
 
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────

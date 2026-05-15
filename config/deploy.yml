@@ -1,23 +1,24 @@
 # Kamal 2 — single homelab box behind Cloudflare Tunnel.
 #
-# Build + push + run all happen on the homelab box itself:
-#   - `builder.remote: ssh://deploy@$ONPREM_HOST` + `local: false` →
-#     docker buildx runs natively on the box (amd64, no QEMU on the Mac).
-#   - A `registry:3` container at 127.0.0.1:5000 on the box receives the push.
-#     The container is started by infra/deploy.sh outside of Kamal (chicken-and-
-#     egg: Kamal accessory boot does a registry login first, which would fail
-#     before the registry exists).
-#   - The deploy host pulls from the same localhost registry. No external
-#     network, no GHCR token, no Docker Hub rate limits.
+# Build runs natively on the homelab box via `builder.remote: ssh://...`
+# (amd64, no QEMU on the Mac). Image is pushed to GitHub Container Registry
+# and pulled by the same box. Registry auth uses the `gh` CLI's token
+# (see .kamal/secrets).
 
 service: meta-menu
 
-image: meta-menu
+image: <%= ENV.fetch("GHCR_USER") %>/meta-menu
 
 servers:
   web:
     hosts:
       - <%= ENV.fetch("ONPREM_HOST") %>
+    # Run Drizzle migrations before starting the server. Safe across multiple
+    # replicas — scripts/migrate.mjs holds a pg_advisory_lock so only one
+    # container actually migrates; others wait briefly then exit the lock.
+    # Replaces a pre-deploy hook that didn't work on first deploy (Kamal pushes
+    # the env file during boot, not before pre-deploy hooks fire).
+    cmd: sh -c "node scripts/migrate.mjs && node server.js"
 
 proxy:
   ssl: false                              # Cloudflare Tunnel terminates TLS
@@ -33,31 +34,24 @@ proxy:
     responses: true
     max_request_body: 10_000_000          # image uploads cap ~5 MB client-side
 
-# Local registry on the box. We can't use `localhost:5000` (Kamal would SSH
-# port-forward back to the Mac — wrong direction). We can't use `127.0.0.1`
-# either: the buildx container runs in its own netns where 127.0.0.1 means
-# itself, not the host. So we use the box's LAN IP — buildx reaches it via
-# the normal bridge → host route, and the registry binds to 0.0.0.0:5000
-# (see deploy.sh). Tradeoff: registry is reachable from the LAN.
-# registry:3 doesn't enforce auth; Kamal requires the field — placeholder.
 registry:
-  server: <%= ENV.fetch("ONPREM_HOST") %>:5000
-  username: kamal
+  server: ghcr.io
+  username: <%= ENV.fetch("GHCR_USER") %>
   password:
-    - REGISTRY_PASSWORD
+    - KAMAL_REGISTRY_PASSWORD
 
 ssh:
-  user: deploy
+  user: <%= ENV.fetch("SSH_USER") %>
   port: 22
 
 # Remote-only builder: SSH to the box and build there natively (amd64).
 # No buildx on the Mac, no QEMU, no source transfer over the WAN.
 builder:
   arch: amd64
-  remote: ssh://deploy@<%= ENV.fetch("ONPREM_HOST") %>
+  remote: ssh://<%= ENV.fetch("SSH_USER") %>@<%= ENV.fetch("ONPREM_HOST") %>
   local: false
-  context:    <%= ENV.fetch("KAMAL_BUILD_CONTEXT") %>            # absolute path — set by deploy.sh / k.sh
-  dockerfile: <%= ENV.fetch("KAMAL_BUILD_CONTEXT") %>/Dockerfile # kamal resolves this via File.expand_path against PWD, not against `context` — must be absolute (lib/kamal/commands/builder/base.rb#build_dockerfile)
+  context: .
+  dockerfile: Dockerfile
 
 env:
   clear:

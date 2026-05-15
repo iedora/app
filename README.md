@@ -47,16 +47,15 @@ features/    one folder per slice — auth, menu-builder, menu-publishing, …
 shared/      db client + schema, env, ui primitives, testing fixtures
 tests/       Playwright e2e specs + fixtures (Vitest tests are co-located)
 docs/        architecture, testing, infra, deploy
-infra/       tofu/ (Cloudflare tunnel + DNS) + kamal/ (deploy.yml + hooks)
-scripts/     host-init.sh, kamal-first-deploy.sh, sync-env.sh, migrate.mjs, check-migrations.ts
+infra/       tofu/ (Cloudflare tunnel + DNS) + kamal/ (deploy.yml + .kamal/secrets + hooks)
+scripts/     migrate.mjs, check-migrations.ts
 ```
 
 ## Where to go next
 
 - **[`docs/architecture.md`](docs/architecture.md)** — the slice playbook + how to add a feature
 - **[`docs/testing.md`](docs/testing.md)** — Vitest+PGLite unit tests, Playwright e2e
-- **[`docs/infra.md`](docs/infra.md)** — self-hosting on a homelab box behind a Cloudflare Tunnel
-- **[`docs/deploy.md`](docs/deploy.md)** — production deploys with Kamal 2
+- **[`docs/deploy.md`](docs/deploy.md)** — self-hosting on a homelab box behind a Cloudflare Tunnel with Kamal 2
 - **[`AGENTS.md`](AGENTS.md)** — hard rules + conventions (also read by AI assistants)
 
 ## Scripts
@@ -70,9 +69,10 @@ scripts/     host-init.sh, kamal-first-deploy.sh, sync-env.sh, migrate.mjs, chec
 | `bun run test:e2e` | Playwright end-to-end suite |
 | `bun run db:generate` | Generate Drizzle migration from `shared/db/schema.ts` |
 | `bun run db:migrate` | Apply pending migrations |
-| `cp infra/.env.example infra/.env` | (Prereq, one-time) fill in Cloudflare creds + box IP |
-| `ssh-copy-id <user>@<box>` | (Prereq, one-time) install your SSH pubkey on the box |
-| `make deploy` | End-to-end: tofu apply → host-init (if needed) → kamal first/regular deploy |
+| `cp .env.example .env` | (Prereq, one-time) fill in Cloudflare creds + box + GHCR user + 4 generated secrets |
+| `ssh-copy-id $SSH_USER@$ONPREM_HOST` | (Prereq, one-time) install your SSH pubkey on the box |
+| `make setup` | First-time: `tofu apply` + `kamal server bootstrap` + boot accessories + `kamal deploy` |
+| `make deploy` | Every other time: `tofu apply` + `kamal deploy` |
 
 `make help` lists every target.
 

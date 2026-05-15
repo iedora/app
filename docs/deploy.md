@@ -1,7 +1,6 @@
-# Deploy — homelab box behind a Cloudflare Tunnel
+# Deploy — homelab box or cloud VPS behind a Cloudflare Tunnel
 
-> One-line purpose: edit one config file, run one command, app live on a homelab box behind a Cloudflare Tunnel.
-> **Last updated:** 2026.
+End-to-end self-host: edit one config file, run one command, app live behind a Cloudflare Tunnel with TLS. Kamal 2 does the heavy lifting; the only "script" is the Makefile.
 
 ```
 Internet → Cloudflare edge (TLS) ─→ cloudflared accessory (outbound)
@@ -10,128 +9,218 @@ Internet → Cloudflare edge (TLS) ─→ cloudflared accessory (outbound)
                                        └─→ http://meta-menu-minio:9000 → MinIO
 ```
 
-Single source of truth: **`infra/.env`**. Single entry point: **`make deploy`** (= `bash infra/deploy.sh`).
+The same flow works identically on a homelab Ubuntu box and a fresh cloud VPS (DigitalOcean, Hetzner, Linode, AWS). The only difference: cloud VPS images already ship with root SSH + your key; a homelab box needs the key copied to root once.
 
-## Prerequisites (one-time)
+---
 
-| | |
-|---|---|
-| Mac tools | `brew install opentofu` + `sudo gem install kamal -N` (kamal is a Ruby gem, not a brew formula) |
-| Docker | running locally (OrbStack, Docker Desktop, …) |
-| `gh` CLI | logged in (`gh auth status`) — Kamal uses your GH token to push to GHCR |
-| Cloudflare | account + a zone (domain) you control |
-| Homelab box | Ubuntu 24.04+, sudo user, reachable over SSH |
-| SSH key on box | `ssh-copy-id <user>@<box>` — paste their password once |
-
-## Two configuration files (and only two)
-
-### 1. `infra/.env` — everything
+## Step 1 — Local Mac prerequisites (one-time, ever)
 
 ```bash
-cp infra/.env.example infra/.env
-$EDITOR infra/.env
+brew install opentofu                    # IaC tool (Terraform fork)
+sudo gem install kamal -N                # Kamal is a Ruby gem, not a brew formula
+brew install --cask orbstack             # or docker desktop — anything that runs docker
+brew install gh                          # GitHub CLI
+gh auth login                            # follow the device-code prompts
 ```
 
-Required (fill in):
+Verify each: `tofu version`, `kamal version`, `docker info`, `gh auth status`. All should succeed.
+
+---
+
+## Step 2 — One-time GitHub Container Registry scope
 
 ```bash
-CLOUDFLARE_ACCOUNT_ID=<32-char hex>
-CLOUDFLARE_ZONE_ID=<32-char hex>
-CLOUDFLARE_API_TOKEN=<token with Tunnel·Edit + DNS·Edit + Account·Read>
+gh auth refresh -s write:packages
+```
+
+Kamal pushes the built image to `ghcr.io/<your-github-username>/meta-menu`. The scope is per-token, not per-package — do it once, ever. Confirm with `gh auth status` and look for `write:packages` in the scopes line.
+
+---
+
+## Step 3 — One-time Cloudflare prep
+
+You need an existing zone (a domain you control, like `example.com`, added to your Cloudflare account). Then create a scoped API token:
+
+1. `dash.cloudflare.com` → top-right profile → **API Tokens** → **Create Custom Token**
+2. Add permissions:
+   - **Account · Cloudflare Tunnel · Edit**
+   - **Zone · DNS · Edit** (scope to the specific zone)
+   - **Account · Account Settings · Read**
+3. Copy the token — you'll paste it into `.env`.
+
+Also grab your **Account ID** and **Zone ID** from the right sidebar of any Cloudflare dashboard page.
+
+---
+
+## Step 4 — Provision the box
+
+**Cloud VPS (DigitalOcean / Hetzner / Linode / AWS):** create a fresh Ubuntu 24.04+ droplet, paste your SSH public key during provisioning. The image ships with `PermitRootLogin prohibit-password`, password auth off, your key in `/root/.ssh/authorized_keys`. **Nothing else to do.**
+
+**Homelab box:** install Ubuntu 24.04+ Server, set up your sudo user during install (call them whatever — `eduardo`, `pwu`, etc.). Then from your Mac:
+
+```bash
+# 4a. Install your SSH key for the sudo user.
+ssh-copy-id <sudo-user>@<box-ip>
+
+# 4b. Copy that key into /root/.ssh — this is the key Kamal will use.
+ssh -t <sudo-user>@<box-ip> 'sudo install -d -m 700 -o root -g root /root/.ssh && sudo cp ~/.ssh/authorized_keys /root/.ssh/authorized_keys && sudo chown root:root /root/.ssh/authorized_keys && sudo chmod 600 /root/.ssh/authorized_keys'
+
+# 4c. If Ubuntu's sshd disables root login entirely, flip it to "prohibit-password" (key-only, never "yes").
+ssh -t <sudo-user>@<box-ip> 'sudo sed -i "s/^PermitRootLogin.*/PermitRootLogin prohibit-password/" /etc/ssh/sshd_config && sudo systemctl reload ssh'
+
+# 4d. Verify root SSH works with your key (should print "root" instantly, no password prompt).
+ssh root@<box-ip> 'whoami'
+```
+
+> **Why root?** Kamal 2's canonical convention is `ssh.user: root` with **SSH-key-only** login. `kamal server bootstrap` curls `get.docker.com` which needs root; Kamal itself never runs `sudo`. The non-root path requires NOPASSWD-sudo (which has the same root blast radius without the simplicity). Key-only root login is what cloud images do by default — and is materially safer than NOPASSWD sudo. Keep your sudo human account for ad-hoc admin; Kamal's lane stays root-via-key.
+
+---
+
+## Step 5 — Clone, configure, generate secrets
+
+```bash
+git clone https://github.com/<you>/meta-menu.git
+cd meta-menu
+cp .env.example .env
+```
+
+`.env` has 7 inputs you fill in and 4 secrets you generate. Use `openssl rand -hex 32` four times and paste into `STATE_PASSPHRASE` / `BETTER_AUTH_SECRET` / `POSTGRES_PASSWORD` / `MINIO_ROOT_PASSWORD`:
+
+```bash
+# Cloudflare (from step 3)
+CLOUDFLARE_ACCOUNT_ID=2716bf6ee8be2880904e70f19050d2ef
+CLOUDFLARE_ZONE_ID=133ea809e27a8770c6ea83a257ba2ff5
+CLOUDFLARE_API_TOKEN=cf-token-from-step-3
+
+# The hostname your app lives at (must be a subdomain of your Cloudflare zone)
 PUBLIC_HOSTNAME=menu.example.com
+
+# The box (cloud VPS public IP or homelab LAN IP); SSH_USER stays root
 ONPREM_HOST=192.168.50.53
-BOOTSTRAP_USER=pwu
+SSH_USER=root
+
+# Your GitHub username — image will be pushed to ghcr.io/<this>/meta-menu
+GHCR_USER=eduvhc
+
+# Generated secrets (openssl rand -hex 32 each)
+STATE_PASSPHRASE=…
+BETTER_AUTH_SECRET=…
+POSTGRES_PASSWORD=…
+MINIO_ROOT_PASSWORD=…
+
+MINIO_ROOT_USER=metamenu
 ```
 
-Auto-generated (leave blank — `make deploy` fills them in and saves back):
+Keep `.env` in your password manager — it holds everything needed to redeploy from scratch. The file is gitignored.
+
+---
+
+## Step 6 — First deploy
 
 ```bash
-STATE_PASSPHRASE=
-BETTER_AUTH_SECRET=
-POSTGRES_PASSWORD=
-MINIO_ROOT_PASSWORD=
+make setup
 ```
 
-This file is gitignored. Back it up to a password manager — it holds everything needed to redeploy.
+That single command does, in order:
 
-### 2. Cloudflare API token
+1. **`tofu apply`** — creates the Cloudflare Tunnel + 2 ingress rules + 2 DNS CNAMEs.
+2. **`kamal server bootstrap`** — installs Docker on the box (via `get.docker.com` as root).
+3. **`kamal accessory boot all`** — boots postgres, redis, minio, cloudflared.
+4. **`kamal deploy`** — builds the image natively on the box (amd64, no QEMU on the Mac via `builder.remote`), pushes to GHCR, pulls on the box, starts the app container.
 
-`dash.cloudflare.com → My Profile → API Tokens → Create Custom Token`:
-- Account · Cloudflare Tunnel · **Edit**
-- Zone · DNS · **Edit** (scoped to your zone)
-- Account · Account Settings · **Read**
+The app container's start command is `node scripts/migrate.mjs && node server.js` — Drizzle migrations run under a `pg_advisory_lock` (safe across multiple replicas) before the server boots.
 
-## Deploy
+Total time: **5–10 min** the first time (cold image build). Subsequent deploys are 1–2 min with the build cache.
+
+When it finishes, hit `https://$PUBLIC_HOSTNAME/up` — should return `{"ok":true,"db":"ok"}`.
+
+---
+
+## Step 7 — Subsequent deploys
 
 ```bash
 make deploy
 ```
 
-What `infra/deploy.sh` does, in order:
+`tofu apply` (idempotent) + `kamal deploy`. Build is cached on the box; only changed source layers rebuild.
 
-1. Loads `infra/.env`.
-2. Generates any blank secrets (`openssl rand …`), saves them back to `.env`.
-3. `tofu apply` — creates Cloudflare tunnel + 2 ingress rules + 2 DNS CNAMEs (idempotent).
-4. Writes `infra/kamal/.kamal/secrets-common` from the env values.
-5. **First run only**: SSHs into the box, creates the `deploy` user with your SSH key, hardens sshd. You'll be prompted **once** for `BOOTSTRAP_USER`'s sudo password.
-6. **First run only**: `kamal server bootstrap` installs Docker on the box, boots accessories, `kamal setup --skip-hooks`, runs first migration.
-7. **Subsequent runs**: `kamal deploy` — build, push, migrate, zero-downtime roll.
-
-First deploy takes ~5-10 min (QEMU cross-compile amd64 from Apple Silicon). Subsequent deploys ~1-2 min with the registry cache.
+---
 
 ## Day-2 commands
 
 ```bash
-make logs           # tail app logs
-make console        # bash inside the app container
+make logs           # tail app logs (rolling)
+make console        # bash inside a fresh app container with env loaded
+make migrate        # run migrations on the current image (rare; container start already does this)
 make redeploy       # re-pull current image, no rebuild
-make rollback       # roll back to previous version
-make migrate        # run migrations against current image
+make rollback       # roll back to the previous version
+make destroy        # tofu destroy — removes the Cloudflare tunnel + DNS only; box untouched
 ```
 
-All of these go through `scripts/k.sh` which loads `infra/.env`. You never need to `source` anything yourself.
+All are direct `kamal` calls — the Makefile only loads `.env`, exports its values, and resolves the gem-bin PATH so subprocesses find `kamal`.
 
-## Updating the tunnel
-
-`infra/tofu/main.tf` defines ingress + DNS. Edit it (e.g. add a third ingress rule), then `make deploy` — `tofu apply` runs again and pushes the change. DNS + ingress propagate in seconds.
-
-## Teardown
+For ad-hoc kamal commands (e.g. `kamal app stop`, `kamal accessory exec`), source `.env` first:
 
 ```bash
-make destroy        # destroys the Cloudflare tunnel + DNS only — does NOT touch the box
+set -a; . .env; set +a
+kamal app stop
 ```
 
-To wipe the box: SSH in as `deploy` and `docker compose down -v` for each Kamal container, or just `sudo rm -rf /var/lib/docker /etc/kamal*`.
+---
 
-## Structure
+## Adding a second box / a cloud VPS later
+
+Same five steps — only step 4 (provisioning) differs. For a cloud VPS, **nothing** is needed in step 4 because the image ships with root SSH already. For a second box, you'd typically use Kamal's multi-host config — bump `servers.web.hosts` in `config/deploy.yml` to a list, and Kamal load-balances behind kamal-proxy.
+
+---
+
+## How values flow
+
+- **`.env`** → Makefile `-include` + `export` → visible to every `tofu`/`kamal` subprocess.
+- **Tunnel token** → generated by `tofu apply`, read at deploy time by `.kamal/secrets` via `$(tofu -chdir=infra/tofu output -raw tunnel_token)`. No manual copy step.
+- **Registry password** → `$(gh auth token)` evaluated when Kamal logs into ghcr.io.
+- **App secrets** (BETTER_AUTH_SECRET, POSTGRES_PASSWORD, etc.) → `.kamal/secrets` references `$VAR` form, which Kamal evaluates against the env (sourced from `.env` via the Makefile).
+
+`.kamal/secrets` is checked into git — it contains **only references**, never values.
+
+---
+
+## Updating the Cloudflare tunnel (adding routes, etc.)
+
+`infra/tofu/main.tf` defines ingress + DNS. Edit it (e.g. add a third ingress rule for a new accessory), then `make deploy` — `tofu apply` runs first and pushes the change. DNS + ingress propagate in seconds.
+
+---
+
+## File structure
 
 ```
-infra/
-  .env.example                    template — copy to .env (gitignored)
-  deploy.sh                       the one entry point
-  tofu/                           Cloudflare tunnel + DNS + ingress
-  kamal/
-    config/deploy.yml             app + 4 accessories (postgres, redis, minio, cloudflared)
-    .kamal/hooks/pre-deploy       Drizzle migrations under pg_advisory_lock
-    .kamal/secrets-common         generated by deploy.sh, gitignored
-scripts/
-  host-init.sh                    bootstraps the box (called by deploy.sh on first run)
-  kamal-first-deploy.sh           Kamal first-deploy ordering (called by deploy.sh on first run)
-  k.sh                            kamal wrapper that loads infra/.env (used by `make logs` etc.)
-  migrate.mjs                     Drizzle migrations under pg_advisory_lock
-Dockerfile                        multi-stage build (Bun install, Node build, standalone)
+.env.example                         template — copy to .env (gitignored; loaded by Next + Kamal)
+config/deploy.yml                    Kamal config — app + 4 accessories (postgres, redis, minio, cloudflared)
+.kamal/secrets                       shell-evaluated references; committed, no values
+infra/tofu/                          Cloudflare tunnel + DNS + ingress (encrypted state)
+Makefile                             the only entry point (calls tofu + kamal directly)
+Dockerfile                           multi-stage build (Bun install, Node build, standalone)
+scripts/migrate.mjs                  Drizzle migrator with pg_advisory_lock
 ```
+
+---
 
 ## Troubleshooting
 
-**`make deploy` errors "missing in infra/.env"** — fill in the named field.
+**`make deploy` errors with `cut: …` or `key not found` early on** — `.env` is missing or a required key isn't filled. Copy `.env.example` and fill in every value.
 
-**Sudo password keeps being rejected during host-init** — confirm the user can sudo: `ssh <user>@<box> 'sudo -v'`. The user must be in the `sudo` group (default on Ubuntu's first-created user).
+**`ssh root@host` asks for a password** — root SSH isn't accepting your key. Three causes: (a) key isn't in `/root/.ssh/authorized_keys` (re-run step 4b); (b) `/root/.ssh` perms are wrong (must be `700`, file `600`, both owned by `root`); (c) sshd disables root login (re-run step 4c to set `PermitRootLogin prohibit-password`).
 
-**`cloudflared` accessory restarts in a loop** — stale `TUNNEL_TOKEN`. Delete `infra/kamal/.kamal/secrets-common` and re-run `make deploy` — it'll regenerate from the fresh tofu output.
+**`kamal server bootstrap` hangs or fails** — Kamal needs root. Either set `SSH_USER=root` and complete step 4, or pre-install Docker yourself and grant NOPASSWD sudo (the non-root path, not recommended).
 
-**502 from the tunnel** — verify ingress in `infra/tofu/main.tf` points at container names (`http://kamal-proxy`, `http://meta-menu-minio:9000`). `docker network inspect kamal` on the box should list all 5 containers.
+**GHCR push returns "denied"** — `gh auth status` must show `write:packages` in the scopes line. Re-run step 2.
 
-**Healthcheck flaps** — app starts slower than `interval`. Raise `proxy.healthcheck.interval` in `infra/kamal/config/deploy.yml`.
+**`cloudflared` accessory restart-loops** — stale tunnel token cached on the box. `tofu apply` produces the current token; `kamal deploy` should pick it up. If it doesn't, `make destroy && make setup` recreates from scratch (the box's Docker volumes for postgres/minio survive).
 
-**"unable to find image" on the server** — registry push failed. `gh auth status` must show a valid token.
+**502 from the tunnel** — `docker network inspect kamal` on the box should list 5 containers (kamal-proxy + 4 accessories + the app). If one's missing: `kamal accessory boot <name>` for that accessory, or check `kamal logs` for the app.
+
+**Healthcheck flaps on first deploy** — app starts slower than `interval`. Raise `proxy.healthcheck.interval` in `config/deploy.yml`.
+
+**`unable to find image` on the server** — registry push failed. `gh auth status` must show `write:packages`; if the smoketest `echo $(gh auth token) | docker login ghcr.io -u <user> --password-stdin` fails, the token is wrong.
+
+**Build-time warnings about `BETTER_AUTH_SECRET`** — Better Auth reads `process.env` during `next build`. The Dockerfile sets placeholder values for build-only; runtime values from Kamal's `--env-file` override them. If the warnings come back after a Dockerfile change, the placeholders got removed — re-add the `ENV BETTER_AUTH_SECRET=…` / `ENV BETTER_AUTH_URL=…` lines before `RUN node --run build`.
