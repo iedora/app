@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { APP_HOSTNAME, BRAND_NAME, BRAND_URL, CONTACT_EMAIL } from "@/shared/brand";
 import "./landing.css";
 
 type LangCode = "en" | "pt" | "es" | "fr";
@@ -39,9 +40,9 @@ type Copy = {
     foot: string;
   };
   closing: { eyebrow: string; h: string; p: string; ctaPrimary: string; ctaGhost: string };
-  // `left` accepts inline parts so the "iedora" brand can be a real <a>
-  // pointing at https://iedora.com. Plain strings render as text; objects
-  // render as anchors.
+  // `left` accepts inline parts so the brand name can be a real anchor
+  // pointing at the parent brand site (BRAND_URL). Plain strings render
+  // as text; objects render as anchors.
   footer: { left: (string | { text: string; href: string })[]; links: string[] };
   boa: string;
   editor: { title: string; restaurant: string; item: string; desc: string; section: string; price: string; publish: string; live: string; add: string };
@@ -109,7 +110,7 @@ const COPY: Record<LangCode, Copy> = {
       ctaPrimary: "Bring your menu over",
       ctaGhost: "Email us instead",
     },
-    footer: { left: ["Menu · an ", { text: "iedora", href: "https://iedora.com" }, " product · made in Lisbon"], links: ["Privacy", "Contact"] },
+    footer: { left: ["Menu · an ", { text: BRAND_NAME, href: BRAND_URL }, " product · made in Lisbon"], links: ["Privacy", "Contact"] },
     boa: "Enjoy your meal.",
     editor: { title: "Menu", restaurant: "Restaurant", item: "Item name", desc: "Description", section: "Section", price: "Price (€)", publish: "⌘ S to save", live: "live", add: "+ add item" },
     phone: { eyebrow: "at the table", live: "updated just now" },
@@ -167,7 +168,7 @@ const COPY: Record<LangCode, Copy> = {
       ctaPrimary: "Traga a sua carta",
       ctaGhost: "Escreva-nos",
     },
-    footer: { left: ["Menu · um produto ", { text: "iedora", href: "https://iedora.com" }, " · feito em Lisboa"], links: ["Privacidade", "Contacto"] },
+    footer: { left: ["Menu · um produto ", { text: BRAND_NAME, href: BRAND_URL }, " · feito em Lisboa"], links: ["Privacidade", "Contacto"] },
     boa: "Boa mesa.",
     editor: { title: "Carta", restaurant: "Restaurante", item: "Nome do prato", desc: "Descrição", section: "Secção", price: "Preço (€)", publish: "⌘ S para guardar", live: "ao vivo", add: "+ adicionar" },
     phone: { eyebrow: "à mesa", live: "actualizado agora" },
@@ -225,7 +226,7 @@ const COPY: Record<LangCode, Copy> = {
       ctaPrimary: "Trae tu carta",
       ctaGhost: "Escríbenos",
     },
-    footer: { left: ["Menu · un producto ", { text: "iedora", href: "https://iedora.com" }, " · hecho en Lisboa"], links: ["Privacidad", "Contacto"] },
+    footer: { left: ["Menu · un producto ", { text: BRAND_NAME, href: BRAND_URL }, " · hecho en Lisboa"], links: ["Privacidad", "Contacto"] },
     boa: "Boa mesa.",
     editor: { title: "Carta", restaurant: "Restaurante", item: "Nombre del plato", desc: "Descripción", section: "Sección", price: "Precio (€)", publish: "⌘ S para guardar", live: "en vivo", add: "+ añadir" },
     phone: { eyebrow: "à mesa", live: "actualizado ahora" },
@@ -283,7 +284,7 @@ const COPY: Record<LangCode, Copy> = {
       ctaPrimary: "Apportez votre carte",
       ctaGhost: "Écrivez-nous",
     },
-    footer: { left: ["Menu · un produit ", { text: "iedora", href: "https://iedora.com" }, " · fait à Lisbonne"], links: ["Confidentialité", "Contact"] },
+    footer: { left: ["Menu · un produit ", { text: BRAND_NAME, href: BRAND_URL }, " · fait à Lisbonne"], links: ["Confidentialité", "Contact"] },
     boa: "Boa mesa.",
     editor: { title: "Carte", restaurant: "Restaurant", item: "Nom du plat", desc: "Description", section: "Section", price: "Prix (€)", publish: "⌘ S pour enregistrer", live: "en direct", add: "+ ajouter" },
     phone: { eyebrow: "à mesa", live: "mis à jour à l'instant" },
@@ -482,7 +483,7 @@ function EditorMock({ menu, c, highlightId }: { menu: DemoMenu; c: Copy; highlig
       <div className="laptop-screen">
         <div className="laptop-bar">
           <i></i><i></i><i></i>
-          <span className="url">menu.iedora.com / house-tavern / editor</span>
+          <span className="url">{APP_HOSTNAME} / house-tavern / editor</span>
         </div>
         <div className="editor">
           <div className="editor-side">
@@ -674,7 +675,7 @@ function Closing({ c }: { c: Copy }) {
           <p>{c.closing.p}</p>
           <div className="hero-ctas" style={{ justifyContent: "center" }}>
             <a className="btn btn-primary" href="/signup">{c.closing.ctaPrimary}</a>
-            <a className="btn btn-ghost" href="mailto:hello@iedora.com">{c.closing.ctaGhost}</a>
+            <a className="btn btn-ghost" href={`mailto:${CONTACT_EMAIL}`}>{c.closing.ctaGhost}</a>
           </div>
         </div>
       </section>
@@ -696,7 +697,7 @@ function Closing({ c }: { c: Copy }) {
           </span>
           <span className="footer-links">
             {c.footer.links.map((l, i) => <a key={i} href="#">{l}</a>)}
-            <a href="mailto:hello@iedora.com">hello@iedora.com</a>
+            <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
           </span>
         </div>
       </footer>
