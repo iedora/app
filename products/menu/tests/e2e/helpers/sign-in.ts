@@ -170,15 +170,28 @@ export async function signInAs(
     )
   `
 
+  // Menu's Better Auth runs with `advanced.useSecureCookies: true` in
+  // every environment (see better-auth-instance.ts — added in 560640e
+  // for IdP hardening). That means:
+  //   - the cookie name is prefixed `__Secure-` (Better Auth uses
+  //     `SECURE_COOKIE_PREFIX + "better-auth.session_token"`)
+  //   - the cookie has the `Secure` attribute, only sent over HTTPS
+  //
+  // Chromium treats `http://localhost` as a secure context (since 2020),
+  // so a `Secure` cookie set there IS sent back on http://localhost
+  // requests. Tests run on http://localhost:3000 — this works.
+  // The full-OAuth-handshake spec proves it: Better Auth's own callback
+  // sets `__Secure-better-auth.session_token` with `Secure` and the
+  // browser sends it back fine.
   const cookieValue = signCookieValue(sessionToken)
   await context.addCookies([
     {
-      name: 'better-auth.session_token',
+      name: '__Secure-better-auth.session_token',
       value: cookieValue,
       domain: 'localhost',
       path: '/',
       httpOnly: true,
-      secure: false,
+      secure: true,
       sameSite: 'Lax',
       expires: Math.floor(expiresAt.getTime() / 1000),
     },
