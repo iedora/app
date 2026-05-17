@@ -19,16 +19,16 @@ export default async function ProfilePage() {
   ])
 
   return (
-    <div style={{ display: 'grid', gap: 64, maxWidth: 760 }}>
-      <header style={{ display: 'grid', gap: 8 }}>
+    <div style={{ display: 'grid', gap: 'var(--s-9)', maxWidth: 760 }}>
+      <header style={{ display: 'grid', gap: 'var(--s-2)' }}>
         <span className="eyebrow">/ 01 ACCOUNT</span>
         <h1
           style={{
             margin: 0,
             fontFamily: 'var(--serif)',
             fontWeight: 300,
-            fontSize: 'clamp(40px, 6vw, 64px)',
-            lineHeight: 1.05,
+            fontSize: 'clamp(32px, 9vw, 64px)',
+            lineHeight: 'var(--lh-tight)',
             letterSpacing: '-0.025em',
           }}
         >
@@ -40,8 +40,9 @@ export default async function ProfilePage() {
             margin: 0,
             fontFamily: 'var(--serif)',
             fontStyle: 'italic',
-            fontSize: 17,
+            fontSize: 'var(--t-lg)',
             color: 'var(--ink-70)',
+            wordBreak: 'break-word',
           }}
         >
           {session.user.email}
@@ -50,7 +51,7 @@ export default async function ProfilePage() {
 
       <Separator />
 
-      <section style={{ display: 'grid', gap: 24 }}>
+      <section style={{ display: 'grid', gap: 'var(--s-5)' }}>
         <span className="eyebrow">/ 02 PRODUCTS</span>
         {grants.length === 0 ? (
           <EmptyState
@@ -64,26 +65,19 @@ export default async function ProfilePage() {
               padding: 0,
               margin: 0,
               display: 'grid',
-              gap: 24,
+              gap: 'var(--s-5)',
             }}
           >
             {grants.map((g) => (
               <li
                 key={g.consentId}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr auto',
-                  alignItems: 'baseline',
-                  gap: 18,
-                  paddingBottom: 18,
-                  borderBottom: '1px solid var(--ink-14)',
-                }}
+                className="ds-profile-row ds-profile-row--ruled"
               >
-                <div style={{ display: 'grid', gap: 4 }}>
+                <div style={{ display: 'grid', gap: 'var(--s-1)' }}>
                   <div
                     style={{
                       fontFamily: 'var(--serif)',
-                      fontSize: 21,
+                      fontSize: 'var(--t-xl)',
                       letterSpacing: '-0.015em',
                     }}
                   >
@@ -92,12 +86,12 @@ export default async function ProfilePage() {
                   <div
                     style={{
                       fontFamily: 'var(--mono)',
-                      fontSize: 10.5,
+                      fontSize: 'var(--t-2xs)',
                       letterSpacing: '0.14em',
                       textTransform: 'uppercase',
                       color: 'var(--ink-55)',
                       display: 'flex',
-                      gap: 8,
+                      gap: 'var(--s-2)',
                       flexWrap: 'wrap',
                     }}
                   >
@@ -106,21 +100,9 @@ export default async function ProfilePage() {
                     ))}
                   </div>
                 </div>
-                <form action={revokeGrant}>
+                <form action={revokeGrant} className="ds-profile-row__action">
                   <input type="hidden" name="consentId" value={g.consentId} />
-                  <button
-                    type="submit"
-                    style={{
-                      background: 'transparent',
-                      border: 0,
-                      cursor: 'pointer',
-                      fontFamily: 'var(--mono)',
-                      fontSize: 10.5,
-                      letterSpacing: '0.18em',
-                      textTransform: 'uppercase',
-                      color: 'var(--cinnabar)',
-                    }}
-                  >
+                  <button type="submit" className="ds-revoke-btn">
                     Revoke
                   </button>
                 </form>
@@ -132,7 +114,7 @@ export default async function ProfilePage() {
 
       <Separator />
 
-      <section style={{ display: 'grid', gap: 24 }}>
+      <section style={{ display: 'grid', gap: 'var(--s-5)' }}>
         <span className="eyebrow">/ 03 ORGANIZATIONS</span>
         {organizations.length === 0 ? (
           <EmptyState
@@ -146,24 +128,16 @@ export default async function ProfilePage() {
               padding: 0,
               margin: 0,
               display: 'grid',
-              gap: 14,
+              gap: 'var(--s-4)',
             }}
           >
             {organizations.map((o) => (
-              <li
-                key={o.id}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr auto',
-                  alignItems: 'baseline',
-                  gap: 18,
-                }}
-              >
-                <div style={{ display: 'grid', gap: 2 }}>
+              <li key={o.id} className="ds-profile-row">
+                <div style={{ display: 'grid', gap: 'var(--s-1)' }}>
                   <span
                     style={{
                       fontFamily: 'var(--serif)',
-                      fontSize: 19,
+                      fontSize: 'var(--t-xl)',
                       letterSpacing: '-0.01em',
                     }}
                   >
@@ -172,7 +146,7 @@ export default async function ProfilePage() {
                   <span
                     style={{
                       fontFamily: 'var(--mono)',
-                      fontSize: 10.5,
+                      fontSize: 'var(--t-2xs)',
                       letterSpacing: '0.14em',
                       textTransform: 'uppercase',
                       color: 'var(--ink-55)',
@@ -181,7 +155,9 @@ export default async function ProfilePage() {
                     /{o.slug}
                   </span>
                 </div>
-                <Badge>{o.role}</Badge>
+                <div className="ds-profile-row__action">
+                  <Badge>{o.role}</Badge>
+                </div>
               </li>
             ))}
           </ul>
@@ -191,30 +167,21 @@ export default async function ProfilePage() {
       {session.user.role === 'admin' ? (
         <>
           <Separator />
-          <section style={{ display: 'grid', gap: 12 }}>
+          <section style={{ display: 'grid', gap: 'var(--s-3)' }}>
             <span className="eyebrow">/ 04 ADMIN</span>
             <p
               style={{
                 fontFamily: 'var(--serif)',
-                fontSize: 17,
+                fontSize: 'var(--t-lg)',
                 color: 'var(--ink-70)',
-                maxWidth: 56 + 'ch',
+                maxWidth: 'var(--measure)',
+                margin: 0,
               }}
             >
               You have platform-admin access. Manage users, organizations, and
               registered applications.
             </p>
-            <Link
-              href="/admin"
-              style={{
-                fontFamily: 'var(--mono)',
-                fontSize: 10.5,
-                letterSpacing: '0.18em',
-                textTransform: 'uppercase',
-                color: 'var(--cinnabar)',
-                textDecoration: 'none',
-              }}
-            >
+            <Link href="/admin" className="ds-revoke-btn">
               Open admin →
             </Link>
           </section>

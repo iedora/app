@@ -49,16 +49,16 @@ export default async function ConsentPage({
   const clientName = client?.name ?? clientId
 
   return (
-    <div style={{ display: 'grid', gap: 48, maxWidth: 560 }}>
-      <header style={{ display: 'grid', gap: 8 }}>
+    <div style={{ display: 'grid', gap: 'var(--s-8)', maxWidth: 560 }}>
+      <header style={{ display: 'grid', gap: 'var(--s-2)' }}>
         <span className="eyebrow">/ AUTHORIZE</span>
         <h1
           style={{
             margin: 0,
             fontFamily: 'var(--serif)',
             fontWeight: 300,
-            fontSize: 'clamp(32px, 5vw, 48px)',
-            lineHeight: 1.1,
+            fontSize: 'clamp(28px, 7vw, 48px)',
+            lineHeight: 'var(--lh-snug)',
             letterSpacing: '-0.02em',
           }}
         >
@@ -71,9 +71,10 @@ export default async function ConsentPage({
             style={{
               margin: 0,
               fontFamily: 'var(--mono)',
-              fontSize: 11,
+              fontSize: 'var(--t-xs)',
               letterSpacing: '0.12em',
               color: 'var(--ink-55)',
+              wordBreak: 'break-all',
             }}
           >
             {client.uri}
@@ -83,32 +84,22 @@ export default async function ConsentPage({
 
       <section
         style={{
-          paddingTop: 24,
-          borderTop: '1px solid var(--ink-14)',
+          paddingTop: 'var(--s-5)',
+          borderTop: 'var(--hairline) solid var(--ink-14)',
           display: 'grid',
-          gap: 14,
+          gap: 'var(--s-4)',
         }}
       >
-        <span
-          style={{
-            fontFamily: 'var(--mono)',
-            fontSize: 10.5,
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-            color: 'var(--ink-55)',
-          }}
-        >
-          It is asking for
-        </span>
+        <span className="eyebrow">It is asking for</span>
         <ul
           style={{
             listStyle: 'none',
             margin: 0,
             padding: 0,
             display: 'grid',
-            gap: 8,
+            gap: 'var(--s-2)',
             fontFamily: 'var(--serif)',
-            fontSize: 17,
+            fontSize: 'var(--t-lg)',
             color: 'var(--ink)',
           }}
         >
@@ -117,7 +108,7 @@ export default async function ConsentPage({
               <code
                 style={{
                   fontFamily: 'var(--mono)',
-                  fontSize: 13,
+                  fontSize: 'var(--t-sm)',
                   color: 'var(--ink-70)',
                 }}
               >
@@ -127,7 +118,7 @@ export default async function ConsentPage({
                 style={{
                   fontStyle: 'italic',
                   color: 'var(--ink-55)',
-                  marginLeft: 12,
+                  marginLeft: 'var(--s-3)',
                 }}
               >
                 {describeScope(s)}

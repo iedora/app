@@ -40,14 +40,14 @@ export function ConsentForm({ scope }: { scope: string }) {
   }
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
+    <div style={{ display: 'grid', gap: 'var(--s-3)' }}>
       {error ? (
         <p
           role="alert"
           style={{
             margin: 0,
             fontFamily: 'var(--mono)',
-            fontSize: 11,
+            fontSize: 'var(--t-xs)',
             letterSpacing: '0.1em',
             color: 'var(--cinnabar)',
           }}
@@ -58,9 +58,10 @@ export function ConsentForm({ scope }: { scope: string }) {
       <div
         style={{
           display: 'flex',
-          gap: 16,
+          gap: 'var(--s-3)',
           alignItems: 'center',
           justifyContent: 'flex-end',
+          flexWrap: 'wrap',
         }}
       >
         <Button

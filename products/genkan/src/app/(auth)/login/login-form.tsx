@@ -69,7 +69,7 @@ export function LoginForm({ returnTo }: { returnTo: string }) {
 
   return (
     <form onSubmit={onSubmit} noValidate>
-      <div style={{ display: 'grid', gap: 28 }}>
+      <div style={{ display: 'grid', gap: 'var(--s-6)' }}>
         <Field error={Boolean(error)}>
           <FieldLabel htmlFor="email">Email</FieldLabel>
           <FieldInput
@@ -100,25 +100,8 @@ export function LoginForm({ returnTo }: { returnTo: string }) {
         </Field>
       </div>
 
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          paddingTop: 28,
-        }}
-      >
-        <Link
-          href={`/signup${queryString}`}
-          style={{
-            fontFamily: 'var(--mono)',
-            fontSize: 10.5,
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-            color: 'var(--ink-55)',
-            textDecoration: 'none',
-          }}
-        >
+      <div className="ds-auth-foot">
+        <Link href={`/signup${queryString}`} className="ds-auth-link">
           Need a key? Sign up
         </Link>
         <Button type="submit" variant="accent" arrow disabled={pending}>

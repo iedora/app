@@ -8,6 +8,9 @@ import { auth } from '@/features/auth/adapters/better-auth-instance'
  * Shell for every signed-in page (profile, consent, future settings).
  * Soft check: redirects unauthenticated users to /login with a return_to.
  * Per-page DAL guards still apply for stricter requirements (admin role, etc.).
+ *
+ * Padding and gaps scale via clamp() and the spacing tokens; the MetaStrip
+ * collapses to a stacked layout on phones (see globals.css `.ds-shell-meta`).
  */
 export default async function AuthedLayout({
   children,
@@ -25,10 +28,12 @@ export default async function AuthedLayout({
       style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}
     >
       <div
+        className="ds-shell-meta"
         style={{
           width: 'min(1100px, 100%)',
           margin: '0 auto',
-          padding: '36px 56px 0',
+          padding:
+            'clamp(var(--s-4), 5vw, var(--s-7)) clamp(var(--s-4), 5vw, var(--margin)) 0',
         }}
       >
         <MetaStrip
@@ -51,15 +56,20 @@ export default async function AuthedLayout({
       <main
         style={{
           flex: 1,
-          padding: '64px 56px 96px',
+          padding:
+            'clamp(var(--s-7), 8vw, var(--s-9)) clamp(var(--s-4), 5vw, var(--margin)) clamp(var(--s-8), 10vw, var(--s-10))',
           width: 'min(1100px, 100%)',
           margin: '0 auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: 48,
+          gap: 'clamp(var(--s-7), 6vw, var(--s-8))',
         }}
       >
-        <Link href="/profile" aria-label="Genkan" style={{ textDecoration: 'none' }}>
+        <Link
+          href="/profile"
+          aria-label="Genkan"
+          style={{ textDecoration: 'none' }}
+        >
           <Wordmark variant="inline" className="ds-wordmark--reveal" />
         </Link>
         {children}

@@ -3,6 +3,8 @@ import { MetaStrip, Wordmark } from '@iedora/design-system'
 
 /**
  * Editorial shell for every auth page. The lintel above, the form below.
+ * Spacing is token-driven (4-pixel baseline from the design system); the
+ * outer wrapper and inner padding both scale down on small viewports.
  */
 export default function AuthLayout({
   children,
@@ -19,10 +21,12 @@ export default function AuthLayout({
       }}
     >
       <div
+        className="ds-shell-meta"
         style={{
           width: 'min(1100px, 100%)',
           margin: '0 auto',
-          padding: '36px 56px 0',
+          padding:
+            'clamp(var(--s-4), 5vw, var(--s-7)) clamp(var(--s-4), 5vw, var(--margin)) 0',
           position: 'relative',
           zIndex: 1,
         }}
@@ -44,28 +48,28 @@ export default function AuthLayout({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '64px 24px',
+          padding: 'clamp(var(--s-7), 8vw, var(--s-10)) var(--gutter)',
           position: 'relative',
           zIndex: 1,
         }}
       >
-        <div style={{ width: '100%', maxWidth: 560 }}>
+        <div style={{ width: '100%', maxWidth: 560, margin: '0 auto' }}>
           <div
             style={{
               textAlign: 'center',
-              marginBottom: 48,
+              marginBottom: 'clamp(var(--s-6), 6vw, var(--s-8))',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: 8,
+              gap: 'var(--s-2)',
             }}
           >
-            <Wordmark variant="display" />
+            <Wordmark variant="display" className="ds-auth-wordmark" />
             <span
               style={{
                 fontFamily: 'var(--serif)',
                 fontStyle: 'italic',
-                fontSize: 17,
+                fontSize: 'var(--t-lg)',
                 color: 'var(--ink-70)',
               }}
             >
