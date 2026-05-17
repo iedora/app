@@ -1,15 +1,23 @@
-# Continuous integration for meta-menu.
+# Continuous integration — orchestrator.
 #
-# Four jobs: typecheck, lint, and unit run on every push (fast, parallel);
-# e2e gates merges and only runs once the cheap jobs are green so a broken
-# branch doesn't burn ~10 min of runner time before failing.
+# Structure (industry-standard for a Bun-workspaces monorepo):
 #
-# Runtime split (see AGENTS.md): Bun for installs and script orchestration,
-# Node for `next build` and `next start`. Bun + `next build` is unstable as
-# of 2026 (oven-sh/bun#23944), and CI must mirror production runtime anyway.
-# Vitest is invoked via `bun run test` so the `vitest` binary's Node shebang
-# takes over — testcontainers (used by the real-Redis integration suite)
-# doesn't currently work under Bun's runtime (oven-sh/bun#21342).
+#   1. `changes` — dorny/paths-filter detects which workspaces moved.
+#   2. Per-concern jobs (typecheck-menu, lint-menu) — gated on changes.
+#   3. Per-workspace unit jobs — delegated to `_unit.yml` reusable workflow.
+#   4. `e2e` — delegated to `_e2e.yml` reusable workflow, gates on units.
+#
+# Workspace shared-setup (Bun install at repo root) lives ONCE in
+# `.github/actions/setup`. Job-level boilerplate stays here only because
+# `if:` + `needs:` orchestration is the orchestrator's job.
+#
+# Adding a new workspace:
+#   - add one filter entry to the `changes` job
+#   - add one `uses: ./.github/workflows/_unit.yml` block below
+#
+# No new file. No copy-pasted setup.
+#
+# Pattern reference: vercel/next.js + t3-oss/create-t3-turbo + dorny/paths-filter.
 
 name: CI
 
@@ -23,19 +31,57 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  BUN_VERSION: '1.3.13'
-  NODE_VERSION: '22'
-  PLAYWRIGHT_VERSION: '1.59.1'
-
-# All jobs operate on the menu product (the only one with code right now).
-# `defaults.run.working-directory` is set per-job below — that's the level
-# GH Actions accepts; setting it at the workflow level doesn't apply
-# inherited defaults to `services:` / cache `path:` keys anyway.
-
 jobs:
-  typecheck:
-    name: Typecheck
+  # -------------------------------------------------------------------------
+  # 1. Detect which workspaces changed
+  # -------------------------------------------------------------------------
+  changes:
+    name: Detect changed workspaces
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    outputs:
+      menu: ${{ steps.filter.outputs.menu }}
+      genkan: ${{ steps.filter.outputs.genkan }}
+      house: ${{ steps.filter.outputs.house }}
+      identity: ${{ steps.filter.outputs.identity }}
+      authtestkit: ${{ steps.filter.outputs.authtestkit }}
+      design-system: ${{ steps.filter.outputs.design-system }}
+      shared: ${{ steps.filter.outputs.shared }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          # Each filter emits `outputs.<name>` = "true" when any matching
+          # path changed in this push/PR. `shared` covers files that
+          # invalidate every workspace (workspace lockfile, repo-level
+          # config, the CI machinery itself).
+          filters: |
+            menu:
+              - 'products/menu/**'
+            genkan:
+              - 'products/genkan/**'
+            house:
+              - 'products/house/**'
+            identity:
+              - 'packages/iedora-identity/**'
+            authtestkit:
+              - 'packages/iedora-auth-testkit/**'
+            design-system:
+              - 'packages/design-system/**'
+            shared:
+              - 'bun.lock'
+              - 'package.json'
+              - 'tsconfig*.json'
+              - '.github/**'
+
+  # -------------------------------------------------------------------------
+  # 2. Per-concern jobs (menu only — genkan typecheck/lint not wired yet)
+  # -------------------------------------------------------------------------
+  typecheck-menu:
+    name: Typecheck · menu
+    needs: changes
+    if: needs.changes.outputs.menu == 'true' || needs.changes.outputs.shared == 'true' || needs.changes.outputs.design-system == 'true' || needs.changes.outputs.identity == 'true' || needs.changes.outputs.authtestkit == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     defaults:
@@ -43,16 +89,13 @@ jobs:
         working-directory: products/menu
     steps:
       - uses: actions/checkout@v5
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-      - name: Install dependencies (workspace root)
-        working-directory: .
-        run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup
       - run: bun run typecheck
 
-  lint:
-    name: Lint
+  lint-menu:
+    name: Lint · menu
+    needs: changes
+    if: needs.changes.outputs.menu == 'true' || needs.changes.outputs.shared == 'true' || needs.changes.outputs.design-system == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     defaults:
@@ -60,259 +103,66 @@ jobs:
         working-directory: products/menu
     steps:
       - uses: actions/checkout@v5
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-      - name: Install dependencies (workspace root)
-        working-directory: .
-        run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup
       - run: bun run lint
 
+  # -------------------------------------------------------------------------
+  # 3. Per-workspace unit jobs (matrix-style via reusable workflow)
+  # -------------------------------------------------------------------------
   unit-menu:
-    name: Unit · menu (Vitest)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: products/menu
-    # ubuntu-24.04 runners ship Docker Engine, which testcontainers needs
-    # for the real-Redis integration suite. No extra setup required.
-    steps:
-      - uses: actions/checkout@v5
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-      - name: Install dependencies (workspace root)
-        working-directory: .
-        run: bun install --frozen-lockfile
-      - name: Run Vitest
-        # `bun run test` invokes the `vitest` binary which uses a Node shebang,
-        # so testcontainers' `@testcontainers/*` modules run under Node here
-        # (they fail under Bun's runtime — see oven-sh/bun#21342).
-        run: bun run test
+    needs: changes
+    if: needs.changes.outputs.menu == 'true' || needs.changes.outputs.shared == 'true' || needs.changes.outputs.design-system == 'true' || needs.changes.outputs.identity == 'true' || needs.changes.outputs.authtestkit == 'true'
+    uses: ./.github/workflows/_unit.yml
+    with:
+      label: Unit · menu
+      workdir: products/menu
 
   unit-genkan:
-    name: Unit · genkan (Vitest)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: products/genkan
-    steps:
-      - uses: actions/checkout@v5
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-      - name: Install dependencies (workspace root)
-        working-directory: .
-        run: bun install --frozen-lockfile
-      - name: Run Vitest
-        run: bun run test
+    needs: changes
+    # genkan tests depend on auth-testkit + identity, so a change in either
+    # of those re-runs genkan's suite as well.
+    if: needs.changes.outputs.genkan == 'true' || needs.changes.outputs.shared == 'true' || needs.changes.outputs.identity == 'true' || needs.changes.outputs.authtestkit == 'true' || needs.changes.outputs.design-system == 'true'
+    uses: ./.github/workflows/_unit.yml
+    with:
+      label: Unit · genkan
+      workdir: products/genkan
 
   unit-identity:
-    name: Unit · @iedora/identity (Vitest)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    defaults:
-      run:
-        working-directory: packages/iedora-identity
-    steps:
-      - uses: actions/checkout@v5
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-      - name: Install dependencies (workspace root)
-        working-directory: .
-        run: bun install --frozen-lockfile
-      - name: Run Vitest
-        run: bun run test
+    needs: changes
+    if: needs.changes.outputs.identity == 'true' || needs.changes.outputs.shared == 'true'
+    uses: ./.github/workflows/_unit.yml
+    with:
+      label: Unit · @iedora/identity
+      workdir: packages/iedora-identity
+      timeout-minutes: 5
 
   unit-authtestkit:
-    name: Unit · @iedora/auth-testkit (Vitest)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: packages/iedora-auth-testkit
-    # Boots a real Better Auth instance against PGLite + walks the OIDC
-    # handshake. Slower than the other unit jobs but still under 30s.
-    steps:
-      - uses: actions/checkout@v5
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-      - name: Install dependencies (workspace root)
-        working-directory: .
-        run: bun install --frozen-lockfile
-      - name: Run Vitest
-        run: bun run test
+    needs: changes
+    # auth-testkit re-exports genkan's schema + plugins, so any genkan or
+    # identity change must re-run its suite.
+    if: needs.changes.outputs.authtestkit == 'true' || needs.changes.outputs.shared == 'true' || needs.changes.outputs.genkan == 'true' || needs.changes.outputs.identity == 'true'
+    uses: ./.github/workflows/_unit.yml
+    with:
+      label: Unit · @iedora/auth-testkit
+      workdir: packages/iedora-auth-testkit
 
+  # -------------------------------------------------------------------------
+  # 4. E2E gate (only when menu or its deps moved)
+  # -------------------------------------------------------------------------
+  # `if:` uses `!failure() && !cancelled()` instead of plain `success()` so
+  # the job still runs when an upstream was skipped (paths-filter
+  # short-circuited it). `success()` would block the e2e whenever any unit
+  # job is skipped — which is the normal case for a docs-only change to
+  # menu, where typecheck/lint/unit-menu run but the others don't.
   e2e:
     name: E2E (Playwright)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 25
-    needs: [typecheck, lint, unit-menu, unit-genkan, unit-identity, unit-authtestkit]
-    defaults:
-      run:
-        working-directory: products/menu
-
-    services:
-      # `POSTGRES_DB` stays as the default `postgres` admin DB — the e2e
-      # global-setup connects to it to CREATE the `metamenu_test` DB.
-      postgres:
-        image: postgres:18.4-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-      # LocalStack stands in for MinIO/S3 in CI because:
-      #   - GH Actions services don't accept a `command:` override, so
-      #     `minio/minio` (needs `server /data`) can't boot.
-      #   - The public `minio/minio` and `bitnami/minio` images were both
-      #     removed from Docker Hub in 2025 (MinIO 2025-10-23, Bitnami
-      #     2025-08-28 catalog collapse) — there is no current "drop-in"
-      #     MinIO image with a self-booting entrypoint.
-      # LocalStack auto-boots S3 on :4566; the SDK works as long as the
-      # client is created with `forcePathStyle: true` (it already is in
-      # `src/features/upload/adapters/s3.ts`). Local dev still uses the real
-      # `minio/minio` from docker-compose while its cached tag pulls.
-      localstack:
-        image: localstack/localstack:4
-        env:
-          SERVICES: s3
-          DEFAULT_REGION: us-east-1
-          AWS_DEFAULT_REGION: us-east-1
-        ports:
-          - '4566:4566'
-        options: >-
-          --health-cmd "curl -fsS http://localhost:4566/_localstack/health | grep -q 's3'"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-          --health-start-period 10s
-
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/metamenu_test
-      # CI-only secret; production uses the value set in repo Secrets.
-      BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
-      BETTER_AUTH_URL: http://localhost:3000
-      DISABLE_AUTH_RATE_LIMIT: 'true'
-      DISABLE_RATE_LIMIT: 'true'
-      # LocalStack accepts any credentials; we use the conventional `test/test`
-      # pair the AWS SDK uses for local development.
-      S3_ENDPOINT: http://localhost:4566
-      S3_REGION: us-east-1
-      S3_ACCESS_KEY: test
-      S3_SECRET_KEY: test
-      S3_BUCKET: metamenu-test
-      # Next 16's "collect page data" build pass executes module-level env
-      # validation (src/shared/env.ts) — so GENKAN_* must be present at
-      # BUILD time as well as at webServer runtime. The values just need
-      # to be strings that pass Zod; the actual issuer URL is resolved by
-      # the webServer step from playwright.config.ts (where SHIM_PORT lives).
-      GENKAN_OAUTH_CLIENT_ID: menu
-      GENKAN_OAUTH_CLIENT_SECRET: menu-secret
-      GENKAN_ISSUER_URL: http://127.0.0.1:4444
-      # `src/shared/brand.ts::GENKAN_URL` is imported by client components,
-      # so its value gets inlined into the client bundle at BUILD time. The
-      # build step runs separately from `bun run start` in CI, so we pin
-      # the testkit URL here (job-level env) — same value playwright.config.ts
-      # sets at webServer runtime. SHIM_PORT in playwright.config.ts must
-      # match the port suffix here.
-      NEXT_PUBLIC_GENKAN_URL: http://127.0.0.1:4444
-      NEXT_TELEMETRY_DISABLED: '1'
-      CI: 'true'
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Install dependencies
-        working-directory: .
-        run: bun install --frozen-lockfile
-
-      - name: Cache Next.js build output
-        uses: actions/cache@v4
-        with:
-          # Turbopack's persistent cache lives here in Next 16 — large saving
-          # on warm runs. Keying on source files invalidates when code changes.
-          # Path is repo-root-relative; actions/cache doesn't honour the job's
-          # `defaults.run.working-directory`.
-          path: products/menu/.next/cache
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('bun.lock') }}-${{ hashFiles('products/menu/src/**/*.ts', 'products/menu/src/**/*.tsx') }}
-          restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('bun.lock') }}-
-
-      - name: Cache Playwright browsers
-        id: pw-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ env.PLAYWRIGHT_VERSION }}
-
-      - name: Install Playwright browsers (cold cache)
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: bunx playwright install --with-deps chromium
-
-      - name: Install Playwright system deps (warm cache)
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: bunx playwright install-deps chromium
-
-      - name: Create test database
-        # The service container starts with the default `postgres` DB;
-        # globalSetup expects to be able to connect there AND have
-        # `metamenu_test` to migrate against.
-        run: |
-          PGPASSWORD=postgres psql -h localhost -U postgres -d postgres \
-            -c "CREATE DATABASE metamenu_test;"
-
-      - name: Bootstrap S3 bucket
-        # LocalStack starts with zero buckets. `aws` CLI v2 is preinstalled on
-        # ubuntu-24.04 runners; no install step needed.
-        env:
-          AWS_ACCESS_KEY_ID: test
-          AWS_SECRET_ACCESS_KEY: test
-          AWS_DEFAULT_REGION: us-east-1
-        run: |
-          aws --endpoint-url=http://localhost:4566 s3 mb s3://metamenu-test
-          aws --endpoint-url=http://localhost:4566 s3api put-bucket-acl \
-            --bucket metamenu-test --acl public-read
-
-      - name: Build Next.js
-        # Node, not Bun — production runtime parity + AGENTS.md guidance.
-        # `node --run` is the Node 22+ way to invoke a package.json script.
-        run: node --run build
-
-      - name: Run Playwright
-        # playwright.config.ts skips its own `build` step when CI=true,
-        # so this only launches `next start` + runs the suite.
-        run: bunx playwright test
-
-      - name: Upload Playwright HTML report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 7
-
-      - name: Upload traces, screenshots, and videos on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-test-results
-          path: test-results/
-          retention-days: 14
+    needs: [changes, typecheck-menu, lint-menu, unit-menu, unit-genkan, unit-identity, unit-authtestkit]
+    if: |
+      always() && !failure() && !cancelled() &&
+      (needs.changes.outputs.menu == 'true' ||
+       needs.changes.outputs.shared == 'true' ||
+       needs.changes.outputs.identity == 'true' ||
+       needs.changes.outputs.authtestkit == 'true' ||
+       needs.changes.outputs.design-system == 'true')
+    uses: ./.github/workflows/_e2e.yml
+    secrets: inherit

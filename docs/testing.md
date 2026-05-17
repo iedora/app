@@ -313,27 +313,43 @@ the per-PR runtime cost. TODO(genkan-e2e): decide threshold.
 
 ## CI integration
 
-`.github/workflows/ci.yml` runs **seven jobs**. The first six
-run in parallel; e2e gates on all of them.
+CI is structured as **orchestrator + composite action + reusable
+workflows** — the standard monorepo shape (see `AGENTS.md` ## CI for
+the full breakdown). The pieces:
 
-- **Typecheck** — menu only. `cd products/menu && bun run typecheck`. ~2 min.
-- **Lint** — menu only. `cd products/menu && bun run lint`. ~2 min.
-- **Unit · menu (Vitest)** — `cd products/menu && bun run test`. Docker available so testcontainers can boot real Redis for the rate-limit suite. ~3 min.
-- **Unit · genkan (Vitest)** — `cd products/genkan && bun run test`. PGLite + auth-testkit suites. ~3 min.
-- **Unit · `@iedora/identity` (Vitest)** — `cd packages/iedora-identity && bun run test`. No DB; pure crypto + parsing. ~1 min.
-- **Unit · `@iedora/auth-testkit` (Vitest)** — `cd packages/iedora-auth-testkit && bun run test`. Boots itself; slowest of the unit jobs but still under 30s. ~1 min.
-- **E2E (Playwright)** — `cd products/menu`.
-  `needs: [typecheck, lint, unit-menu, unit-genkan, unit-identity, unit-authtestkit]`.
-  Postgres 18 + LocalStack as service containers. Build runs
-  under Node (`node --run build`); Playwright + everything else
-  uses Bun. Caches `.next/cache` (Turbopack persistent cache)
-  and `~/.cache/ms-playwright`. ~15-20 min.
+```
+.github/
+  actions/setup/action.yml      composite: Bun install at the workspace root
+  workflows/
+    ci.yml                       orchestrator: paths-filter + per-workspace gating
+    _unit.yml                    reusable: ONE Vitest job for ONE workspace
+    _e2e.yml                     reusable: menu Playwright suite + owns env literals
+```
 
-Every `unit-*` job runs `bun install --frozen-lockfile` at the
-**workspace root** (`working-directory: .`) and then `cd`s into
-its package before invoking `bun run test`. This is what makes
-the Bun workspaces setup pay off — a single install per runner
-covers four parallel jobs.
+**Jobs** (each gated on `dorny/paths-filter` outputs so unrelated
+changes skip):
+
+- **Typecheck · menu** — `bun run typecheck`. ~2 min.
+- **Lint · menu** — `bun run lint`. ~2 min.
+- **Unit · menu** — `bun run test`. Docker available so testcontainers can boot real Redis for the rate-limit suite. ~3 min.
+- **Unit · genkan** — `bun run test`. PGLite + auth-testkit suites. ~3 min.
+- **Unit · `@iedora/identity`** — `bun run test`. No DB; pure crypto + parsing. ~1 min.
+- **Unit · `@iedora/auth-testkit`** — `bun run test`. Boots itself; slowest of the unit jobs but still under 30s. ~1 min.
+- **E2E (Playwright)** — Postgres 18 + LocalStack as service
+  containers. Build runs under Node (`node --run build`); Playwright
+  + everything else uses Bun. Caches `.next/cache` (Turbopack
+  persistent cache) and `~/.cache/ms-playwright`. ~15-20 min.
+
+`_unit.yml` takes a `workdir` input — every per-workspace job is a
+four-line block in `ci.yml`. The Bun install happens once per runner
+at the workspace root via the composite action, before `cd`-ing into
+the package. Adding a new product = one paths-filter entry + one
+reusable-workflow call. No copy-pasted setup.
+
+The e2e job's `if:` uses `!failure() && !cancelled()` instead of
+plain `success()` so it still runs when an upstream was skipped
+(paths-filter short-circuit). Otherwise a docs-only change to menu
+would skip `unit-genkan` → e2e blocked → noise.
 
 Branch protection is deliberately off — solo, AI-driven project;
 the CI itself is the signal. Revisit when adding collaborators.

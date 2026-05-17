@@ -219,7 +219,11 @@ iedora/                                  repo root
   bun.lock                               single workspace lockfile
   package.json                           workspaces: packages/* + products/{menu,genkan,house}
   justfile                               just modules: menu::, genkan::, house::
-  .github/workflows/ci.yml               seven CI jobs (see "CI" below)
+  .github/                               composite setup action + reusable workflows (see "CI" below)
+    actions/setup/action.yml             composite: install Bun + bun install --frozen-lockfile
+    workflows/ci.yml                       orchestrator: paths-filter → per-concern + reusable calls
+    workflows/_unit.yml                    reusable: one Vitest job per workspace
+    workflows/_e2e.yml                     reusable: menu Playwright suite (owns env literals)
   .mcp.json                              shadcn, postgres, bun, next-devtools, playwright MCP servers
   docs/                                  brand-level docs (deploy, scaling, backups, secrets,
                                          security-audit, tenancy, vendors, architecture, testing)
@@ -453,32 +457,68 @@ mutation.
 
 ## CI
 
-`.github/workflows/ci.yml` runs **seven jobs** on every push and PR.
-The first six run in parallel; the seventh (e2e) gates on all of
-them so a broken branch doesn't burn ~10 min of runner time before
-failing.
+Structured as an **orchestrator + composite action + reusable workflows**
+— the industry-standard shape for monorepos that grow more than two
+products (mirrors the pattern in Vercel/Next.js, t3-oss/create-t3-turbo,
+nx, and turborepo's own repos).
 
-- **Typecheck** — `products/menu/` only. (Genkan's typecheck is
-  covered by `unit-genkan` since Vitest type-checks too; an
-  explicit `typecheck-genkan` job is on the TODO list.)
-  TODO(typecheck-genkan): add explicit job.
-- **Lint** — `products/menu/` only (eslint-plugin-boundaries lives
-  in the menu config). Genkan has a thin `eslint.config.mjs` but
-  no dedicated CI job yet.
-- **Unit · menu (Vitest)** — `cd products/menu && bun run test`. Uses Docker via the ubuntu-24.04 runner so testcontainers can boot a real Redis for the rate-limit suite.
-- **Unit · genkan (Vitest)** — `cd products/genkan && bun run test`. Co-located + `__tests__/` suites; some boot `@iedora/auth-testkit` for integration coverage.
-- **Unit · @iedora/identity (Vitest)** — `cd packages/iedora-identity && bun run test`. No DB; pure crypto + parsing.
-- **Unit · @iedora/auth-testkit (Vitest)** — `cd packages/iedora-auth-testkit && bun run test`. Boots a real Better Auth + PGLite + walks the OIDC handshake; slowest of the unit jobs but still under 30s.
-- **E2E (Playwright)** — `cd products/menu`. `needs: [typecheck, lint, unit-menu, unit-genkan, unit-identity, unit-authtestkit]`. Postgres 18 + LocalStack as service containers. Build runs under Node (`node --run build`) because Bun + `next build` is unstable. Caches `.next/cache` (Turbopack persistent cache) and `~/.cache/ms-playwright`. The shim genkan it talks to is started by `playwright.config.ts`'s `webServer` block using `@iedora/auth-testkit` on `SHIM_PORT`. `NEXT_PUBLIC_GENKAN_URL` and `GENKAN_*` env are pinned at the job level because they're inlined into the menu client bundle at build time.
+```
+.github/
+  actions/setup/action.yml      composite: install Bun + bun install --frozen-lockfile
+  workflows/
+    ci.yml                       orchestrator (paths-filter + job conditionals)
+    _unit.yml                    reusable: ONE Vitest job for ONE workspace
+    _e2e.yml                     reusable: menu Playwright suite + owns ALL e2e env literals
+```
 
-Every `unit-*` job installs deps once at the workspace root
-(`working-directory: .`), then `cd` into its package before running
-`bun run test`. This is what makes the workspace setup pay off — a
-single install per runner covers four parallel jobs.
+**Three load-bearing decisions:**
 
-Branch protection: deliberately NOT enabled — solo, AI-driven
-project; the CI itself is the signal. Revisit when adding
-collaborators or after the first "broken main" incident.
+1. **One composite action for setup.** `actions/setup` runs
+   `oven-sh/setup-bun@v2` + `bun install --frozen-lockfile` at the repo
+   root. Every job that needs deps is one line: `uses: ./.github/actions/setup`.
+   Bumping Bun or adding a cache layer is a one-file edit.
+
+2. **Reusable workflow for unit jobs.** Each per-workspace test job is a
+   four-line `uses: ./.github/workflows/_unit.yml` block with `label` +
+   `workdir` inputs. Adding a new product = one filter entry in `changes`
+   + one `uses:` block. No new file, no copy-pasted setup.
+
+3. **`dorny/paths-filter` for change detection.** The first job
+   (`changes`) emits per-workspace outputs (`menu`, `genkan`, `house`,
+   `identity`, `authtestkit`, `design-system`, `shared`); every
+   downstream job gates on those outputs via `if: ...`. A docs-only edit
+   to `products/menu/` runs only menu's pipeline; a `bun.lock` change
+   (the `shared` filter) runs everything. Workflow-level `paths:` was
+   rejected because skipped status checks hang PR merges — `if:`
+   short-circuits show as `skipped` (success-equivalent for the gate).
+
+**The jobs:**
+
+- **`changes`** — dorny/paths-filter; emits `outputs.<workspace>`.
+- **`typecheck-menu`, `lint-menu`** — menu-only for now (genkan
+  typecheck is covered by Vitest's `--typecheck`; a dedicated
+  `typecheck-genkan` is a known TODO).
+- **`unit-menu`, `unit-genkan`, `unit-identity`, `unit-authtestkit`** —
+  all delegate to `_unit.yml`.
+- **`e2e`** — delegates to `_e2e.yml`; gated on `!failure() && !cancelled()`
+  (not plain `success()`) so a docs-only edit that legitimately skips
+  upstream units doesn't block the gate.
+
+**Where env lives:**
+
+- **Workflow-level (ci.yml)** — empty: orchestrator doesn't need any.
+- **Job-level (`_e2e.yml` env block)** — every e2e env literal:
+  `DATABASE_URL`, `GENKAN_*`, `NEXT_PUBLIC_GENKAN_URL`, `S3_*`. These
+  aren't secret (they're CI fixtures), so they live in code, not in
+  GH Secrets. The reusable workflow is the single home for them —
+  adding one is a one-line edit there.
+- **GH Secrets** — only `BETTER_AUTH_SECRET` (truly sensitive). When
+  deploy workflows land, true per-environment secrets graduate to
+  **GitHub Environments** (`environment: production` / `staging`).
+
+**Branch protection: deliberately NOT enabled** — solo, AI-driven
+project; the CI itself is the signal. Revisit when adding collaborators
+or after the first "broken main" incident.
 
 ## Where to look when unsure
 
