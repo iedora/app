@@ -1,7 +1,14 @@
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { NextConfig } from 'next'
+
+const here = path.dirname(fileURLToPath(import.meta.url))
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  // Bun workspaces monorepo — trace files up to the workspace root so the
+  // standalone build includes the linked @iedora/design-system.
+  outputFileTracingRoot: path.join(here, '..', '..'),
   transpilePackages: ['@iedora/design-system'],
   outputFileTracingIncludes: {
     '/*': [

@@ -58,10 +58,11 @@ builder:
   arch: amd64
   remote: ssh://root@<%= ENV.fetch("ONPREM_HOST") %>
   local: false
-  # Kamal runs from infra/kamal/; the app's Dockerfile lives in infra/.
-  # Build context is the repo root.
-  context: ../..
-  dockerfile: ../Dockerfile
+  # Kamal runs from products/genkan/infra/kamal/. Build context is the REPO
+  # ROOT (../../../..) so the Bun workspace lockfile + linked packages are
+  # visible to the build.
+  context: ../../../..
+  dockerfile: products/genkan/infra/Dockerfile
 
 env:
   clear:
