@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { MetaStrip, Wordmark } from '@iedora/design-system'
 import { auth } from '@/features/auth/adapters/better-auth-instance'
+import { ImpersonationBanner } from './impersonation-banner'
 
 /**
  * Shell for every signed-in page (profile, consent, future settings).
@@ -27,13 +28,14 @@ export default async function AuthedLayout({
       className="ds-root"
       style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}
     >
+      {session.session.impersonatedBy ? (
+        <ImpersonationBanner email={session.user.email} />
+      ) : null}
       <div
-        className="ds-shell-meta"
+        className="ds-shell ds-shell-meta"
         style={{
-          width: 'min(1100px, 100%)',
-          margin: '0 auto',
-          padding:
-            'clamp(var(--s-4), 5vw, var(--s-7)) clamp(var(--s-4), 5vw, var(--margin)) 0',
+          maxWidth: 1100,
+          paddingTop: 'clamp(var(--s-4), 5vw, var(--s-7))',
         }}
       >
         <MetaStrip
@@ -54,12 +56,12 @@ export default async function AuthedLayout({
       </div>
 
       <main
+        className="ds-shell"
         style={{
+          maxWidth: 1100,
           flex: 1,
-          padding:
-            'clamp(var(--s-7), 8vw, var(--s-9)) clamp(var(--s-4), 5vw, var(--margin)) clamp(var(--s-8), 10vw, var(--s-10))',
-          width: 'min(1100px, 100%)',
-          margin: '0 auto',
+          paddingTop: 'clamp(var(--s-7), 8vw, var(--s-9))',
+          paddingBottom: 'clamp(var(--s-8), 10vw, var(--s-10))',
           display: 'flex',
           flexDirection: 'column',
           gap: 'clamp(var(--s-7), 6vw, var(--s-8))',

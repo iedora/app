@@ -27,6 +27,7 @@ export type AuditEvent =
       payload: { from: string; to: string }
     }
   | { action: 'user.impersonate'; targetId: string }
+  | { action: 'user.impersonate_stop'; targetId: string }
   | {
       action: 'org.create'
       targetId: string
@@ -115,6 +116,7 @@ export const ALL_AUDIT_ACTIONS = [
   'user.delete',
   'user.role_change',
   'user.impersonate',
+  'user.impersonate_stop',
   'org.create',
   'org.update',
   'org.delete',
