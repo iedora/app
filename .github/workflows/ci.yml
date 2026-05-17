@@ -46,7 +46,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - run: bun install --frozen-lockfile
+      - name: Install dependencies (workspace root)
+        working-directory: .
+        run: bun install --frozen-lockfile
       - run: bun run typecheck
 
   lint:
@@ -61,7 +63,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - run: bun install --frozen-lockfile
+      - name: Install dependencies (workspace root)
+        working-directory: .
+        run: bun install --frozen-lockfile
       - run: bun run lint
 
   unit:
@@ -78,7 +82,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - run: bun install --frozen-lockfile
+      - name: Install dependencies (workspace root)
+        working-directory: .
+        run: bun install --frozen-lockfile
       - name: Run Vitest
         # `bun run test` invokes the `vitest` binary which uses a Node shebang,
         # so testcontainers' `@testcontainers/*` modules run under Node here
@@ -164,6 +170,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Install dependencies
+        working-directory: .
         run: bun install --frozen-lockfile
 
       - name: Cache Next.js build output
@@ -174,9 +181,9 @@ jobs:
           # Path is repo-root-relative; actions/cache doesn't honour the job's
           # `defaults.run.working-directory`.
           path: products/menu/.next/cache
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('products/menu/bun.lock') }}-${{ hashFiles('products/menu/src/**/*.ts', 'products/menu/src/**/*.tsx') }}
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('bun.lock') }}-${{ hashFiles('products/menu/src/**/*.ts', 'products/menu/src/**/*.tsx') }}
           restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('products/menu/bun.lock') }}-
+            ${{ runner.os }}-nextjs-${{ hashFiles('bun.lock') }}-
 
       - name: Cache Playwright browsers
         id: pw-cache
