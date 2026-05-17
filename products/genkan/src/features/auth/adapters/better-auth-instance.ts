@@ -5,9 +5,11 @@ import { jwt } from 'better-auth/plugins/jwt'
 import { organization } from 'better-auth/plugins/organization'
 import { oauthProvider } from '@better-auth/oauth-provider'
 import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core'
+import { eq } from 'drizzle-orm'
 import { db } from '@/shared/db/client'
 import * as schema from '@/shared/db/schema'
 import { env } from '@/shared/env'
+import { emit } from '@/features/webhooks'
 
 type AuthDb = PgDatabase<PgQueryResultHKT, typeof schema>
 
@@ -74,11 +76,45 @@ function parseTrustedClients(raw: string | undefined) {
 const TRUSTED_CLIENTS = parseTrustedClients(env.TRUSTED_CLIENTS)
 
 /**
+ * In-flight state captured in the `before` hook so the corresponding
+ * `after` hook can compute transitions (e.g. banned → unbanned) without
+ * relying on the partial-update payload. Keyed by user id; admin updates
+ * on the same user serialize through `auth.api.*` so the window is short.
+ *
+ * If a concurrent update happens to evict the entry before `after` runs
+ * we just skip the transition event — that's a fail-soft outcome, never
+ * a duplicate emit.
+ */
+type PriorUserState = {
+  banned: boolean
+  role: string | null
+}
+
+/**
  * Factory. Production uses the singleton at the bottom; tests construct
  * their own instance pointed at a PGLite db to exercise the real adapter
  * wiring (e.g. catch "model X not found in schema object" before deploy).
  */
 export function makeAuth(database: AuthDb) {
+  const priorUserState = new Map<string, PriorUserState>()
+
+  async function snapshotUser(userId: string): Promise<void> {
+    const [row] = await database
+      .select({
+        banned: schema.user.banned,
+        role: schema.user.role,
+      })
+      .from(schema.user)
+      .where(eq(schema.user.id, userId))
+      .limit(1)
+    if (row) {
+      priorUserState.set(userId, {
+        banned: Boolean(row.banned),
+        role: row.role ?? null,
+      })
+    }
+  }
+
   return betterAuth({
     baseURL: env.BETTER_AUTH_URL,
     database: drizzleAdapter(database, {
@@ -114,11 +150,135 @@ export function makeAuth(database: AuthDb) {
         ipv6Subnet: 64,
       },
     },
+    /**
+     * Better Auth lifecycle hooks → @iedora/identity webhook emits.
+     *
+     * Only the user model has core hooks (Better Auth 1.6.11). For
+     * organizations + members we plug into the organization plugin's
+     * own `*Organization` / `*Member` callbacks below.
+     */
+    databaseHooks: {
+      user: {
+        update: {
+          before: async (user) => {
+            if (typeof user.id === 'string') {
+              await snapshotUser(user.id)
+            }
+          },
+          after: async (user) => {
+            const prior = priorUserState.get(user.id)
+            priorUserState.delete(user.id)
+            const banned = Boolean(user.banned)
+            const role = typeof user.role === 'string' ? user.role : null
+
+            if (prior) {
+              if (!prior.banned && banned) {
+                await emit({
+                  event: 'user.banned',
+                  payload: {
+                    user_id: user.id,
+                    reason:
+                      typeof user.banReason === 'string'
+                        ? user.banReason
+                        : undefined,
+                    expires:
+                      user.banExpires instanceof Date
+                        ? user.banExpires.toISOString()
+                        : user.banExpires == null
+                          ? null
+                          : String(user.banExpires),
+                  },
+                })
+              } else if (prior.banned && !banned) {
+                await emit({
+                  event: 'user.unbanned',
+                  payload: { user_id: user.id },
+                })
+              }
+              if (role && prior.role !== role) {
+                await emit({
+                  event: 'user.role_changed',
+                  payload: { user_id: user.id, role },
+                })
+              }
+            }
+          },
+        },
+        delete: {
+          after: async (user) => {
+            await emit({
+              event: 'user.deleted',
+              payload: { user_id: user.id },
+            })
+          },
+        },
+      },
+    },
     plugins: [
       // Better Auth 1.6.11 flipped the verification default; we don't ship
       // email verification yet so leaving the flag at the new default would
       // silently reject every invite. Flip when the email-sender lands.
-      organization({ requireEmailVerificationOnInvitation: false }),
+      organization({
+        requireEmailVerificationOnInvitation: false,
+        organizationHooks: {
+          afterCreateOrganization: async ({ organization: org }) => {
+            await emit({
+              event: 'org.created',
+              payload: {
+                org_id: org.id,
+                slug: org.slug,
+                name: org.name,
+              },
+            })
+          },
+          afterUpdateOrganization: async ({ organization: org }) => {
+            if (!org) return
+            await emit({
+              event: 'org.updated',
+              payload: {
+                org_id: org.id,
+                slug: org.slug,
+                name: org.name,
+              },
+            })
+          },
+          afterDeleteOrganization: async ({ organization: org }) => {
+            await emit({
+              event: 'org.deleted',
+              payload: { org_id: org.id },
+            })
+          },
+          afterAddMember: async ({ member }) => {
+            await emit({
+              event: 'org.member_added',
+              payload: {
+                org_id: member.organizationId,
+                user_id: member.userId,
+                role: member.role,
+              },
+            })
+          },
+          afterRemoveMember: async ({ member }) => {
+            await emit({
+              event: 'org.member_removed',
+              payload: {
+                org_id: member.organizationId,
+                user_id: member.userId,
+              },
+            })
+          },
+          afterUpdateMemberRole: async ({ member }) => {
+            await emit({
+              event: 'org.member_role_changed',
+              payload: {
+                org_id: member.organizationId,
+                user_id: member.userId,
+                role: member.role,
+              },
+            })
+          },
+        },
+      }),
 
       // Platform-admin APIs: list/create/disable users, list sessions, etc.
       // Routes are gated server-side by user.role==='admin'.

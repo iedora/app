@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { and, eq } from 'drizzle-orm'
 import { requireAdmin } from '@/features/admin'
+import { emit } from '@/features/webhooks'
 import { db } from '@/shared/db/client'
 import {
   oauthAccessToken,
@@ -62,6 +63,15 @@ export async function revokeGrantAction(
           )
       }
     })
+    if (consent.userId) {
+      await emit({
+        event: 'grant.revoked',
+        payload: {
+          user_id: consent.userId,
+          client_id: consent.clientId,
+        },
+      })
+    }
   } catch (e) {
     return {
       ok: false,

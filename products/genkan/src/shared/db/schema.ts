@@ -270,6 +270,35 @@ export const rateLimit = pgTable("rate_limit", {
   lastRequest: bigint("last_request", { mode: "number" }).notNull(),
 });
 
+/**
+ * Webhook subscriptions for the iedora identity bus. Genkan's webhooks
+ * slice reads this table at delivery time and POSTs the signed envelope
+ * to every enabled subscriber whose `events` allow-list covers the event
+ * being emitted (NULL = receive everything).
+ */
+export const webhookSubscription = pgTable(
+  "webhook_subscription",
+  {
+    id: text("id").primaryKey(),
+    /** Absolute HTTPS endpoint the subscriber POSTs to. */
+    url: text("url").notNull(),
+    /** Shared HMAC secret. Both sides sign + verify with it. */
+    secret: text("secret").notNull(),
+    /** NULL = subscribe to every event; otherwise an explicit allow-list. */
+    events: text("events").array(),
+    /** Soft-disable without losing the row. */
+    enabled: boolean("enabled").default(true).notNull(),
+    /** Free-form label shown in admin UI (e.g. "menu"). */
+    name: text("name"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("webhookSubscription_enabled_idx").on(table.enabled)],
+);
+
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),

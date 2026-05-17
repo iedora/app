@@ -6,6 +6,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@/shared/db/client'
 import { oauthAccessToken, oauthConsent, oauthRefreshToken } from '@/shared/db/schema'
 import { auth } from '@/features/auth/adapters/better-auth-instance'
+import { emit } from '@/features/webhooks'
 
 /**
  * Revoke a single OAuth grant — deletes the consent row and invalidates any
@@ -51,6 +52,11 @@ export async function revokeGrant(formData: FormData) {
           eq(oauthRefreshToken.clientId, clientId),
         ),
       )
+  })
+
+  await emit({
+    event: 'grant.revoked',
+    payload: { user_id: userId, client_id: clientId },
   })
 
   revalidatePath('/profile')

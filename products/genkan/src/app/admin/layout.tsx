@@ -88,6 +88,9 @@ export default async function AdminLayout({
           <Link href="/admin/applications" style={navLinkStyle}>
             Applications
           </Link>
+          <Link href="/admin/webhooks" style={navLinkStyle}>
+            Webhooks
+          </Link>
           <Link href="/admin/grants" style={navLinkStyle}>
             Grants
           </Link>
