@@ -36,6 +36,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+
+      # Astro requires Node >=22.12. The default ubuntu-24.04 Node is 20.x,
+      # which fails at `astro build`. setup-node BEFORE the composite setup
+      # so the version is established before Bun's install ecosystem reads it.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - uses: ./.github/actions/setup
 
       - name: Install bws CLI

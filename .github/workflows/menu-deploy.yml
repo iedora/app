@@ -38,7 +38,11 @@ jobs:
       product: menu
       # workflow_run gives us head_sha; workflow_dispatch lets the user pick
       # one or defaults to the SHA of the ref the dispatch fired on.
-      sha: ${{ github.event.workflow_run.head_sha || inputs.sha || github.sha }}
+      # Use `github.event.inputs.sha` (NOT `inputs.sha`) — the `inputs`
+      # context is undefined for workflow_run events and accessing it is a
+      # workflow-file-parse error (startup_failure). `github.event.inputs`
+      # is event-specific and safely null for workflow_run.
+      sha: ${{ github.event.workflow_run.head_sha || github.event.inputs.sha || github.sha }}
       onprem_host: ${{ vars.ONPREM_HOST }}
       public_hostname: ${{ vars.MENU_PUBLIC_HOSTNAME }}
       bws_project_id: ${{ vars.BWS_PROJECT_ID }}

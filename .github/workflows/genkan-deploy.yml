@@ -23,7 +23,9 @@ jobs:
     uses: ./.github/workflows/_kamal-deploy.yml
     with:
       product: genkan
-      sha: ${{ github.event.workflow_run.head_sha || inputs.sha || github.sha }}
+      # See menu-deploy.yml for why `github.event.inputs.sha` (not `inputs.sha`):
+      # the `inputs` context is undefined for workflow_run events.
+      sha: ${{ github.event.workflow_run.head_sha || github.event.inputs.sha || github.sha }}
       onprem_host: ${{ vars.ONPREM_HOST }}
       public_hostname: ${{ vars.GENKAN_PUBLIC_HOSTNAME }}
       bws_project_id: ${{ vars.BWS_PROJECT_ID }}
