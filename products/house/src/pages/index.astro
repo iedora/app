@@ -32,7 +32,7 @@ import { PageProgress } from "@iedora/design-system";
         </div>
         <div class="ds-meta-strip__center"></div>
         <div class="ds-meta-strip__right">
-          <a href="#contact" id="navContact">Contact</a>
+          <a href="mailto:hi@iedora.com">Contact</a>
         </div>
       </nav>
 
@@ -59,19 +59,20 @@ import { PageProgress } from "@iedora/design-system";
 </style>
 
 <!--
-  All choreography lives here. Ported 1:1 from the legacy script:
+  All choreography lives here:
   - wordmark letter reveal + body.ds-loaded
   - page-progress fill via --ds-pageprog-progress
-  - shoji slide-open + close (wordmark / Esc / Back / nav)
   - per-section scroll progress (--p on .ds-v-pin) driving:
       • mission: line draw + door-knob / stamp fade
       • slowly: timeline grow + mark lighting
       • quietly: wave bar collapse
       • work 01: QR tiles + analytics line + meta fade
+      • work 02: seal stroke-draw + sessions list + meta fade
       • together: rooms fill room-by-room
   - phrases crossfade keyed on the same --p
   - scroll-hint hides after first scroll
-  Throttled by a single rAF.
+  Throttled by a single rAF. No form / no shoji — contact is a plain
+  mailto link in the header.
 -->
 <script is:inline>
   (() => {
@@ -88,60 +89,6 @@ import { PageProgress } from "@iedora/design-system";
         document.body.classList.add("ds-loaded");
       }),
     );
-
-    // ── Shoji slide-open
-    const houseHeader = document.getElementById("houseHeader");
-    const wordmark = document.getElementById("wordmark");
-    const lintelMark = document.getElementById("lintelMark");
-    const closeContact = document.getElementById("closeContact");
-    const contactHouse = document.getElementById("contactHouse");
-    const navContact = document.getElementById("navContact");
-    const shoji = document.getElementById("shoji");
-    const contactForm = document.getElementById("contactForm");
-
-    function openHouse() {
-      if (!houseHeader || houseHeader.classList.contains("open")) return;
-      houseHeader.classList.add("open");
-      if (contactHouse) contactHouse.setAttribute("aria-hidden", "false");
-      setTimeout(() => {
-        const first = contactForm?.querySelector("input, textarea");
-        if (first) first.focus({ preventScroll: true });
-      }, 550);
-    }
-    function closeHouse() {
-      if (!houseHeader || !houseHeader.classList.contains("open")) return;
-      houseHeader.classList.remove("open");
-      if (contactHouse) contactHouse.setAttribute("aria-hidden", "true");
-      if (shoji) shoji.classList.remove("ds-shoji--sent");
-    }
-    wordmark?.addEventListener("click", openHouse);
-    wordmark?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        openHouse();
-      }
-    });
-    lintelMark?.addEventListener("click", closeHouse);
-    lintelMark?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        closeHouse();
-      }
-    });
-    closeContact?.addEventListener("click", closeHouse);
-    navContact?.addEventListener("click", (e) => {
-      e.preventDefault();
-      openHouse();
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && houseHeader?.classList.contains("open"))
-        closeHouse();
-    });
-    contactForm?.addEventListener("submit", (e) => {
-      e.preventDefault();
-      shoji?.classList.add("ds-shoji--sent");
-    });
 
     // ── Page progress
     const pageFill = document.querySelector(".ds-pageprog__fill");
