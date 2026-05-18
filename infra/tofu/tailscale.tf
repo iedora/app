@@ -57,9 +57,3 @@ resource "tailscale_federated_identity" "ci" {
   issuer      = "https://token.actions.githubusercontent.com"
   subject     = "repo:eduvhc/iedora:*"
 }
-
-# (Removed 2026-05-18: the legacy tailscale_oauth_client.ci has been
-# replaced by tailscale_federated_identity.ci above. The WIF flow is
-# validated; no CI workflow references the OAuth client anymore. The
-# corresponding BWS entries INFRA_CI_TAILSCALE_OAUTH_CLIENT_{ID,SECRET}
-# get removed by the same just infra::deploy run that destroys this.)

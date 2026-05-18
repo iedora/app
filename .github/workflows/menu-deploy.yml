@@ -43,6 +43,7 @@ permissions:
   actions: read
   id-token: write
   security-events: write
+  attestations: write
 
 jobs:
   deploy:

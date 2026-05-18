@@ -233,6 +233,13 @@ Adding a new workspace = one new file.
     design-system.yml            @iedora/design-system unit suite
     identity.yml                 @iedora/identity unit suite
     auth-testkit.yml             @iedora/auth-testkit unit suite
+    menu-deploy.yml              menu CD (workflow_run after green Menu CI, then _kamal-deploy)
+    genkan-deploy.yml            genkan CD (same shape)
+    house-deploy.yml             house CD (Astro → wrangler deploy)
+    _kamal-deploy.yml            reusable: kamal deploy + Trivy image scan + SLSA attestations
+    codeql.yml                   CodeQL SAST (TS+JS); push + PR + weekly cron
+    scorecard.yml                OpenSSF Scorecard posture grading; weekly cron
+    dependency-review.yml        block PRs that add HIGH/CRITICAL CVE deps
 ```
 
 **Two load-bearing decisions:**
@@ -269,6 +276,21 @@ Adding a new workspace = one new file.
   walks the OIDC handshake). Re-exports genkan's schema, so its
   `paths:` filter ALSO includes `products/genkan/src/shared/db/schema.ts`
   — a genkan schema change retriggers it.
+- **codeql.yml** — GitHub-native SAST. Runs on push/PR to main and
+  weekly Mon 04:30 UTC. `security-extended` query suite. Findings in
+  Security tab → Code scanning, grouped by language.
+- **scorecard.yml** — OpenSSF Scorecard. Runs Mon 05:00 UTC, publishes
+  results to OpenSSF's public API (enables a `scorecard` badge if we
+  want one in README). Two known low scores: Branch-Protection (off
+  by design) and Code-Review (solo project).
+- **dependency-review.yml** — `actions/dependency-review-action@v4`
+  on every PR; gates on HIGH+ severity. Complements menu/genkan's
+  post-merge Trivy fs scan by catching vulnerable deps at PR time.
+- **menu-deploy.yml / genkan-deploy.yml / house-deploy.yml** — CD
+  workflows. The two Kamal-based ones delegate to `_kamal-deploy.yml`
+  (reusable), which builds + deploys + runs a post-deploy Trivy image
+  scan + mints SLSA build-provenance + SBOM attestations attached to
+  GHCR via Sigstore. House goes straight to `wrangler deploy`.
 
 **Where env lives:**
 

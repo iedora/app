@@ -1,0 +1,65 @@
+# CodeQL SAST — GitHub's first-party static analysis.
+#
+# Complements Trivy (which is purely SCA — known CVEs in dependencies)
+# by catching application-level vulns: SQL injection, XSS, prototype
+# pollution, hardcoded crypto, taint flow from user input → exec, etc.
+#
+# Findings appear in the Security tab → Code scanning, grouped per
+# language. The `language` matrix is one entry today (TS+JS combined)
+# but stays a matrix so adding (say) `go` later is a one-line change.
+#
+# Why no paths filter: SAST signal lives in cross-cutting taint flow —
+# a vuln in a shared package can surface only when reached from a
+# product's entrypoint, so partial scans miss reachable findings.
+# Full repo scan every time keeps results sound.
+
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Monday 04:30 UTC — aligned with Renovate's weekly window so the
+    # security signal lands on the same morning Eduardo reviews PRs.
+    - cron: '30 4 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+      packages: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # `javascript-typescript` covers both .ts and .js in one analysis
+        # run — CodeQL's native combined language since 2024. Splitting
+        # them gains nothing and doubles the runtime.
+        language: ['javascript-typescript']
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # `security-extended` adds queries beyond the default suite
+          # (e.g. clear-text logging, weak crypto defaults). Some false-
+          # positive risk but solo-project — easier to triage than miss.
+          queries: security-extended
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:${{ matrix.language }}'

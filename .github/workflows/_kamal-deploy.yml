@@ -67,8 +67,9 @@ jobs:
     permissions:
       contents: read
       packages: write         # `docker push ghcr.io/...`
-      id-token: write         # GitHub-issued OIDC JWT for Tailscale WIF
+      id-token: write         # GitHub-issued OIDC JWT for Tailscale WIF + Sigstore attestations
       security-events: write  # post-deploy Trivy image scan → SARIF → Security tab
+      attestations: write     # SLSA build provenance + SBOM attestations attached to GHCR image
 
     env:
       # Selects the CI branch of the kamal deploy.yml ERB toggle (local build
@@ -266,3 +267,53 @@ jobs:
         with:
           sarif_file: trivy-image.sarif
           category: image-${{ inputs.product }}
+
+      # ── Supply-chain attestations (SLSA Level 3 provenance + SBOM) ─────────
+      #
+      # Sigstore + GitHub OIDC: every successful deploy mints a keyless
+      # Cosign signature tying the image digest to this workflow run, plus
+      # an SBOM attestation. Both are pushed to GHCR alongside the image
+      # (push-to-registry: true), so `gh attestation verify oci://...`
+      # works from any client without needing repo metadata.
+      #
+      # Skipped if the Trivy gate above failed — no point provenancing an
+      # image we don't trust. `if: success()` is the default but stated
+      # for clarity.
+      - name: Resolve image digest
+        id: digest
+        if: success()
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/${{ inputs.ghcr_user }}/${{ inputs.product }}:${{ inputs.sha }}"
+          # `buildx imagetools inspect` queries the registry without
+          # downloading the image. Our images are amd64-only so the top-
+          # level manifest digest IS the image digest (no manifest list).
+          DIGEST=$(docker buildx imagetools inspect "$IMAGE" --format '{{.Manifest.Digest}}')
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "[attest] image digest: $DIGEST"
+
+      - name: Attest SLSA build provenance
+        if: success()
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-name: ghcr.io/${{ inputs.ghcr_user }}/${{ inputs.product }}
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          push-to-registry: true
+
+      - name: Generate image SBOM
+        if: success()
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          image-ref: ghcr.io/${{ inputs.ghcr_user }}/${{ inputs.product }}:${{ inputs.sha }}
+          format: spdx-json
+          output: image-sbom.spdx.json
+          exit-code: '0'
+
+      - name: Attest image SBOM
+        if: success()
+        uses: actions/attest-sbom@v3
+        with:
+          subject-name: ghcr.io/${{ inputs.ghcr_user }}/${{ inputs.product }}
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          sbom-path: image-sbom.spdx.json
+          push-to-registry: true
