@@ -62,6 +62,27 @@ deploy:
     (cd ../../.. && bun install --frozen-lockfile)
     {{tofu}} init -upgrade -input=false >/dev/null
     {{tofu}} apply -auto-approve
+    # Write-through Tofu outputs to BWS so CI can read them without running
+    # Tofu (mirrors products/house/infra/justfile's pattern). Each apply
+    # refreshes these values, keeping BWS in sync if tunnel/R2 tokens rotate.
+    echo "[deploy] writing tofu outputs to BWS …"
+    for PAIR in "tunnel_token:INFRA_MENU_TUNNEL_TOKEN" \
+                "assets_endpoint:INFRA_MENU_ASSETS_ENDPOINT" \
+                "assets_bucket_name:INFRA_MENU_ASSETS_BUCKET" \
+                "assets_r2_access_key_id:INFRA_MENU_ASSETS_ACCESS_KEY" \
+                "assets_r2_secret_access_key:INFRA_MENU_ASSETS_SECRET_KEY" \
+                "assets_public_url:INFRA_MENU_ASSETS_PUBLIC_URL"; do
+      OUTPUT=${PAIR%%:*}
+      KEY=${PAIR##*:}
+      VAL=$({{tofu}} output -raw "$OUTPUT")
+      SECRET_ID=$(bws secret list "$BWS_PROJECT_ID" -o json | jq -r --arg k "$KEY" '.[] | select(.key==$k) | .id')
+      if [ -n "$SECRET_ID" ]; then
+        bws secret edit "$SECRET_ID" --value "$VAL" -o none >/dev/null
+      else
+        bws secret create -o none -- "$KEY" "$VAL" "$BWS_PROJECT_ID" >/dev/null
+      fi
+    done
+    echo "[deploy] ✓ BWS write-through complete"
     bin/with-secrets bash -c \
       'cd kamal && PATH="{{kamal-bin}}$PATH" exec kamal accessory boot all'
     if ssh -o ConnectTimeout=5 -o BatchMode=yes "root@${ONPREM_HOST}" \

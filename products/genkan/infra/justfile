@@ -45,6 +45,17 @@ deploy:
     (cd ../../.. && bun install --frozen-lockfile)
     {{tofu}} init -upgrade -input=false >/dev/null
     {{tofu}} apply -auto-approve
+    # Write-through Tofu output to BWS so CI reads from BWS, not Tofu state.
+    # Mirrors menu's pattern; only 1 value because genkan owns only the tunnel.
+    echo "[deploy] writing tunnel token to BWS …"
+    TUNNEL_TOKEN=$({{tofu}} output -raw tunnel_token)
+    SECRET_ID=$(bws secret list "$BWS_PROJECT_ID" -o json | jq -r '.[] | select(.key=="INFRA_GENKAN_TUNNEL_TOKEN") | .id')
+    if [ -n "$SECRET_ID" ]; then
+      bws secret edit "$SECRET_ID" --value "$TUNNEL_TOKEN" -o none >/dev/null
+    else
+      bws secret create -o none -- INFRA_GENKAN_TUNNEL_TOKEN "$TUNNEL_TOKEN" "$BWS_PROJECT_ID" >/dev/null
+    fi
+    echo "[deploy] ✓ BWS write-through complete"
     bin/with-secrets bash -c \
       'cd kamal && PATH="{{kamal-bin}}$PATH" exec kamal accessory boot all'
     if ssh -o ConnectTimeout=5 -o BatchMode=yes "root@${ONPREM_HOST}" \
