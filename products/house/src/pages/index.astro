@@ -247,6 +247,21 @@ import { PageProgress, ScreenLabel } from "@iedora/design-system";
         if (ww) ww.style.setProperty("--p", p.toFixed(4));
       }
 
+      // Work 02 (genkan): seal ring stroke-draws, then "i" + ticks fade
+      // in, then sessions list cascades, then meta fades. Sub-progresses:
+      //   seal-p: 0.00 → 0.55   (ring + i + ticks)
+      //   sess-p: 0.30 → 0.75   (4 hairline rows, --delay 0.00..0.30)
+      //   meta:   0.04 → 0.55   (matches w-meta's pacing)
+      if (value.classList.contains("w-sig")) {
+        const pin = value.querySelector(".ds-v-pin");
+        if (pin) {
+          pin.style.setProperty("--seal-p", localRange(p, 0, 0.55).toFixed(4));
+          pin.style.setProperty("--sess-p", localRange(p, 0.30, 0.75).toFixed(4));
+        }
+        const meta = value.querySelector(".work-meta");
+        if (meta) meta.style.setProperty("--meta", localRange(p, 0.04, 0.55).toFixed(4));
+      }
+
       // Work 01: QR cascade + analytics line + meta fade
       if (value.classList.contains("w-meta")) {
         const tiles = value.querySelectorAll(".qr-big i");
