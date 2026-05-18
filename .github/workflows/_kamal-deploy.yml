@@ -148,7 +148,11 @@ jobs:
           oauth-client-id: ${{ steps.ts.outputs.client_id }}
           oauth-secret: ${{ steps.ts.outputs.client_secret }}
           tags: tag:ci
-          version: 1.96.5
+          # `latest` is acceptable on a single-platform (ubuntu-24.04) runner —
+          # the cross-platform reproducibility issue (tailscale/github-action#284)
+          # only matters when the same workflow runs on macOS/Windows too.
+          # Re-pin to a specific x.y.z once we know what `latest` resolved to.
+          version: latest
           hostname: gha-${{ inputs.product }}-${{ github.run_id }}
           ping: iedora-homelab
 
