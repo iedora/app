@@ -88,6 +88,56 @@ Genkan reuses the same slice shape as menu, so menu's rules about ports / use-ca
    default; menu sign-up flows through genkan anyway, so the
    policy is effectively centralised).
 
+## Design language
+
+Genkan consumes `@iedora/design-system` — same palette, same type
+pairing, same primitives as house and menu. The brand surface stays
+unified across the federation; no genkan-only tokens, no parallel CSS
+language.
+
+Tokens + primitives reference: [`packages/design-system/README.md`](../../packages/design-system/README.md)
+and [`docs/components.md`](../../packages/design-system/docs/components.md).
+Canonical editorial composition: [`products/house/src/pages/index.astro`](../house/src/pages/index.astro).
+
+**Voice** — quieter than menu, more functional than house. Genkan isn't
+a marketing surface and it isn't a workshop floor; it's the threshold.
+Copy reads like a doorman, not a salesperson:
+
+- **Manual, not marketing.** No exclamation marks, no countdowns, no
+  "✨" or emoji adornments anywhere. Mirrors the brand Manual ("Quietly"
+  room in house).
+- **Latin numerals + mono detail.** Section indices and metadata read
+  as `/ 01 SESSION` in JetBrains Mono. Body copy is Fraunces.
+- **One cinnabar accent per surface.** A cinnabar dot, a live-pulse,
+  a "Sign in" arrow — pick one. The accent earns its noise.
+- **Italics carry the only soft emphasis.** Wrap a word in `<em>` to
+  mark it (the iedora idiom). Don't bold for emphasis on the marketing
+  surface; bold reads as "operational alert" in the design system.
+
+**Hard surfaces** (no marketing voice, pure operational chrome) —
+`/admin/*`, `/reauth`, the impersonation banner, audit log. These use
+the Manual § VI primitives directly: `Card`, `Field`, `Table`,
+`Button`, `Badge`. No flourish.
+
+**Brand surfaces** (room for editorial voice) — `/`, `/login`,
+`/signup`, `/consent`. These can use editorial chrome (`Wordmark`,
+`MetaStrip`, `Statement`, `Lintel`) and a thoughtful composition.
+Reference house's index.astro for the rhythm; genkan's pages are
+shorter and more functional, but the typographic language is
+identical.
+
+**Anti-patterns** — see also the design-system README; pinned here for
+visibility because they crop up on auth pages:
+
+- Reaching for a Tailwind utility class. Genkan's only styling
+  vocabulary is design-system tokens + `.ds-*` classes. If a token is
+  missing, add it to the design system, don't inline a hex.
+- A second sans-serif "for legibility". Fraunces + JetBrains Mono is
+  the whole pairing.
+- A coloured "primary action" button. The button variants are `solid`
+  (ink-on-paper or paper-on-ink), `ghost`, `accent` (cinnabar — for
+  destructive only). No blue, no green.
+
 ## File layout
 
 ```
