@@ -220,7 +220,11 @@
 .ds-lintel {
   display: grid;
   grid-template-columns: auto 1fr auto;
-  align-items: center;
+  /* baseline, not center — the hairline rule needs to sit at the
+     wordmark's text baseline (where the letters rest), not at the
+     row's vertical mid-point. Mirrors how `.ds-v-head` aligns its
+     section rule with the head label. */
+  align-items: baseline;
   gap: 18px;
   padding-bottom: 10px;
 }
@@ -228,7 +232,9 @@
   display: block;
   height: 1px;
   background: var(--ink-22);
-  align-self: center;
+  /* `align-items: baseline` puts non-text blocks' baselines at the
+     bottom of their margin box. A 2px lift drops the hairline visually
+     onto the wordmark's underline level. */
   transform: translateY(-2px);
 }
 
