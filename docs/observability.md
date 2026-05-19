@@ -190,7 +190,7 @@ Flow:
    `infra/tofu/access.tf`).
 3. Visitor signs in at Genkan (or skips this step if already signed in).
 4. Genkan bounces back to Cloudflare Access's callback
-   (`https://iedora.cloudflareaccess.com/cdn-cgi/access/callback`).
+   (`https://eduardoferdcarvalho.cloudflareaccess.com/cdn-cgi/access/callback`).
 5. Cloudflare Access verifies the OIDC id_token's `email` claim against
    the `cf_access_allowed_emails` allow-list. Allowed → set CF Access
    session cookie. Denied → "you don't have access" page.
