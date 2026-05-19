@@ -12,6 +12,11 @@ import "./landing.css";
  * /api/auth/oauth2/callback/genkan. Better Auth's `generic-oauth` plugin
  * exchanges the code for tokens and creates the local session — by the
  * time the browser lands on `/dashboard` the user is signed in.
+ *
+ * The proxy.ts redirect path for deep-linked-while-signed-out visitors
+ * uses `/sign-in?next=<path>` instead — see app/sign-in/page.tsx. This
+ * landing handler only fires from the explicit CTAs, where there's no
+ * meaningful original path to preserve.
  */
 function startGenkanSignIn(e: React.MouseEvent) {
   e.preventDefault();

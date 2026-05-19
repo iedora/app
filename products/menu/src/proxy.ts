@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessionCookie } from 'better-auth/cookies'
-import { GENKAN_URL } from '@/shared/brand'
 
 const protectedPrefixes = ['/dashboard', '/onboarding']
 
@@ -9,9 +8,20 @@ const protectedPrefixes = ['/dashboard', '/onboarding']
  * gate runs in the DAL — this only avoids a wasted RSC render when the
  * caller obviously isn't signed in.
  *
- * Menu's session cookie is now LOCAL (host-only on menu.iedora.com) — sign
- * in lives on Genkan and is routed there via OAuth. So when the cookie is
- * missing we send the browser to Genkan's /login.
+ * When the menu session cookie is missing we redirect to `/sign-in` —
+ * a dedicated client page that kicks off Better Auth's generic-oauth
+ * dance:
+ *   menu → genkan/authorize → (sign-in if needed at genkan) → menu
+ *   callback → menu session cookie set → redirect to `next`.
+ *
+ * This is Better Auth's recommended Next.js pattern (see
+ * better-auth.com/docs/integrations/next). Previous incarnation
+ * redirected to `genkan.iedora.com/login?next=…` directly, which caused
+ * ERR_TOO_MANY_REDIRECTS: signing in at genkan only sets a genkan-domain
+ * cookie, so the bounce back to menu arrived without a menu session
+ * cookie and the proxy looped. Cross-domain auth requires the full
+ * OAuth handshake to be initiated from menu's own host — the only way
+ * the local session cookie gets set on the menu domain.
  */
 export default function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname
@@ -20,8 +30,12 @@ export default function proxy(req: NextRequest) {
 
   const sessionCookie = getSessionCookie(req)
   if (!sessionCookie) {
-    const url = new URL(`${GENKAN_URL}/login`)
-    url.searchParams.set('next', `${req.nextUrl.origin}${path}`)
+    const url = req.nextUrl.clone()
+    url.pathname = '/sign-in'
+    url.search = ''
+    // Same-origin path. /sign-in's safeNextPath() rejects anything that
+    // isn't a same-origin path before passing to Better Auth.
+    url.searchParams.set('next', path)
     return NextResponse.redirect(url)
   }
 
