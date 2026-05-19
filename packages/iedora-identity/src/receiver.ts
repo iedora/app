@@ -168,62 +168,66 @@ export function createWebhookReceiver<Handlers extends Partial<HandlerMap>>(
         return new Response("malformed body", { status: 400 });
       }
 
-      // Idempotent receive: a replayed envelope (same `id` inside the
-      // window) returns 200 without invoking the handler, so the sender
-      // doesn't keep retrying.
-      if (await dedupStore.has(parsed.id)) {
-        return new Response("ok", { status: 200 });
-      }
-
-      const eventName = parsed.event as IdentityEventName;
-      // Single dynamic dispatch — index the handler map with the runtime
-      // tag and call it with the matching payload. We widen to `unknown`
-      // through a single cast because indexing a mapped type by a union
-      // key narrows to the intersection of payloads (which is `never` for
-      // disjoint payloads); the runtime correlation between `event` tag
-      // and `payload` shape was already established by `isIdentityEnvelope`.
-      const handler = (opts.on as Partial<HandlerMap>)[eventName] as
-        | ((payload: unknown) => void | Promise<void>)
-        | undefined;
-
-      if (!handler) {
-        if (warnOnUnknown) {
-          console.warn(
-            `[iedora-identity] no handler for event "${eventName}"; envelope id=${parsed.id}`,
-          );
-        }
-        // Still remember the id so a redelivered unknown event doesn't
-        // burn handler work on every retry.
-        await dedupStore.remember(parsed.id, dedupTtlMs);
-        return new Response("ok", { status: 200 });
-      }
-
       // Pick up the trace context the sender injected (`traceparent` +
-      // `tracestate`). Running the handler inside that context means any
-      // spans the handler creates stitch to the upstream trace in
-      // OpenObserve. propagation.extract is no-op safe when no propagator
-      // is registered or the headers aren't present.
+      // `tracestate`). Extract BEFORE any post-validation work so the
+      // entire receiver lifecycle — dedup check, handler dispatch, dedup
+      // write, unknown-event warning — runs inside the upstream trace.
+      // Means any spans/logs the dedup store or future enhancements emit
+      // stitch to the same trace OO sees from the sender side.
+      // propagation.extract is no-op safe when no propagator is registered
+      // or the headers aren't present.
       const incomingHeaders = Object.fromEntries(req.headers);
       const upstreamContext = propagation.extract(
         context.active(),
         incomingHeaders,
       );
 
-      try {
-        await context.with(upstreamContext, () =>
-          handler((parsed as IdentityEvent).payload),
-        );
-      } catch (e) {
-        console.error(
-          `[iedora-identity] handler for "${eventName}" threw:`,
-          e,
-        );
-        // Don't remember the id on handler failure — let the sender retry.
-        return new Response("handler error", { status: 500 });
-      }
+      return context.with(upstreamContext, async (): Promise<Response> => {
+        // Idempotent receive: a replayed envelope (same `id` inside the
+        // window) returns 200 without invoking the handler, so the sender
+        // doesn't keep retrying.
+        if (await dedupStore.has(parsed.id)) {
+          return new Response("ok", { status: 200 });
+        }
 
-      await dedupStore.remember(parsed.id, dedupTtlMs);
-      return new Response("ok", { status: 200 });
+        const eventName = parsed.event as IdentityEventName;
+        // Single dynamic dispatch — index the handler map with the runtime
+        // tag and call it with the matching payload. We widen to `unknown`
+        // through a single cast because indexing a mapped type by a union
+        // key narrows to the intersection of payloads (which is `never`
+        // for disjoint payloads); the runtime correlation between `event`
+        // tag and `payload` shape was already established by
+        // `isIdentityEnvelope`.
+        const handler = (opts.on as Partial<HandlerMap>)[eventName] as
+          | ((payload: unknown) => void | Promise<void>)
+          | undefined;
+
+        if (!handler) {
+          if (warnOnUnknown) {
+            console.warn(
+              `[iedora-identity] no handler for event "${eventName}"; envelope id=${parsed.id}`,
+            );
+          }
+          // Still remember the id so a redelivered unknown event doesn't
+          // burn handler work on every retry.
+          await dedupStore.remember(parsed.id, dedupTtlMs);
+          return new Response("ok", { status: 200 });
+        }
+
+        try {
+          await handler((parsed as IdentityEvent).payload);
+        } catch (e) {
+          console.error(
+            `[iedora-identity] handler for "${eventName}" threw:`,
+            e,
+          );
+          // Don't remember the id on handler failure — let the sender retry.
+          return new Response("handler error", { status: 500 });
+        }
+
+        await dedupStore.remember(parsed.id, dedupTtlMs);
+        return new Response("ok", { status: 200 });
+      });
     },
   };
 }

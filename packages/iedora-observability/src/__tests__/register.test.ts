@@ -91,6 +91,170 @@ describe("registerIedoraOtel", () => {
     }
   });
 
+  it("passes resource attributes from the env to registerOTel", async () => {
+    // Critical scenario: every span/metric carries service.version,
+    // host.name, deployment.environment.name. Dashboards filter on these.
+    // If a future refactor drops one (e.g. a typo on the env var name),
+    // every dashboard's "by host" / "by version" breakdown silently
+    // returns blank and we don't notice until someone tries to debug
+    // a per-host incident.
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+    const originalGitSha = process.env.GIT_SHA;
+    const originalHostName = process.env.HOST_NAME;
+    const originalDeploymentEnv = process.env.DEPLOYMENT_ENV;
+
+    process.env.NODE_ENV = "production";
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT =
+      "http://infra-openobserve.test:5080/api/default";
+    process.env.GIT_SHA = "abc1234deadbeef";
+    process.env.HOST_NAME = "homelab-pt-01";
+    process.env.DEPLOYMENT_ENV = "staging";
+
+    vi.resetModules();
+    const registerOtelSpy = vi.fn();
+    vi.doMock("@vercel/otel", () => ({
+      registerOTel: registerOtelSpy,
+    }));
+
+    try {
+      const { registerIedoraOtel } = await import("../register");
+      registerIedoraOtel({ serviceName: "iedora-test-resource" });
+      expect(registerOtelSpy).toHaveBeenCalledTimes(1);
+      const config = registerOtelSpy.mock.calls[0]?.[0] as {
+        serviceName: string;
+        attributes: Record<string, string>;
+      };
+      expect(config.serviceName).toBe("iedora-test-resource");
+      expect(config.attributes).toMatchObject({
+        // Canonical semconv keys — pinned by literal so a string drift
+        // in @opentelemetry/semantic-conventions breaks the test, not
+        // production dashboards.
+        "service.name": "iedora-test-resource",
+        "service.namespace": "iedora",
+        "service.version": "abc1234deadbeef",
+        "host.name": "homelab-pt-01",
+        // DEPLOYMENT_ENV wins over NODE_ENV when both are set — matches
+        // the "fleet manifest is the source of truth" intent from #8.
+        "deployment.environment.name": "staging",
+      });
+    } finally {
+      vi.doUnmock("@vercel/otel");
+      process.env.NODE_ENV = originalNodeEnv;
+      if (originalEndpoint !== undefined) {
+        process.env.OTEL_EXPORTER_OTLP_ENDPOINT = originalEndpoint;
+      } else {
+        delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+      }
+      if (originalGitSha !== undefined) {
+        process.env.GIT_SHA = originalGitSha;
+      } else {
+        delete process.env.GIT_SHA;
+      }
+      if (originalHostName !== undefined) {
+        process.env.HOST_NAME = originalHostName;
+      } else {
+        delete process.env.HOST_NAME;
+      }
+      if (originalDeploymentEnv !== undefined) {
+        process.env.DEPLOYMENT_ENV = originalDeploymentEnv;
+      } else {
+        delete process.env.DEPLOYMENT_ENV;
+      }
+    }
+  });
+
+  it("falls back to NODE_ENV when DEPLOYMENT_ENV is unset", async () => {
+    // Most deploys today (pre-#8 fleet manifest) don't set DEPLOYMENT_ENV.
+    // NODE_ENV is the fallback so dashboards still have something to filter
+    // on. Pin the fallback ordering.
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+    const originalDeploymentEnv = process.env.DEPLOYMENT_ENV;
+
+    process.env.NODE_ENV = "production";
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT =
+      "http://infra-openobserve.test:5080/api/default";
+    delete process.env.DEPLOYMENT_ENV;
+
+    vi.resetModules();
+    const registerOtelSpy = vi.fn();
+    vi.doMock("@vercel/otel", () => ({
+      registerOTel: registerOtelSpy,
+    }));
+
+    try {
+      const { registerIedoraOtel } = await import("../register");
+      registerIedoraOtel({ serviceName: "iedora-test-fallback" });
+      const config = registerOtelSpy.mock.calls[0]?.[0] as {
+        attributes: Record<string, string>;
+      };
+      expect(config.attributes["deployment.environment.name"]).toBe("production");
+    } finally {
+      vi.doUnmock("@vercel/otel");
+      process.env.NODE_ENV = originalNodeEnv;
+      if (originalEndpoint !== undefined) {
+        process.env.OTEL_EXPORTER_OTLP_ENDPOINT = originalEndpoint;
+      } else {
+        delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+      }
+      if (originalDeploymentEnv !== undefined) {
+        process.env.DEPLOYMENT_ENV = originalDeploymentEnv;
+      }
+    }
+  });
+
+  it("omits service.version and host.name when their env vars are unset (no phantom empty labels)", async () => {
+    // Local dev or first-boot edge case: GIT_SHA + HOST_NAME aren't set.
+    // The package omits those keys (rather than setting them to empty
+    // string) so OO dashboards don't grow a "(empty)" bucket. Pinned
+    // here against a future "always set everything to ''" refactor.
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+    const originalGitSha = process.env.GIT_SHA;
+    const originalHostName = process.env.HOST_NAME;
+
+    process.env.NODE_ENV = "production";
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT =
+      "http://infra-openobserve.test:5080/api/default";
+    delete process.env.GIT_SHA;
+    delete process.env.HOST_NAME;
+
+    vi.resetModules();
+    const registerOtelSpy = vi.fn();
+    vi.doMock("@vercel/otel", () => ({
+      registerOTel: registerOtelSpy,
+    }));
+
+    try {
+      const { registerIedoraOtel } = await import("../register");
+      registerIedoraOtel({ serviceName: "iedora-test-min-env" });
+      const config = registerOtelSpy.mock.calls[0]?.[0] as {
+        attributes: Record<string, string>;
+      };
+      // Pinned omissions.
+      expect("service.version" in config.attributes).toBe(false);
+      expect("host.name" in config.attributes).toBe(false);
+      // Always-present keys still there.
+      expect(config.attributes["service.name"]).toBeDefined();
+      expect(config.attributes["service.namespace"]).toBe("iedora");
+    } finally {
+      vi.doUnmock("@vercel/otel");
+      process.env.NODE_ENV = originalNodeEnv;
+      if (originalEndpoint !== undefined) {
+        process.env.OTEL_EXPORTER_OTLP_ENDPOINT = originalEndpoint;
+      } else {
+        delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+      }
+      if (originalGitSha !== undefined) {
+        process.env.GIT_SHA = originalGitSha;
+      }
+      if (originalHostName !== undefined) {
+        process.env.HOST_NAME = originalHostName;
+      }
+    }
+  });
+
   it("constructs the OTLP metric exporter with DELTA temporality (counters are sum-aggregatable)", async () => {
     // Pinned against the OTLP exporter default (CUMULATIVE). Caught by
     // Codex on PR #14: a CUMULATIVE counter sends process-lifetime totals

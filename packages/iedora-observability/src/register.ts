@@ -53,7 +53,7 @@ const DEFAULT_METRIC_EXPORT_INTERVAL_MS = 60_000;
  * Patterns match Next 16's auto-generated span names of shape
  * `[METHOD] [route]`, e.g. `GET /up` or `GET /api/track/[slug]`.
  */
-const NOISE_PATTERNS: RegExp[] = [
+export const NOISE_PATTERNS: RegExp[] = [
   /\s\/up$/,
   /\s\/api\/track\//,
 ];
@@ -62,8 +62,12 @@ const NOISE_PATTERNS: RegExp[] = [
  * Wraps an inner Sampler with a span-name regex denylist. Filter happens
  * BEFORE the inner sampler, so a denied span costs nothing past the
  * shouldSample() call — no record, no export.
+ *
+ * Exported for the test suite (`__tests__/sampler.test.ts`). Not re-exported
+ * from the barrel — this is an internal mechanism, callers shouldn't
+ * construct it directly.
  */
-class NoiseFilteringSampler implements Sampler {
+export class NoiseFilteringSampler implements Sampler {
   constructor(private readonly inner: Sampler) {}
 
   shouldSample(
@@ -102,7 +106,7 @@ class NoiseFilteringSampler implements Sampler {
  * stitched to a nonexistent parent. Parent-based honours the upstream's
  * decision; the root sampler only fires when there's no parent.
  */
-function defaultSampler(environment: string): Sampler {
+export function defaultSampler(environment: string): Sampler {
   const root =
     environment === "production"
       ? new TraceIdRatioBasedSampler(0.1)
