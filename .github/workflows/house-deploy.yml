@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
-      contents: read
+      contents: write  # commit the encrypted tfstate back after apply
 
     env:
       BWS_ACCESS_TOKEN: ${{ secrets.BWS_ACCESS_TOKEN }}
@@ -82,3 +82,34 @@ jobs:
       - name: just house::deploy
         working-directory: products/house/infra
         run: just deploy
+
+      - name: Commit state back to main
+        # Same rationale as infra-deploy.yml: encrypted Tofu state is the
+        # source of truth, CI applies that don't commit back leave git
+        # stale and the next run drifts. Idempotent — skips when there's
+        # no state diff.
+        if: success()
+        working-directory: products/house/infra
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- tofu/terraform.tfstate; then
+            echo "[house-deploy] no state changes — nothing to commit"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tofu/terraform.tfstate
+          git commit -m "chore(house): tfstate updated by CI (${GITHUB_WORKFLOW} #${GITHUB_RUN_NUMBER})
+
+Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+Triggered by: ${GITHUB_EVENT_NAME}"
+          for i in 1 2; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" || true
+            if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              echo "[house-deploy] state committed + pushed"
+              exit 0
+            fi
+            echo "[house-deploy] push attempt $i failed, retrying..."
+          done
+          echo "[house-deploy] FAIL: couldn't push state after 2 attempts" >&2
+          exit 1
