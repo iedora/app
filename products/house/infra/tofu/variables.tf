@@ -1,13 +1,13 @@
 variable "cloudflare_api_token" {
   description = <<-EOT
     Bootstrap Cloudflare API token. Permissions for this root:
-      - Account · Workers Scripts · Edit       (to mint the workload token)
-      - Account · Account Settings · Read
-      - Zone · DNS · Edit                       (to mint the workload token)
-      - User · API Tokens · Edit                (to create/replace the workload token itself)
-    Provide via TF_VAR_cloudflare_api_token (set by bin/with-secrets from BWS).
-    The same BWS token can serve every product's Tofu root if granted every
-    permission any of them require (one bootstrap, many workload tokens).
+      - Account · Workers Scripts · Edit       (upload + manage script + assets)
+      - Account · Account Settings · Read      (zone lookup)
+      - Zone · DNS · Edit                       (custom_domain auto-DNS)
+      - Zone · Workers Routes · Edit            (custom_domain binding)
+    Provide via TF_VAR_cloudflare_api_token (set by bin/with-secrets from
+    BWS key INFRA_CLOUDFLARE_API_TOKEN). The same BWS token serves every
+    iedora product's Tofu root.
   EOT
   type        = string
   sensitive   = true
@@ -35,12 +35,18 @@ variable "account_id" {
 }
 
 variable "worker_name" {
-  description = <<-EOT
-    Cloudflare Worker name for the house site. Lowercase, kebab-case. Must
-    match `name = "..."` in products/house/wrangler.toml — the workload
-    token's name uses this as its prefix, and a mismatch only affects
-    cosmetics in the dashboard, not the deploy.
-  EOT
+  description = "Cloudflare Worker name. Lowercase, kebab-case. Appears in the dashboard + the *.workers.dev sub if ever re-enabled."
   type        = string
   default     = "iedora-com"
+
+  validation {
+    condition     = can(regex("^[a-z0-9-]+$", var.worker_name))
+    error_message = "worker_name must be lowercase letters, digits, and hyphens."
+  }
+}
+
+variable "zone_name" {
+  description = "Apex domain. Drives the cloudflare_zone lookup + the custom domain hostname."
+  type        = string
+  default     = "iedora.com"
 }

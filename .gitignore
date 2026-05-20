@@ -20,6 +20,10 @@ node_modules/
 .next/
 /out/
 
+# Astro build output — products/house/dist is regenerated on every deploy
+# (Tofu reads it during apply). Don't track build artifacts.
+products/house/dist/
+
 # production
 /build
 

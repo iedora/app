@@ -4,9 +4,15 @@ Root page of `iedora.com`. Static, self-contained.
 
 Not part of the Next.js menu app (which lives at `menu.iedora.com`). This is
 an **Astro** site that consumes `@iedora/design-system` — the same primitives
-and tokens menu and genkan use — and renders everything to plain HTML at
-build time. Zero JS ships to the browser. It deploys to **Cloudflare Workers
-Static Assets** (the successor to Pages, which was deprecated April 2025).
+and tokens menu uses — and renders everything to plain HTML at build time.
+Zero JS ships to the browser.
+
+Deploys to **Cloudflare Workers Static Assets** (the successor to Pages,
+deprecated April 2025), fully declaratively: one `tofu apply` uploads the
+`dist/` directory, reconciles the worker script, binds `iedora.com` as a
+custom domain, and provisions the TLS cert. No wrangler in the deploy
+path — the `cloudflare/cloudflare` Terraform provider v5.11+ implements
+Cloudflare's `assets-upload-session` API directly.
 
 ## Layout
 
@@ -16,17 +22,16 @@ products/house/
 ├── astro.config.mjs    static output → dist/, React integration, port 3002
 ├── package.json        astro + @astrojs/react + workspace dep on design-system
 ├── tsconfig.json       extends astro/tsconfigs/strict
-├── wrangler.toml       Cloudflare Worker config (name + assets dir + apex route)
 ├── src/
 │   ├── pages/index.astro       composes the home page
 │   ├── layouts/BaseLayout.astro html/head shell, Google Fonts
 │   ├── components/             HouseHeader, HouseWorks, HouseFooter
 │   └── styles/global.css       imports @iedora/design-system/styles.css
-├── dist/                       build output — what wrangler uploads
+├── dist/                       build output — what Tofu uploads to CF
 ├── site-legacy/                the previous 1789-line static site, kept for ref
-└── infra/                      Tofu root + justfile (NOT shipped to Workers)
+└── infra/                      Tofu root + justfile (NOT shipped to CF)
     ├── justfile        `just house::deploy` lives here
-    ├── tofu/           ONE resource: the narrow workload deploy token
+    ├── tofu/           cloudflare_workers_script + cloudflare_workers_custom_domain
     └── bin/with-secrets BWS env wrapper
 ```
 
@@ -45,60 +50,31 @@ From the repo root:
 
     just house::deploy
 
-That sequences three steps:
+That recipe runs:
 
 1. `bun run build` from `products/house/` → `dist/`
-2. `tofu apply` in `products/house/infra/tofu/` — idempotent; mints / refreshes
-   the workload `cloudflare_api_token` (Workers Scripts: Edit + DNS: Edit).
-3. `wrangler deploy` (run from `products/house/`, reads `wrangler.toml`) —
-   uploads `dist/`, binds the apex domain `iedora.com` with
-   `custom_domain = true` (Cloudflare auto-creates the DNS record + cert),
-   and pins `workers_dev = false` so the site is only reachable at
-   `iedora.com`.
+2. `tofu apply` in `products/house/infra/tofu/`. The provider scans
+   `dist/`, hashes every file, opens an `assets-upload-session` against
+   Cloudflare, uploads changed files in parallel, then reconciles the
+   `cloudflare_workers_script.house` + `cloudflare_workers_custom_domain.apex`
+   resources. Idempotent — unchanged files skip upload.
 
-### URLs after a deploy
+Same recipe runs in CI on every push that touches `products/house/**`
+(see `.github/workflows/house-deploy.yml`).
 
-`workers_dev = false` in `wrangler.toml` closes the `<worker>.workers.dev`
-preview URL completely — `iedora.com` is the only entry point. The
-Pages-era Bulk Redirect that bounced `*.pages.dev → iedora.com` is gone;
-nothing leaks to redirect.
+## Why Workers, not Pages
 
-## Architecture note — why Workers, not Pages
-
-Cloudflare deprecated Pages in **April 2025**. Workers Static Assets reached
-feature parity for static sites with custom domains in **early 2026** and
-is where every new Cloudflare deploy primitive lands first (or only). The
-Astro build output already has the shape Workers Static Assets expects, so
-the migration was minor: a new `wrangler.toml`, a much smaller Tofu root
-(one resource down from five), and `wrangler deploy` instead of
-`wrangler pages deploy`.
-
-### Migrating an existing Pages-era deploy
-
-If this repo was previously deployed via the Pages-era config (apex DNS +
-Pages project + Bulk Redirect all in Tofu), do this once:
-
-```
-# On the old Pages-era files (or with the old state):
-just house::destroy        # tears down Pages project + DNS + redirect
-
-# Switch to these new files (or pull from main):
-just house::deploy         # provisions worker + DNS + cert from scratch
-```
-
-Brief downtime between the two commands while DNS swaps from
-`<project>.pages.dev` to the Workers route — fine since this is a brand
-site with no transactional traffic.
+Cloudflare deprecated Pages in April 2025. Workers Static Assets reached
+feature parity for static sites with custom domains in early 2026, and the
+Terraform provider got native directory uploads in v5.11 (Oct 2025) — which
+removed the last reason to keep wrangler in the deploy path.
 
 ## Rendering model — static, with a clear escape hatch
 
-`astro.config.mjs` is pinned at `output: 'static'`. Every byte ships as
-a prebuilt asset; the Worker entrypoint in `wrangler.toml` is
-deliberately absent. No request to `iedora.com` invokes server code —
-Cloudflare's edge serves the response directly. This is intentional for
-a brand site with no per-request data, and it matches Cloudflare's own
-[Astro framework guide](https://developers.cloudflare.com/workers/framework-guides/web-apps/astro/):
-static-first, add dynamic only when something concretely needs it.
+`astro.config.mjs` is pinned at `output: 'static'`. Every byte ships as a
+prebuilt asset; the Worker `content` is a 1-line 404 stub that never runs
+in steady state — Cloudflare's edge serves `dist/404.html` directly when
+no file matches. No request to `iedora.com` invokes server code.
 
 If a single component ever needs dynamic data (latest works pulled from
 an API, geo-aware copy, an A/B headline), reach for **Astro Server
@@ -109,7 +85,7 @@ Islands** — not full SSR:
    ```js
    import cloudflare from '@astrojs/cloudflare';
    export default defineConfig({
-     output: 'static',         // stays static-by-default
+     output: 'static',
      adapter: cloudflare(),    // unlocks the island runtime
      integrations: [react()],
    });
@@ -120,12 +96,11 @@ Islands** — not full SSR:
      <Fragment slot="fallback">Loading…</Fragment>
    </LatestWork>
    ```
-4. Add `main = "./dist/_worker.js/index.js"` to `wrangler.toml`.
+4. Replace the 404 stub in `iedora.tf` with the path Astro emits
+   (`./dist/_worker.js/index.js`).
 
 Result: every other route still serves from the edge with zero Worker
-invocations; only the island fragment hits the Worker. `output: 'server'`
-on every route is overkill for this site — revisit only if a second
-route appears that genuinely needs per-request rendering.
+invocations; only the island fragment hits the Worker.
 
 ## Design source
 

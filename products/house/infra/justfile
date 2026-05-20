@@ -1,14 +1,8 @@
 # House — iedora.com root brand site (Astro on Cloudflare Workers Static Assets).
 #
-# Layout: one Tofu root (tofu/ — workload deploy token only; everything else
-# the worker needs is created by wrangler on deploy), one .env with shared
-# BWS access, one `bin/with-secrets` that injects the BWS env + TF_VAR_*
-# aliases for `tofu apply`.
-#
-# Deployable content comes from `astro build` → `products/house/dist/`. The
-# build runs first, then Tofu mints / refreshes the narrow workload token,
-# then wrangler reads ../wrangler.toml and uploads dist + binds iedora.com
-# + provisions the TLS cert in one shot.
+# One Tofu root (`tofu/`) owns the entire deploy end-to-end since cloudflare/
+# cloudflare provider v5.11+ added native directory asset uploads to
+# `cloudflare_workers_script`. There is no wrangler in this workflow.
 #
 # `just` (no args) lists every recipe.
 
@@ -16,62 +10,10 @@ set dotenv-load := true
 
 tofu := "bin/with-secrets tofu -chdir=tofu"
 
-# Default: list recipes.
 _default:
     @just --list --unsorted
 
-# Deploy is CI-driven: triggers house-deploy.yml which builds Astro + uploads
-# via wrangler. Single mutation surface, auditable in GH run history. Same
-# pattern as menu + genkan.
-#
-# Cloudflare workload token (the narrow wrangler-deploy credential) is minted
-# by Tofu and rotated via `just house::rotate-token` when needed — independent
-# of routine deploys.
-deploy:
-    @gh workflow run house-deploy.yml --ref "$(git rev-parse HEAD)"
-    @echo "→ house deploy triggered. Watch: gh run watch  (or: gh run list --workflow=house-deploy.yml --limit 1)"
-
-# Local-only Tofu apply for the narrow workers-deploy token. Writes the new
-# token into BWS so CI reads it on its next run. Rare — token is set-and-forget
-# unless suspected leak (then use `rotate-token` below).
-infra:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    {{tofu}} init -upgrade -input=false >/dev/null
-    {{tofu}} apply -auto-approve
-    DEPLOY_TOKEN=$({{tofu}} output -raw workers_deploy_token)
-    SECRET_ID=$(bws secret list "$BWS_PROJECT_ID" -o json \
-      | jq -r '.[] | select(.key=="INFRA_HOUSE_WORKERS_TOKEN") | .id')
-    if [ -n "$SECRET_ID" ]; then
-      bws secret edit "$SECRET_ID" --value "$DEPLOY_TOKEN" -o none
-    else
-      bws secret create -o none -- INFRA_HOUSE_WORKERS_TOKEN "$DEPLOY_TOKEN" "$BWS_PROJECT_ID"
-    fi
-    echo "[infra] ✓ done. Now run 'just house::deploy' to roll the new token."
-
-# Rotate the narrow workload token. Mints a fresh one via Tofu, write-through
-# to BWS, then redeploys so CI's next run uses the same fresh token.
-#
-# Use this — NOT bare `tofu apply -replace=...` — to keep BWS in sync.
-# Drift between Tofu state and BWS would make house CI fail (401 from
-# Cloudflare); recovering requires re-running this recipe.
-rotate-token:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    {{tofu}} init -upgrade -input=false >/dev/null
-    {{tofu}} apply -replace=cloudflare_api_token.workers_deploy -auto-approve
-    NEW_TOKEN=$({{tofu}} output -raw workers_deploy_token)
-    SECRET_ID=$(bws secret list "$BWS_PROJECT_ID" -o json \
-      | jq -r '.[] | select(.key=="INFRA_HOUSE_WORKERS_TOKEN") | .id')
-    if [ -n "$SECRET_ID" ]; then
-      bws secret edit "$SECRET_ID" --value "$NEW_TOKEN" -o none
-    else
-      bws secret create INFRA_HOUSE_WORKERS_TOKEN "$NEW_TOKEN" "$BWS_PROJECT_ID" -o none
-    fi
-    echo "✓ workload token rotated; BWS updated; next 'just house::deploy' (or push to main) picks it up"
-
-# Build the static site without deploying — fast local sanity check before
-# `just deploy`. Equivalent to `cd .. && bun run build` from products/house/.
+# Build the static site without deploying — fast local sanity check.
 build:
     cd .. && bun run build
 
@@ -79,14 +21,16 @@ build:
 preview:
     cd .. && bun run preview
 
-# Tear down: deletes the worker (and its custom domain + DNS record) via
-# wrangler, then revokes the workload token via tofu. Both steps are idempotent.
+# Full declarative deploy: build dist/, then `tofu apply` to upload the
+# assets + reconcile the worker / custom-domain / TLS cert.
+#
+# Same recipe runs in CI (.github/workflows/house-deploy.yml). Idempotent —
+# unchanged files skip upload via Cloudflare's asset hash check.
+deploy: build
+    {{tofu}} init -upgrade -input=false
+    {{tofu}} apply -auto-approve
+
+# Tear down: deletes the worker (which removes the custom domain + DNS
+# record + TLS cert as part of the same destroy) via Tofu. Idempotent.
 destroy:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    DEPLOY_TOKEN=$({{tofu}} output -raw workers_deploy_token 2>/dev/null || true)
-    if [ -n "$DEPLOY_TOKEN" ]; then
-      (cd .. && CLOUDFLARE_API_TOKEN="$DEPLOY_TOKEN" \
-        bunx wrangler@latest delete --name iedora-com) || true
-    fi
     {{tofu}} destroy -auto-approve

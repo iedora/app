@@ -1,110 +1,81 @@
-# House (iedora.com) — Tofu root for the Workers Static Assets deploy.
+# House (iedora.com) — fully declarative Astro deploy on Cloudflare Workers
+# Static Assets.
 #
-# Owns ONE thing: a narrow Cloudflare API token that wrangler uses to push
-# the worker + assets at `iedora.com`. Everything else — the worker itself,
-# the DNS record at the apex, the TLS cert — is created by `wrangler deploy`
-# reading products/house/wrangler.toml (workers_dev=false + custom_domain
-# route). Cloudflare absorbed all of those concerns into the Worker.
+# Owns end-to-end: the Worker script, the static asset bundle (uploaded by
+# Tofu via Cloudflare's `assets-upload-session` API since provider v5.11+),
+# the custom domain at iedora.com, and the TLS cert / proxied DNS record
+# the Workers API auto-creates under `cloudflare_workers_custom_domain`.
+# No wrangler in the deploy path — `bun run build` → `tofu apply`.
 #
-# What this DOESN'T need to manage (vs. the previous Pages-era setup):
-#   - cloudflare_pages_project          (Pages gone)
-#   - cloudflare_pages_domain           (Pages gone)
-#   - cloudflare_dns_record (apex)      (wrangler creates it via custom_domain)
-#   - account-level Bulk Redirect       (workers_dev=false closes the leak)
-#
-# Migration note: if you previously ran the Pages-era version of this root,
-# run `just house::destroy` on the OLD files FIRST to clear those resources
-# from state, then pull these new files and `just house::deploy` for a clean
-# Workers setup. State is encrypted so a stale state file won't accidentally
-# leak old tokens.
+# Why no narrow workload token any more:
+#   The provider authenticates with the SAME bootstrap CF token Tofu uses
+#   to mint everything else (passed in via TF_VAR_cloudflare_api_token).
+#   Minting a derived shorter-scope token bought nothing in CI — it was
+#   the parent token that exposed it anyway. One credential, two consumers,
+#   both authenticated against the same audit trail in Cloudflare.
 
-# ── Workload token for wrangler ──────────────────────────────────────────────
-#
-# The bootstrap token in BWS (TF_VAR_cloudflare_api_token) is what Tofu uses
-# to provision this resource — it's admin-ish, because Tofu can't provision
-# its own credential (chicken/egg). It never leaves the parent shell.
-#
-# For `wrangler deploy` we mint a narrower token with just what an asset
-# deploy actually needs:
-#   - Account · Workers Scripts · Edit   (write the worker + upload assets)
-#   - Zone · DNS · Edit                  (for the auto-created custom domain)
-#
-# Rotation: `tofu apply -replace=cloudflare_api_token.workers_deploy`
-# regenerates the token value; wrangler picks the new one up on the next
-# deploy because the justfile reads it from `tofu output` every run.
-#
-# Permission group IDs are hardcoded (the v5 Cloudflare provider dropped
-# the `cloudflare_api_token_permission_groups` data source in favor of
-# stable hardcoded IDs). If Cloudflare ever rotates one, look up the new
-# value with:
-#
-#   curl -s -H "Authorization: Bearer $BOOTSTRAP_TOKEN" \
-#     https://api.cloudflare.com/client/v4/user/tokens/permission_groups \
-#     | jq '.result[] | select(.name | test("Workers Scripts Write|Workers Routes Write|DNS Write"))'
-
-locals {
-  # Account-scope: upload + manage the worker script + its assets.
-  permission_group_workers_scripts_write = "e086da7e2179491d91ee5f35b3ca210a"
-  # Zone-scope: bind / unbind the worker route at iedora.com. Wrangler GETs
-  # /zones/{id}/workers/routes during every deploy to check what's already
-  # bound; without this it 403s before the route is created.
-  permission_group_workers_routes_write = "28f4b596e7d643029c524985477ae49a"
-  # Zone-scope: edit DNS records (the proxied AAAA at the apex that
-  # `custom_domain = true` triggers Cloudflare to create).
-  permission_group_dns_write = "4755a26eedb94da69e1066d98aa820be"
-
-  zone_resources = jsonencode({
-    "com.cloudflare.api.account.${var.account_id}" = {
-      "com.cloudflare.api.account.zone.*" = "*"
-    }
-  })
+data "cloudflare_zone" "iedora" {
+  filter = { name = var.zone_name }
 }
 
-resource "cloudflare_api_token" "workers_deploy" {
-  name = "${var.worker_name}-workers-deploy"
+# ── Worker + static assets ───────────────────────────────────────────────────
+#
+# `assets.directory` is a relative path on the operator's machine (or the
+# CI runner). The provider scans the directory, computes per-file hashes,
+# opens an `assets-upload-session` against Cloudflare, uploads each file
+# (chunked, parallel), and binds the completion token to the script in
+# one apply step. Subsequent applies skip unchanged files.
+#
+# Stub `content` is required because every Worker script must have a main
+# module — even when assets serve directly (which they do by default when
+# a request matches a file). The stub only runs on miss; the
+# `not_found_handling = "404-page"` setting below makes Cloudflare serve
+# `dist/404.html` directly without invoking the stub.
 
-  # KNOWN BUG: the cloudflare/cloudflare v5 provider returns api_token
-  # `policies` (and the `permission_groups` inside each policy) in a
-  # non-deterministic order, so every apply trips "Provider produced
-  # inconsistent result after apply" even with no real change.
-  # Splitting one permission_group per policy isn't enough — the order
-  # of the policies themselves drifts too. Workaround: ignore drift on
-  # `policies` after first create. Auditing the token's actual perms
-  # is a dashboard concern from then on.
-  #
-  # Reference: github.com/cloudflare/terraform-provider-cloudflare#5849
-  # (or similar — track upstream for a fix that lets us drop the lifecycle).
-  lifecycle {
-    ignore_changes = [policies]
+resource "cloudflare_workers_script" "house" {
+  account_id  = var.account_id
+  script_name = var.worker_name
+
+  # Tiny inline module — the stub never executes in steady state because
+  # `dist/404.html` exists and `not_found_handling = "404-page"` makes the
+  # asset layer serve it directly. Kept as a defensive fallback if Astro
+  # ever stops emitting a 404 page.
+  content     = "export default { async fetch() { return new Response(null, { status: 404 }) } }"
+  main_module = "worker.js"
+
+  # Bump when adopting a newer Workers runtime; keeps deploys pinned to
+  # known semantics. Same date convention as the rest of the iedora TF.
+  compatibility_date = "2026-05-15"
+
+  # Astro's static build output. Relative to this .tf file:
+  #   infra/tofu/iedora.tf → ../../dist
+  # CI (or `just house::deploy`) runs `bun run build` first.
+  assets = {
+    directory = "${path.module}/../../dist"
+    config = {
+      # Add a trailing slash to extensionless URLs. Matches Astro's
+      # default routing.
+      html_handling = "auto-trailing-slash"
+      # Serve dist/404.html on miss. Astro emits it from 404.astro.
+      not_found_handling = "404-page"
+    }
   }
+}
 
-  policies = [
-    {
-      effect = "allow"
-      permission_groups = [
-        { id = local.permission_group_workers_scripts_write }
-      ]
-      resources = jsonencode({
-        "com.cloudflare.api.account.${var.account_id}" = "*"
-      })
-    },
-    {
-      effect = "allow"
-      permission_groups = [
-        { id = local.permission_group_workers_routes_write }
-      ]
-      # All zones in the account — wrangler only touches the zone matching
-      # the route in wrangler.toml. Tighten by replacing the wildcard with
-      # "com.cloudflare.api.account.zone.<zone_id>" if you'd rather scope
-      # this token to a single zone (requires a data "cloudflare_zone").
-      resources = local.zone_resources
-    },
-    {
-      effect = "allow"
-      permission_groups = [
-        { id = local.permission_group_dns_write }
-      ]
-      resources = local.zone_resources
-    },
-  ]
+# ── Custom domain at the apex ────────────────────────────────────────────────
+#
+# Cloudflare's `workers_custom_domain` resource:
+#   1. Creates a proxied AAAA DNS record at the apex (zone-level).
+#   2. Issues + renews the TLS cert via Cloudflare's edge.
+#   3. Binds requests for the hostname to the worker.
+# Single declarative call, no separate `cloudflare_dns_record` needed.
+#
+# `environment` field is deprecated for assets-only scripts (cf TF
+# provider issue #5618) — omitted intentionally.
+
+resource "cloudflare_workers_custom_domain" "apex" {
+  account_id = var.account_id
+  zone_id    = data.cloudflare_zone.iedora.zone_id
+  hostname   = var.zone_name
+  service    = cloudflare_workers_script.house.script_name
 }
