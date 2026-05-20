@@ -79,8 +79,7 @@ func applyDevStack(selected []string, repoRoot, devTofuDir string) {
 	// random_password / module.menu_env need the runtime PAT and
 	// aren't part of this pass; targeting keeps stale state from
 	// previous failed runs from tripping the apply.
-	pass1 := append([]string{
-		"apply", "-auto-approve", "-input=false",
+	targets := []string{
 		"-target=docker_network.iedora",
 		"-target=docker_volume.postgres_data",
 		"-target=docker_volume.localstack_data",
@@ -93,12 +92,22 @@ func applyDevStack(selected []string, repoRoot, devTofuDir string) {
 		"-target=module.openobserve",
 		"-target=docker_image.house",
 		"-target=module.house",
-		// docker_image.menu builds in parallel with the other resources
-		// during the first apply (~30s). The container itself can't
-		// come up yet (depends on the zitadel seed) — it lands in
-		// pass 2.
-		"-target=docker_image.menu",
-	}, enableVars...)
+	}
+	// docker_image.menu builds in parallel with the other resources
+	// during the first apply (~30s). The container itself can't come
+	// up yet (gated on seed_active, which is false until pass 2).
+	//
+	// Only target the image when menu is SELECTED. When --except menu,
+	// targeting the image without also targeting the container would
+	// make tofu plan `docker rmi` while docker_container.menu (gated on
+	// seed_active=false in pass 1, so NOT in this -target list) still
+	// references it → docker daemon refuses the rmi. Pass 2 (full
+	// apply) cleans both up in correct dep order.
+	if contains(selected, "menu") {
+		targets = append(targets, "-target=docker_image.menu")
+	}
+	pass1 := append([]string{"apply", "-auto-approve", "-input=false"}, targets...)
+	pass1 = append(pass1, enableVars...)
 	runIn(devTofuDir, "tofu", pass1...)
 
 	step(3, "wait for Zitadel /debug/ready")
