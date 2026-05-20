@@ -208,9 +208,22 @@ module "zitadel" {
 module "zitadel_login" {
   source = "../modules/services/zitadel-login"
 
-  network_name   = docker_network.iedora.name
-  api_url        = "http://infra-zitadel:8080"
+  network_name = docker_network.iedora.name
+  # The login UI MUST hit Zitadel with the same `Host:` header Zitadel
+  # advertises as its ExternalDomain — otherwise the API returns
+  # "Instance not found" (Zitadel matches the instance by Host). Going
+  # straight to `http://infra-zitadel:8080` fails because the Host
+  # would be `infra-zitadel:8080`.
+  #
+  # Fix: hit Zitadel through Caddy. host-gateway maps auth.iedora.com
+  # inside the container to the VPS's host IP, where Caddy sits on :443
+  # and reverse-proxies to infra-zitadel:8080 with the right Host
+  # header. Same path external clients take.
+  api_url        = "https://auth.iedora.com"
   bootstrap_path = docker_volume.zitadel_bootstrap.name
+  host_entries = [
+    { host = "auth.iedora.com", ip = "host-gateway" },
+  ]
 
   depends_on = [module.zitadel]
 }
