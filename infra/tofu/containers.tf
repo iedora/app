@@ -380,31 +380,25 @@ resource "docker_container" "zitadel_login" {
 # add more route blocks to the Caddyfile + DNS records here.
 
 # ── Menu app (Next.js SaaS — was Kamal-managed until 2026-05-20) ─────────────
-# Pulled from GHCR's `:latest` tag (CI pushes on every successful merge to
-# main). The `docker_registry_image` data source queries the live digest, so
-# `pull_triggers` flips whenever CI publishes a new image — Tofu force-replaces
-# the container on the next apply.
+# SHA-pinned image. CI writes `${{ github.sha }}` to BWS as MENU_IMAGE_SHA
+# after each successful build; bin/with-secrets exports it as
+# TF_VAR_menu_image_sha. When the SHA changes, the image resource's `name`
+# changes → force-replace → docker_container.menu_web also replaces because
+# it references `docker_image.menu.image_id`.
 #
-# No SHA pinning in HCL: trade-off for zero chicken-egg (no need to write SHA
-# back through BWS after every CI run). The downside is `tofu plan` against a
-# fresh GHCR push always shows a replace, even if you're applying for an
-# unrelated reason. Acceptable for a single-app workspace; if menu ever
-# regresses on a deploy we still have R2 dumps to roll back the Postgres data.
+# Default "latest" for first-bootstrap (before CI has run); steady state is
+# always a SHA. Rollback: set TF_VAR_menu_image_sha to an older commit
+# (image is immutable per tag, deterministic).
 #
 # Migrations: `node scripts/migrate.mjs` holds a `pg_advisory_lock` so a
 # rolling restart (multiple replicas one day) doesn't double-migrate. It's
-# safe to re-run on a populated DB — same idempotency as Kamal had.
-
-data "docker_registry_image" "menu" {
-  name = "ghcr.io/${var.github_owner}/menu:latest"
-}
+# safe to re-run on a populated DB.
 
 resource "docker_image" "menu" {
-  name          = data.docker_registry_image.menu.name
-  pull_triggers = [data.docker_registry_image.menu.sha256_digest]
+  name = "ghcr.io/${var.github_owner}/menu:${var.menu_image_sha}"
 
-  # Keeping the image cached on the host across container recreations cuts
-  # restart time. Tofu re-pulls only when the upstream digest changes.
+  # Keep the image cached on the host so a container restart doesn't re-pull.
+  # New SHA = new name = force-replace = single pull on next apply.
   keep_locally = true
 }
 

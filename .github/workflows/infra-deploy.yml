@@ -33,10 +33,12 @@ name: Infra deploy
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: ['Menu']
-    types: [completed]
-    branches: [main]
+    inputs:
+      image_sha:
+        description: 'Menu image tag to deploy (commit SHA or "latest"). Pinned via TF_VAR_menu_image_sha so docker_container.menu_web pulls THIS exact digest. Override for rollback: `gh workflow run infra-deploy.yml --field image_sha=<older-sha>`.'
+        type: string
+        required: false
+        default: latest
 
 # Tofu apply must NEVER be cancelled mid-flight — partial applies can leave
 # the state file half-written (resources marked `tainted` or worse, the
@@ -60,14 +62,6 @@ jobs:
       contents: read
       id-token: write  # reserved for future Sigstore plan attestations
 
-    # workflow_run guard: only proceed when Menu CI passed on main. Same
-    # pattern as menu-deploy.yml (handles actions/runner#4035 where
-    # workflow_run can fire before the upstream completes).
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main')
-
     env:
       BWS_ACCESS_TOKEN: ${{ secrets.BWS_ACCESS_TOKEN }}
       BWS_PROJECT_ID: ${{ vars.BWS_PROJECT_ID }}
@@ -75,15 +69,21 @@ jobs:
       # BWS) — it's the bootstrap input that points at which CF account
       # owns the rest. Stored as a GH Actions variable for visibility.
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      # Pin the menu image to the exact SHA the caller passed. Menu CI fires
+      # `gh workflow run infra-deploy.yml --field image_sha=${{ github.sha }}`
+      # after every successful build, so steady state is per-commit pinned.
+      # Manual rollback: `gh workflow run infra-deploy.yml --field image_sha=<old-sha>`.
+      TF_VAR_menu_image_sha: ${{ inputs.image_sha }}
 
     steps:
       - name: Checkout @ main
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          # workflow_run fires with head_sha = upstream CI's commit. For
-          # workflow_dispatch this is just `github.sha` (the dispatch ref).
-          # Either way we want THAT commit's .tf files.
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # Run against the dispatched ref (typically `main`). The .tf files
+          # are read from this commit; `inputs.image_sha` is what gets pinned
+          # in the docker_image resource (may be a DIFFERENT commit — the one
+          # whose CI just built the image).
+          ref: ${{ github.sha }}
 
       - name: Install bws CLI
         # Pinned to bws v2.0.0 (Feb 2025, statically-linked MUSL). Same

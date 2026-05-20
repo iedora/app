@@ -216,10 +216,13 @@ jobs:
           push-to-registry: true
 
       # ── Trigger infra deploy ──────────────────────────────────────────────
-      # Fires `infra-deploy.yml` (separate workflow, owned by the infra
-      # workspace) which runs `tofu apply` to roll the docker_container.
-      # The `--field` payload lets the infra workflow pin to the exact SHA
-      # we just pushed instead of racing against a second push to main.
+      # Fires `infra-deploy.yml` (workflow_dispatch) passing this commit's
+      # SHA as `image_sha`. The infra workflow sets
+      # `TF_VAR_menu_image_sha=<sha>` in its job env, so the next `tofu apply`
+      # pins `docker_image.menu` at THIS exact tag — fully deterministic.
+      #
+      # Rollback path (no BWS round-trip):
+      #   gh workflow run infra-deploy.yml --field image_sha=<older-sha>
       - name: Trigger infra deploy
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -227,5 +230,4 @@ jobs:
           set -euo pipefail
           gh workflow run infra-deploy.yml \
             --ref main \
-            --field product=menu \
             --field image_sha=${{ github.sha }}

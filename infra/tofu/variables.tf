@@ -135,6 +135,24 @@ variable "menu_public_hostname" {
   default     = "menu.iedora.com"
 }
 
+variable "menu_image_sha" {
+  description = <<-EOT
+    Image tag for ghcr.io/OWNER/menu — the tag (commit SHA or "latest") the
+    docker_image.menu resource pins to. Sources:
+      - CI:   .github/workflows/infra-deploy.yml sets TF_VAR_menu_image_sha
+              from `inputs.image_sha`. The menu CI dispatches infra-deploy
+              with the freshly-built commit SHA after each main push, so
+              steady state is per-commit pinned.
+      - Local: defaults to "latest"; override for deterministic deploys
+               with `TF_VAR_menu_image_sha=<sha> just infra::deploy`.
+    Rollback path: `gh workflow run infra-deploy.yml --field image_sha=<old-sha>`.
+    The image SHA is not a secret and is deliberately NOT in BWS — workflow
+    inputs keep config and secrets separate.
+  EOT
+  type        = string
+  default     = "latest"
+}
+
 # ── Hetzner Cloud ────────────────────────────────────────────────────────────
 
 variable "infra_hcloud_token" {
