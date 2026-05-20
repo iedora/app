@@ -42,7 +42,7 @@ dev *ARGS:
 # re-bootstrap when you want fresh PATs / fresh Zitadel DB.
 [doc("wipe the dev stack (containers + network + volumes + PATs + .env.local)")]
 dev-down:
-    -cd infra/dev/tofu && tofu destroy -auto-approve -var zitadel_pat="" 2>/dev/null
+    -cd infra/dev/tofu && tofu destroy -auto-approve -var zitadel_jwt_profile="" 2>/dev/null
     -docker ps -aq --filter "name=infra-" | xargs -r docker rm -f
     -docker network rm iedora 2>/dev/null
     -docker volume rm postgres-data localstack-data openobserve-data 2>/dev/null

@@ -187,6 +187,15 @@ module "zitadel" {
   bootstrap_path    = local.bootstrap_host_path
   expose_host_port  = 8080
 
+  # Mirror prod: FirstInstance mints a JSON RSA key for the
+  # `zitadel-admin-sa` machine user. The TF provider authenticates with
+  # it via `jwt_profile_json`. `menu-sa` (the PAT the menu app uses for
+  # privileged calls) is created separately by the zitadel_* resources
+  # below, exactly like prod's infra/tofu/zitadel.tf.
+  machine_username = "zitadel-admin-sa"
+  machine_name     = "Terraform"
+  machine_key_type = "json"
+
   depends_on = [
     module.postgres,
     docker_container.zitadel_bootstrap_chmod,
@@ -229,14 +238,15 @@ module "house" {
 }
 
 # ── Zitadel seed (project + OIDC app + menu env files) ──────────────────────
-# Two-phase: the first `tofu apply` runs with zitadel_pat="" — just
-# brings the containers up. FirstInstance writes the PAT to the
-# bind-mount, dev.go reads it, and the second `tofu apply` runs with
-# the real PAT set, which gates these resources via
-# `local.seed_active`. Idempotent.
+# Two-phase: the first `tofu apply` runs with zitadel_jwt_profile="" —
+# just brings the containers up. FirstInstance writes the JSON RSA key
+# for `zitadel-admin-sa` to the bind-mount, dev.go reads it, and the
+# second `tofu apply` runs with the JSON set (via TF_VAR env to avoid
+# shell-escaping the multi-line JSON), which gates these resources via
+# `local.seed_active`. Same shape as prod's infra/tofu/zitadel.tf.
 
-variable "zitadel_pat" {
-  description = "PAT for the menu-sa machine user. dev.go captures it from infra/dev/.zitadel-bootstrap/menu-sa.pat after the first apply. Pass empty on the first apply."
+variable "zitadel_jwt_profile" {
+  description = "JWT-profile JSON for `zitadel-admin-sa`. dev.go captures it from infra/dev/.zitadel-bootstrap/zitadel-admin-sa.json after the first apply. Pass empty on the first apply."
   type        = string
   default     = ""
   sensitive   = true
@@ -244,16 +254,22 @@ variable "zitadel_pat" {
 
 locals {
   # `nonsensitive` is safe here — we're only checking PRESENCE (length
-  # > 0), not the PAT itself. Without this, every for_each / count
+  # > 0), not the JSON's content. Without it, every for_each / count
   # gating on `seed_active` would taint as sensitive.
-  seed_active = var.enable_zitadel && nonsensitive(length(var.zitadel_pat)) > 0
+  seed_active = var.enable_zitadel && nonsensitive(length(var.zitadel_jwt_profile)) > 0
 }
 
 provider "zitadel" {
-  domain       = "localhost"
-  port         = "8080"
-  insecure     = true
-  access_token = local.seed_active ? var.zitadel_pat : "placeholder-never-used"
+  domain   = "localhost"
+  port     = "8080"
+  insecure = true
+  # Provider.Configure() runs at plan time regardless of resource count.
+  # Empty `jwt_profile_json` fails the "one auth method" check. During
+  # bootstrap we pass a placeholder access_token (any non-empty string)
+  # to satisfy that check; it's never used because every zitadel_*
+  # resource gates on `local.seed_active`. Same pattern as prod.
+  access_token     = local.seed_active ? null : "placeholder-never-used"
+  jwt_profile_json = local.seed_active ? var.zitadel_jwt_profile : null
 }
 
 data "zitadel_orgs" "iedora" {
@@ -308,6 +324,32 @@ resource "zitadel_application_oidc" "menu" {
   }
 }
 
+# Menu service account — same shape as prod's infra/tofu/zitadel.tf.
+# The `zitadel-admin-sa` JSON key is for TF-provider auth only; the
+# menu app itself runs with a separate PAT under `menu-sa`, scoped
+# IAM_OWNER for org provisioning + membership lookups.
+resource "zitadel_machine_user" "menu_sa" {
+  count             = local.seed_active ? 1 : 0
+  org_id            = zitadel_org.iedora[0].id
+  user_name         = "menu-sa"
+  name              = "Menu"
+  description       = "Service account menu uses for org provisioning + membership lookups (#20)."
+  access_token_type = "ACCESS_TOKEN_TYPE_BEARER"
+}
+
+resource "zitadel_instance_member" "menu_sa_iam_owner" {
+  count   = local.seed_active ? 1 : 0
+  user_id = zitadel_machine_user.menu_sa[0].id
+  roles   = ["IAM_OWNER"]
+}
+
+resource "zitadel_personal_access_token" "menu_sa" {
+  count           = local.seed_active ? 1 : 0
+  org_id          = zitadel_org.iedora[0].id
+  user_id         = zitadel_machine_user.menu_sa[0].id
+  expiration_date = "2099-01-01T00:00:00Z"
+}
+
 resource "random_password" "menu_session_secret" {
   count   = local.seed_active ? 1 : 0
   length  = 48
@@ -326,7 +368,7 @@ module "menu_env" {
   zitadel_issuer_url          = "http://localhost:8080"
   zitadel_oauth_client_id     = zitadel_application_oidc.menu[0].client_id
   zitadel_oauth_client_secret = zitadel_application_oidc.menu[0].client_secret
-  zitadel_management_token    = var.zitadel_pat
+  zitadel_management_token    = zitadel_personal_access_token.menu_sa[0].token
 
   s3_endpoint   = "http://localhost:4566"
   s3_region     = "us-east-1"

@@ -186,30 +186,39 @@ func main() {
 		"-target=module.openobserve",
 		"-target=docker_image.house",
 		"-target=module.house",
-		"-var", "zitadel_pat=",
 	}
 	applyArgs = append(applyArgs, enableVars...)
 	runIn(devTofuDir, "tofu", applyArgs...)
 
 	if contains(selected, "zitadel") {
-		step(3, "wait for FirstInstance PAT + Zitadel API ready")
-		patPath := filepath.Join(repoRoot, "infra/dev/.zitadel-bootstrap/menu-sa.pat")
-		if err := waitForFile(patPath, 60*time.Second); err != nil {
+		step(3, "wait for FirstInstance SA key + Zitadel API ready")
+		// Mirror prod: FirstInstance mints a JSON RSA key for the
+		// `zitadel-admin-sa` machine user; the TF provider auths with it
+		// via `jwt_profile_json`. The `menu-sa` PAT used by the menu app
+		// is then created by the seed apply as a zitadel_* resource.
+		jwtPath := filepath.Join(repoRoot, "infra/dev/.zitadel-bootstrap/zitadel-admin-sa.json")
+		if err := waitForFile(jwtPath, 60*time.Second); err != nil {
 			fail("%v\nhint: docker logs infra-zitadel", err)
 		}
-		// PAT existing means FirstInstance ran but the HTTP/gRPC server
-		// may still be coming up. Block on /debug/ready (Zitadel's
-		// readiness probe) before the seed apply.
+		// File existing only proves FirstInstance ran. Block on
+		// /debug/ready (Zitadel's readiness probe) before the seed apply
+		// so the API is actually answering gRPC + HTTP.
 		if err := waitForHTTPOK("http://localhost:8080/debug/ready", 60*time.Second); err != nil {
 			fail("%v\nhint: docker logs infra-zitadel", err)
 		}
-		patBytes, _ := os.ReadFile(patPath)
-		pat := strings.TrimSpace(string(patBytes))
+		jwtBytes, err := os.ReadFile(jwtPath)
+		if err != nil {
+			fail("read %s: %v", jwtPath, err)
+		}
 
 		step(4, "tofu apply (seed Zitadel + emit env files)")
 		seedArgs := append([]string{"apply", "-auto-approve", "-input=false"}, enableVars...)
-		seedArgs = append(seedArgs, "-var", "zitadel_pat="+pat)
-		runIn(devTofuDir, "tofu", seedArgs...)
+		// JSON is multi-line + contains quotes — passing via TF_VAR env
+		// avoids shell-escaping. Same channel prod's `with-secrets` uses
+		// for `TF_VAR_infra_zitadel_sa_key_json`.
+		runInWithEnv(devTofuDir,
+			[]string{"TF_VAR_zitadel_jwt_profile=" + string(jwtBytes)},
+			"tofu", seedArgs...)
 
 		// `.env` (committed) is fully TF-owned — overwrite on every run.
 		writeEnvFile(filepath.Join(menuDir, ".env"),
@@ -612,6 +621,20 @@ func warn(format string, args ...any) {
 func runIn(dir, name string, args ...string) {
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fail("%s %v: %v", name, args, err)
+	}
+}
+
+// runInWithEnv runs a command with extra env vars on top of the
+// inherited environment. Used to pass `TF_VAR_zitadel_jwt_profile`
+// (multi-line JSON) to `tofu apply` without shell-escaping.
+func runInWithEnv(dir string, extraEnv []string, name string, args ...string) {
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), extraEnv...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
