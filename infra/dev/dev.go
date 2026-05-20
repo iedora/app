@@ -1,120 +1,297 @@
-// Dev orchestrator — single command from fresh clone to running app.
+// Dev orchestrator. Same shape as prod: shared infra (postgres,
+// localstack, zitadel, openobserve) sits at infra/dev/, products
+// (menu) consume it.
 //
-// Shape mirrors prod: the shared dev infra (Postgres + LocalStack +
-// Zitadel + Login UI) lives at `infra/dev/`, transversal to every
-// product — same as `infra/tofu/` owns the shared prod stack. This
-// script is the menu-product-specific wrapper that:
+// Default: bring up everything — `bun run dev` / `just dev`.
 //
-//   1. Brings up `infra/dev/docker-compose.yml`. Zitadel's FirstInstance
-//      writes both PATs to `infra/dev/.zitadel-bootstrap/` on first
-//      boot. Re-runs are a no-op when containers are already healthy.
-//   2. Waits up to 60 s for menu-sa.pat.
-//   3. `tofu apply` in `infra/dev/tofu/` — seeds Zitadel project + OIDC
-//      app, then writes `products/menu/.env.local` with every runtime
-//      env var the app needs (mirrors
-//      `infra/tofu/containers.tf::menu_web.env` 1:1).
-//   4. `bun run db:migrate` — pending Drizzle migrations.
-//   5. exec `bun --bun next dev`. The fresh `.env.local` is loaded by
-//      Next on startup.
+// Subset selection (deps auto-resolved):
+//   bun run dev -i                  interactive TUI per category
+//   bun run dev --only menu         menu + everything menu needs
+//   bun run dev --only zitadel      compose's zitadel + postgres (skips next dev)
+//   bun run dev --except openobserve  everything except observability
 //
-// Invoked via `bun run dev` (resolved by `go run`). Stdlib only — no
-// go.mod.
+// When the user opts out of a service the menu depends on, dev.go does
+// NOT write the dynamic .env.local — the user is responsible for
+// hand-providing those keys (or pointing them at an alternate IdP /
+// db / S3).
 //
-// Exit codes:
-//   0  next is running in the foreground
-//   1  any step failed (loud error to stderr)
+// Stdlib only except for `github.com/charmbracelet/huh` (one Charm dep
+// for the grouped multi-select TUI). go.mod committed.
 
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/charmbracelet/huh"
 )
 
-// Paths relative to the repo root. Resolved from this file's location
-// so the script can be invoked from anywhere (`bun run dev`, IDE,
-// laptop shell).
+// ── Service graph ───────────────────────────────────────────────────────────
+
+type category string
+
 const (
-	devInfraDir = "infra/dev"
-	devTofuDir  = "infra/dev/tofu"
-	patFile     = "infra/dev/.zitadel-bootstrap/menu-sa.pat"
+	catInfra    category = "infra"
+	catProducts category = "products"
 )
 
-func main() {
-	// Locate the repo root: this file is at
-	//   <repo>/infra/dev/dev.go
-	// → repo root is two levels up from `runtime.Caller`'s file.
-	_, thisFile, _, ok := runtime.Caller(0)
-	if !ok {
-		fail("runtime.Caller failed")
-	}
-	repoRoot := filepath.Dir(filepath.Dir(filepath.Dir(thisFile)))
-
-	step(1, "docker compose up -d --wait  ("+devInfraDir+")")
-	runIn(filepath.Join(repoRoot, devInfraDir), "docker", "compose", "up", "-d", "--wait")
-
-	step(2, "waiting for "+patFile)
-	absPat := filepath.Join(repoRoot, patFile)
-	if err := waitForFile(absPat, 60*time.Second); err != nil {
-		fail("%v\nhint: docker compose -f %s/docker-compose.yml logs zitadel", err, devInfraDir)
-	}
-	patBytes, err := os.ReadFile(absPat)
-	if err != nil {
-		fail("read %s: %v", absPat, err)
-	}
-	// FirstInstance writes the PAT with a trailing newline. Zitadel
-	// rejects the `Authorization: Bearer …\n` header with
-	// "non-printable ASCII characters", so trim every byte that isn't
-	// part of the token.
-	pat := strings.TrimSpace(string(patBytes))
-
-	step(3, "tofu apply  ("+devTofuDir+")")
-	tofuDir := filepath.Join(repoRoot, devTofuDir)
-	runIn(tofuDir, "tofu", "init", "-upgrade", "-input=false")
-	runIn(tofuDir, "tofu", "apply", "-auto-approve", "-input=false", "-var", "zitadel_pat="+pat)
-
-	step(4, "write products/menu/{.env,.env.local} from tofu outputs")
-	menuRoot := filepath.Join(repoRoot, "products/menu")
-	// Committed `.env` — statics + placeholders. The file is the
-	// schema-as-checked-in-text: a fresh clone has all keys Zod
-	// expects, IDE / lint / typecheck pass without `just dev`.
-	if err := os.WriteFile(
-		filepath.Join(menuRoot, ".env"),
-		[]byte(envHeader(false)+captureIn(tofuDir, "tofu", "output", "-raw", "env_committable_file")+"\n"),
-		0o644,
-	); err != nil {
-		fail("write .env: %v", err)
-	}
-	// Gitignored `.env.local` — real Zitadel + session values, only
-	// the dynamic keys. Next loads it AFTER `.env` so it overrides
-	// the placeholders. Users can also hand-edit between dev runs;
-	// TF rewrites on the next `bun run dev`.
-	if err := os.WriteFile(
-		filepath.Join(menuRoot, ".env.local"),
-		[]byte(envHeader(true)+captureIn(tofuDir, "tofu", "output", "-raw", "env_dynamic_file")+"\n"),
-		0o600,
-	); err != nil {
-		fail("write .env.local: %v", err)
-	}
-
-	step(5, "drizzle migrate + next dev")
-	menuDir := filepath.Join(repoRoot, "products/menu")
-	runIn(menuDir, "bun", "run", "db:migrate")
-	if err := os.Chdir(menuDir); err != nil {
-		fail("chdir %s: %v", menuDir, err)
-	}
-	execv("bun", "--bun", "next", "dev")
+type service struct {
+	name        string   // selection key + label
+	composeName []string // docker-compose service names; empty for host-run apps
+	deps        []string // transitive selection deps (other service.name values)
+	cat         category
 }
 
-// envHeader returns the comment block at the top of the generated env
-// files. `dynamic=true` is the `.env.local` variant which Next.js loads
-// with higher priority than `.env`.
+// Ordered for deterministic UI rendering.
+var allServices = []service{
+	{name: "postgres", composeName: []string{"postgres"}, cat: catInfra},
+	{name: "localstack", composeName: []string{"localstack"}, cat: catInfra},
+	{name: "zitadel", composeName: []string{"zitadel", "zitadel-login"}, deps: []string{"postgres"}, cat: catInfra},
+	{name: "openobserve", composeName: []string{"openobserve"}, deps: []string{"localstack"}, cat: catInfra},
+	{name: "menu", deps: []string{"postgres", "localstack", "zitadel", "openobserve"}, cat: catProducts},
+}
+
+func serviceByName(n string) (service, bool) {
+	for _, s := range allServices {
+		if s.name == n {
+			return s, true
+		}
+	}
+	return service{}, false
+}
+
+func defaultSelection() []string {
+	out := make([]string, 0, len(allServices))
+	for _, s := range allServices {
+		out = append(out, s.name)
+	}
+	return out
+}
+
+// expandDeps closes `selected` over `service.deps`. Result is sorted.
+func expandDeps(selected []string) []string {
+	set := map[string]bool{}
+	var dfs func(string)
+	dfs = func(n string) {
+		if set[n] {
+			return
+		}
+		set[n] = true
+		s, ok := serviceByName(n)
+		if !ok {
+			fail("unknown service %q", n)
+		}
+		for _, d := range s.deps {
+			dfs(d)
+		}
+	}
+	for _, n := range selected {
+		dfs(n)
+	}
+	out := make([]string, 0, len(set))
+	for k := range set {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// composeServiceNames maps the selection to docker-compose service names.
+// Skips entries with no compose presence (e.g. menu — host-run via Next).
+func composeServiceNames(selected []string) []string {
+	out := []string{}
+	for _, n := range selected {
+		s, _ := serviceByName(n)
+		out = append(out, s.composeName...)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func contains(haystack []string, needle string) bool {
+	for _, s := range haystack {
+		if s == needle {
+			return true
+		}
+	}
+	return false
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
+
+func main() {
+	interactive := flag.Bool("i", false, "interactive selection (TUI per category)")
+	flag.BoolVar(interactive, "interactive", false, "alias for -i")
+	only := flag.String("only", "", "comma-separated services to start (+ their deps); skips everything else")
+	except := flag.String("except", "", "comma-separated services to skip; everything else (+ their deps) starts")
+	flag.Parse()
+
+	selected, err := resolveSelection(*interactive, *only, *except)
+	if err != nil {
+		fail("%v", err)
+	}
+	selected = expandDeps(selected)
+	// `--except` must win over dep-expansion: a user saying
+	// `--except openobserve` doesn't want it back through menu's deps.
+	// The menu app boots either way — when OTLP_ENDPOINT can't reach
+	// the collector, the observability SDK degrades to a no-op silently.
+	if *except != "" {
+		blocked := map[string]bool{}
+		for _, n := range splitCSV(*except) {
+			blocked[n] = true
+		}
+		filtered := selected[:0]
+		for _, n := range selected {
+			if !blocked[n] {
+				filtered = append(filtered, n)
+			}
+		}
+		selected = filtered
+	}
+	if len(selected) == 0 {
+		fail("empty selection — pick at least one service")
+	}
+
+	repoRoot := findRepoRoot()
+	devInfraDir := filepath.Join(repoRoot, "infra/dev")
+	devTofuDir := filepath.Join(repoRoot, "infra/dev/tofu")
+	menuDir := filepath.Join(repoRoot, "products/menu")
+
+	fmt.Printf("[dev] running: %s\n", strings.Join(selected, ", "))
+
+	step(1, "docker compose up -d --wait")
+	composeArgs := append([]string{"compose", "up", "-d", "--wait"}, composeServiceNames(selected)...)
+	runIn(devInfraDir, "docker", composeArgs...)
+
+	// Zitadel-bound steps. Skip when the user opted out — they're
+	// responsible for providing the dynamic Zitadel keys in
+	// products/menu/.env.local (or hitting a remote IdP).
+	if contains(selected, "zitadel") {
+		step(2, "waiting for .zitadel-bootstrap/menu-sa.pat")
+		patPath := filepath.Join(devInfraDir, ".zitadel-bootstrap/menu-sa.pat")
+		if err := waitForFile(patPath, 60*time.Second); err != nil {
+			fail("%v\nhint: docker compose -f infra/dev/docker-compose.yml logs zitadel", err)
+		}
+		patBytes, _ := os.ReadFile(patPath)
+		pat := strings.TrimSpace(string(patBytes))
+
+		step(3, "tofu apply (seed Zitadel + emit env files)")
+		runIn(devTofuDir, "tofu", "init", "-upgrade", "-input=false")
+		runIn(devTofuDir, "tofu", "apply", "-auto-approve", "-input=false", "-var", "zitadel_pat="+pat)
+
+		step(4, "write products/menu/{.env,.env.local}")
+		writeEnvFile(filepath.Join(menuDir, ".env"),
+			captureIn(devTofuDir, "tofu", "output", "-raw", "env_committable_file"),
+			false, 0o644)
+		writeEnvFile(filepath.Join(menuDir, ".env.local"),
+			captureIn(devTofuDir, "tofu", "output", "-raw", "env_dynamic_file"),
+			true, 0o600)
+	} else {
+		warn("zitadel opted out — leaving .env.local untouched. Make sure ZITADEL_OAUTH_CLIENT_ID/SECRET/MANAGEMENT_TOKEN point at a real IdP, or auth flows will 500.")
+	}
+
+	// Menu host-run steps. Skip when menu is opted out (infra-only mode).
+	if contains(selected, "menu") {
+		step(5, "drizzle migrate + next dev")
+		runIn(menuDir, "bun", "run", "db:migrate")
+		if err := os.Chdir(menuDir); err != nil {
+			fail("chdir %s: %v", menuDir, err)
+		}
+		execv("bun", "--bun", "next", "dev")
+		return
+	}
+
+	fmt.Println("[dev] menu opted out — infra is up, exiting (the compose stack stays running in background)")
+}
+
+// ── Selection: flags + interactive ──────────────────────────────────────────
+
+func resolveSelection(interactive bool, only, except string) ([]string, error) {
+	if interactive {
+		return runTUI()
+	}
+	if only != "" && except != "" {
+		return nil, fmt.Errorf("--only and --except are mutually exclusive")
+	}
+	if only != "" {
+		return splitCSV(only), nil
+	}
+	if except != "" {
+		excluded := map[string]bool{}
+		for _, n := range splitCSV(except) {
+			excluded[n] = true
+		}
+		out := []string{}
+		for _, s := range allServices {
+			if !excluded[s.name] {
+				out = append(out, s.name)
+			}
+		}
+		return out, nil
+	}
+	return defaultSelection(), nil
+}
+
+func splitCSV(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// runTUI presents a per-category multi-select. Returns the selection
+// the user confirmed (Enter on the last group).
+func runTUI() ([]string, error) {
+	groups := map[category][]huh.Option[string]{}
+	for _, s := range allServices {
+		groups[s.cat] = append(groups[s.cat], huh.NewOption(s.name, s.name).Selected(true))
+	}
+
+	var infraSelected, productsSelected []string
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewMultiSelect[string]().
+				Title("infra").
+				Description("Backing services. Postgres + LocalStack required for any menu use; Zitadel optional if pointing at a remote IdP; OpenObserve optional.").
+				Options(groups[catInfra]...).
+				Value(&infraSelected),
+		),
+		huh.NewGroup(
+			huh.NewMultiSelect[string]().
+				Title("products").
+				Description("Host-run apps. Menu boots Next.js after the infra it depends on is up.").
+				Options(groups[catProducts]...).
+				Value(&productsSelected),
+		),
+	)
+	if err := form.Run(); err != nil {
+		return nil, err
+	}
+	return append(infraSelected, productsSelected...), nil
+}
+
+// ── File helpers ─────────────────────────────────────────────────────────────
+
+func writeEnvFile(path, body string, dynamic bool, mode os.FileMode) {
+	header := envHeader(dynamic)
+	if err := os.WriteFile(path, []byte(header+body+"\n"), mode); err != nil {
+		fail("write %s: %v", path, err)
+	}
+}
+
 func envHeader(dynamic bool) string {
 	if dynamic {
 		return "# AUTO-GENERATED by `bun run dev` (infra/modules/menu_env).\n" +
@@ -129,8 +306,35 @@ func envHeader(dynamic bool) string {
 		"# Commit changes here when the env schema evolves.\n\n"
 }
 
-// captureIn runs a command and returns trimmed stdout. Used for
-// `tofu output -raw` where we want the value, not stream-to-tty.
+// ── Process helpers ──────────────────────────────────────────────────────────
+
+func findRepoRoot() string {
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		fail("runtime.Caller failed")
+	}
+	// <repo>/infra/dev/dev.go → two levels up.
+	return filepath.Dir(filepath.Dir(filepath.Dir(thisFile)))
+}
+
+func step(n int, msg string) {
+	fmt.Printf("[dev] %d/5  %s\n", n, msg)
+}
+
+func warn(msg string) {
+	fmt.Fprintf(os.Stderr, "[dev] WARN: %s\n", msg)
+}
+
+func runIn(dir, name string, args ...string) {
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fail("%s %v: %v", name, args, err)
+	}
+}
+
 func captureIn(dir, name string, args ...string) string {
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
@@ -142,27 +346,9 @@ func captureIn(dir, name string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// step writes a numbered progress line. The total is hardcoded — easier
-// to read than threading state around for a script this small.
-func step(n int, msg string) {
-	fmt.Printf("[dev] %d/5  %s\n", n, msg)
-}
-
-func runIn(dir, name string, args ...string) {
-	cmd := exec.Command(name, args...)
-	if dir != "" {
-		cmd.Dir = dir
-	}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		fail("%s %v: %v", name, args, err)
-	}
-}
-
-// execv replaces the current process with the target so signals (Ctrl-C)
-// and PID 1 semantics behave naturally — same as `exec` at the end of a
-// bash script.
+// execv replaces the current process with the target so signals
+// (Ctrl-C) flow naturally — same as `exec` at the end of a bash
+// script.
 func execv(name string, args ...string) {
 	path, err := exec.LookPath(name)
 	if err != nil {
@@ -173,10 +359,6 @@ func execv(name string, args ...string) {
 	}
 }
 
-// waitForFile polls every 500 ms until the file exists AND is non-empty.
-// Empty file fails the wait (the PAT is written atomically by Zitadel,
-// so a 0-byte intermediate state shouldn't happen, but it's a cheap
-// defensive check).
 func waitForFile(path string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
