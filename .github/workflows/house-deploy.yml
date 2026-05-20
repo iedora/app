@@ -81,7 +81,20 @@ jobs:
       # TF_VAR_cloudflare_api_token + TF_VAR_account_id out of BWS.
       - name: just house::deploy
         working-directory: products/house/infra
+        env:
+          # OpenTofu 1.12+: machine-readable apply log → tempfile;
+          # human-readable stays on stdout. Uploaded as artifact below.
+          TF_CLI_ARGS_apply: "-json-into=${{ runner.temp }}/tf-apply.json"
         run: just deploy
+
+      - name: Upload tofu apply JSON
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tofu-apply-json-house
+          path: ${{ runner.temp }}/tf-apply.json
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Commit state back to main
         # Same rationale as infra-deploy.yml: encrypted Tofu state is the
@@ -99,10 +112,17 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add tofu/terraform.tfstate
-          git commit -m "chore(house): tfstate updated by CI (${GITHUB_WORKFLOW} #${GITHUB_RUN_NUMBER})
-
-Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
-Triggered by: ${GITHUB_EVENT_NAME}"
+          # Multi-line via -F so un-indented embedded newlines don't
+          # terminate the YAML `run: |` block — see infra-deploy.yml.
+          MSG=$(mktemp)
+          {
+            echo "chore(house): tfstate updated by CI (${GITHUB_WORKFLOW} #${GITHUB_RUN_NUMBER})"
+            echo ""
+            echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "Triggered by: ${GITHUB_EVENT_NAME}"
+          } > "$MSG"
+          git commit -F "$MSG"
+          rm -f "$MSG"
           for i in 1 2; do
             git pull --rebase origin "${GITHUB_REF_NAME}" || true
             if git push origin "HEAD:${GITHUB_REF_NAME}"; then

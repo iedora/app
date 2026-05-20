@@ -181,8 +181,28 @@ jobs:
         #   BWS write-through of INFRA_HOST_IP
         # `TF_VAR_state_passphrase` and every other TF_VAR_* alias is
         # exported by `bin/with-secrets` from the BWS env block.
+        #
+        # `TF_CLI_ARGS_apply` (OpenTofu 1.12+) propagates `-json-into=FILE`
+        # to every `tofu apply` in the dance — last apply wins on overwrite
+        # (steady state is Pass 2; Pass 1/3 only run on first bootstrap).
+        # Uploaded as an artifact below.
         working-directory: infra
+        env:
+          TF_CLI_ARGS_apply: "-json-into=${{ runner.temp }}/tf-apply.json"
         run: just deploy
+
+      - name: Upload tofu apply JSON
+        # Captures the apply log in machine-readable form for later
+        # parsing (post-mortem on a failed deploy, drift reports, etc).
+        # Always uploaded — even on apply failure, the partial log is
+        # the most useful artifact for debugging.
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tofu-apply-json
+          path: ${{ runner.temp }}/tf-apply.json
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Smoke check menu.iedora.com/up
         # After apply, the public hostname should be back to 200 within a
@@ -228,11 +248,21 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add tofu/terraform.tfstate
-          git commit -m "chore(infra): tfstate updated by CI (${GITHUB_WORKFLOW} #${GITHUB_RUN_NUMBER})
-
-Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
-Triggered by: ${GITHUB_EVENT_NAME}
-Image SHA: ${TF_VAR_menu_image_sha:-latest}"
+          # Multi-line commit message via -F to avoid embedding raw
+          # newlines inside the YAML `run: |` block (un-indented
+          # newlines inside the script body terminate the literal block
+          # scalar and cause parse errors that look like
+          # "workflow does not have workflow_dispatch trigger").
+          MSG=$(mktemp)
+          {
+            echo "chore(infra): tfstate updated by CI (${GITHUB_WORKFLOW} #${GITHUB_RUN_NUMBER})"
+            echo ""
+            echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "Triggered by: ${GITHUB_EVENT_NAME}"
+            echo "Image SHA: ${TF_VAR_menu_image_sha:-latest}"
+          } > "$MSG"
+          git commit -F "$MSG"
+          rm -f "$MSG"
           # Retry the push once on contention — if a human pushed between
           # our checkout and now, rebase and try again. Beyond one retry
           # we fail loudly so the operator notices the race.
