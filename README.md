@@ -1,14 +1,19 @@
-# Menu
+# iedora
 
-Self-hosted, multi-tenant SaaS for restaurants to build digital menus by drag-and-drop. Public page at `/r/<slug>`; admin builds it from the dashboard with reorderable categories, items, image uploads, themes, multi-language overrides, plans, and analytics.
+Bun-workspaces monorepo for two products and three shared packages.
+
+- **Menu** (`menu.iedora.com` — `products/menu/`) — Next.js 16 SaaS for restaurants to build digital menus by drag-and-drop. Public menu at `/r/<slug>`; admin dashboard with reorderable categories, items, image uploads, themes, multi-language overrides, plans, analytics.
+- **House** (`iedora.com` — `products/house/`) — Astro static umbrella landing. No DB, no auth.
+
+Identity is Zitadel (`auth.iedora.com`, self-hosted). Menu is a thin OIDC client — see `products/menu/src/features/auth/`.
 
 ## Run it locally
 
 ```bash
-bun install
+bun install                            # at the repo root
 cd products/menu
-cp .env.example .env.local            # paste MENU_SESSION_SECRET + Zitadel creds
-docker compose up -d                  # postgres, localstack
+cp .env.example .env.local             # paste MENU_SESSION_SECRET + Zitadel creds
+docker compose up -d                   # postgres, localstack
 bun run db:migrate
 bun run dev
 ```
@@ -20,10 +25,14 @@ bun run dev
 - **[`AGENTS.md`](AGENTS.md)** — tech stack, hard rules, file layout, conventions (loaded by AI assistants too).
 - **[`docs/architecture.md`](docs/architecture.md)** — vertical-slice + hexagonal playbook, how to add a feature.
 - **[`docs/testing.md`](docs/testing.md)** — Vitest + PGLite unit tests, Playwright e2e.
-- **[`docs/deploy.md`](docs/deploy.md)** — single-box self-host: Tofu-managed Docker + Cloudflare Tunnel, brand-new-machine walkthrough.
-- **[`docs/scaling.md`](docs/scaling.md)** — when one box isn't enough: vertical, Hetzner migration, multi-host via Tailscale.
+- **[`docs/deploy.md`](docs/deploy.md)** — single-box self-host on Hetzner: Tofu-managed Docker + Caddy, brand-new-machine walkthrough.
+- **[`docs/scaling.md`](docs/scaling.md)** — when one box isn't enough: vertical resize, sharding paths.
 - **[`docs/backups.md`](docs/backups.md)** — daily Postgres dumps to Cloudflare R2 via a Tofu-managed backup container + recovery procedures.
-- **[`docs/secrets.md`](docs/secrets.md)** — where every credential lives (BWS + .env + Tofu state), rotation procedures, leak-response playbook.
+- **[`docs/secrets.md`](docs/secrets.md)** — where every credential lives (BWS + Tofu state), rotation procedures, leak-response playbook.
+- **[`docs/observability.md`](docs/observability.md)** — OTel wiring + OpenObserve recipes.
+- **[`docs/tenancy.md`](docs/tenancy.md)** — multi-tenant model + Zitadel org mapping.
+- **[`docs/infra/auth.md`](docs/infra/auth.md)** — Zitadel deploy, bootstrap, day-2 ops.
+- **[`docs/terraform-style.md`](docs/terraform-style.md)** — LLM-safe HCL conventions.
 
 ## License
 
