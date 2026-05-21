@@ -2,77 +2,340 @@
 /**
  * iedora.com — the brand landing page.
  *
- * Composition: page-progress rail + corner mark + meta nav + editorial
- * header (with the shoji contact form) + about (four scroll-pinned
- * rooms) + works (one scroll-pinned showcase) + signature footer.
+ * Aligned with the menu landing's editorial chrome so the company reads
+ * as one design language. Composition mirrors menu/.../landing-page.tsx:
  *
- * Static build (Astro `output: 'static'`): all components SSR to plain
- * markup; one inline init script wires up the scroll animations + the
- * wordmark click → form open. With JS disabled, every section's copy
- * is still readable (the v-track collapses thanks to the @media
- * prefers-reduced-motion fallback).
+ *   PageProgress → sticky Nav → Hero (eyebrow + h1 + tagline + CTAs)
+ *   → Practice section (3 hairline-divided feats: Slowly · Quietly · Together)
+ *   → Products section (one product card per iedora work: Menu)
+ *   → Closing CTA → footer-bar (contact links) → footer-sig (signature).
+ *
+ * Every chrome class is a `.ds-*` primitive from @iedora/design-system —
+ * no bespoke section CSS lives here anymore. The page is fully static
+ * (Astro output: 'static') and reads with JS disabled: only the
+ * page-progress rail + the wordmark letter reveal are JS-driven.
+ *
+ * Every interactive element carries a `data-test-id` (cross-product
+ * hard rule 1). Selectors target by intent, never by visible text.
  */
 import BaseLayout from "../layouts/BaseLayout.astro";
-import HouseHeader from "../components/HouseHeader.astro";
-import HouseAbout from "../components/HouseAbout.astro";
-import HouseWorks from "../components/HouseWorks.astro";
-import HouseFooter from "../components/HouseFooter.astro";
-import { PageProgress } from "@iedora/design-system";
+import {
+  Nav,
+  NavActions,
+  NavBrand,
+  NavLink,
+  NavLinks,
+  PageProgress,
+  Wordmark,
+} from "@iedora/design-system";
+
+const contactEmail = "hi@iedora.com";
+const menuUrl = "https://menu.iedora.com";
 ---
 
 <BaseLayout>
   <PageProgress />
 
-  <main>
-    <div class="ds-shell hub">
-      <nav class="ds-meta-strip" aria-label="House meta">
-        <div class="ds-meta-strip__left">
-          <span>MMXXVI</span>
-          <span>Oporto · Lisboa</span>
+  <Nav sticky data-test-id="house-nav">
+    <NavBrand>
+      <a
+        href="#top"
+        class="house-brand"
+        aria-label="Iedora home"
+        data-test-id="house-brand"
+      >
+        <Wordmark variant="inline" />
+      </a>
+    </NavBrand>
+
+    <NavLinks aria-label="House">
+      <NavLink href="#practice" data-test-id="house-nav-practice">Practice</NavLink>
+      <NavLink href="#products" data-test-id="house-nav-products">Products</NavLink>
+      <NavLink href="#contact" data-test-id="house-nav-contact">Contact</NavLink>
+    </NavLinks>
+
+    <NavActions>
+      <a
+        href={menuUrl}
+        class="ds-btn ds-btn--primary"
+        data-test-id="house-nav-cta"
+        rel="noopener"
+      >
+        <span>Open menu</span>
+        <span class="ds-btn__arrow" aria-hidden="true">→</span>
+      </a>
+    </NavActions>
+  </Nav>
+
+  <main class="ds-shell house-root" id="top">
+    <!-- Hero ───────────────────────────────────────────────────── -->
+    <header class="ds-hero" id="hero" data-test-id="house-hero">
+      <span class="ds-eyebrow">
+        <span class="ds-eyebrow__idx">/ 00</span>
+        <span>House of software</span>
+      </span>
+      <h1 class="ds-hero__h ds-hero__h--dot">
+        We build software the way <em>a house</em> is built
+      </h1>
+      <p class="ds-hero__tagline">
+        Foundations first, then the frame. Patient work, quiet
+        interfaces, and tools we are happy to live with for many seasons.
+      </p>
+      <div class="ds-hero__ctas">
+        <a
+          class="ds-btn ds-btn--primary"
+          href={menuUrl}
+          rel="noopener"
+          data-test-id="house-hero-cta-menu"
+        >
+          <span>See our first product</span>
+          <span class="ds-btn__arrow" aria-hidden="true">→</span>
+        </a>
+        <a
+          class="ds-btn"
+          href={`mailto:${contactEmail}`}
+          data-test-id="house-hero-cta-contact"
+        >
+          <span>Write to us</span>
+        </a>
+      </div>
+      <p class="ds-hero__trust">
+        A small house in Oporto and Lisboa · Available for new works in 2026
+      </p>
+    </header>
+
+    <!-- Practice ─────────────────────────────────────────────── -->
+    <section class="ds-section" id="practice" data-test-id="house-practice">
+      <div class="ds-section__head ds-reveal">
+        <span class="ds-eyebrow">
+          <span class="ds-eyebrow__idx">/ 01</span>
+          <span>Practice</span>
+        </span>
+        <h2 class="ds-section__h ds-section__h--dot">Three ways we work</h2>
+        <p class="ds-section__intro">
+          Plain language, long horizons, and a roadmap that is short on
+          purpose.
+        </p>
+      </div>
+
+      <div class="ds-feat-grid">
+        <article class="ds-feat ds-reveal" data-test-id="house-practice-slowly">
+          <span class="ds-feat__num">/ 01 · Slowly</span>
+          <h3 class="ds-feat__h">We measure in years, not in quarters.</h3>
+          <p class="ds-feat__p">
+            Some things only become true with time. Our roadmap is short
+            because the craft deserves it; the horizon is long because
+            people will still be using this in five.
+          </p>
+        </article>
+
+        <article
+          class="ds-feat ds-reveal"
+          style="--rd: 120ms"
+          data-test-id="house-practice-quietly"
+        >
+          <span class="ds-feat__num">/ 02 · Quietly</span>
+          <h3 class="ds-feat__h">Plain language. No urgency.</h3>
+          <p class="ds-feat__p">
+            Honest words on screen. Hairlines instead of boxes. The brand
+            is the work, not the noise around it. If a button needs to
+            shout, it is the wrong button.
+          </p>
+        </article>
+
+        <article
+          class="ds-feat ds-reveal"
+          style="--rd: 240ms"
+          data-test-id="house-practice-together"
+        >
+          <span class="ds-feat__num">/ 03 · Together</span>
+          <h3 class="ds-feat__h">AI at the desk, never on the page.</h3>
+          <p class="ds-feat__p">
+            We use AI as a collaborator: in the code, in the docs, in the
+            test suite. What ships is software that knows what it is and
+            says so. No surprise chatbots, no theatre.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Products ─────────────────────────────────────────────── -->
+    <section class="ds-section" id="products" data-test-id="house-products">
+      <div class="ds-section__head ds-reveal">
+        <span class="ds-eyebrow">
+          <span class="ds-eyebrow__idx">/ 02</span>
+          <span>Products</span>
+        </span>
+        <h2 class="ds-section__h ds-section__h--dot">What lives in the house</h2>
+        <p class="ds-section__intro">
+          One product in service today; more rooms under construction.
+        </p>
+      </div>
+
+      <div class="ds-product-grid">
+        <article class="ds-product-card ds-reveal" data-test-id="house-product-menu">
+          <header class="ds-product-card__head">
+            <span class="ds-product-card__tier">Menu · in service</span>
+            <span class="ds-product-card__price">
+              <span class="ds-product-card__amt-main">€0</span>
+              <span class="ds-product-card__amt-sub">free for one room</span>
+            </span>
+          </header>
+          <p class="ds-product-card__desc">
+            One QR on the table. The menu behind it changes whenever you
+            want. For the corner café and the place that opens four
+            nights a week.
+          </p>
+          <ul class="ds-product-card__feats">
+            <li>Drag-and-drop menu builder</li>
+            <li>Multiple translations, allergens, dietary tags</li>
+            <li>Hour-by-hour scan analytics</li>
+            <li>Always free for one restaurant</li>
+          </ul>
+          <div class="ds-product-card__foot">
+            <a
+              class="ds-btn ds-btn--primary"
+              href={menuUrl}
+              rel="noopener"
+              data-test-id="house-product-menu-cta"
+            >
+              <span>Open menu</span>
+              <span class="ds-btn__arrow" aria-hidden="true">→</span>
+            </a>
+          </div>
+        </article>
+
+        <article
+          class="ds-product-card ds-reveal"
+          style="--rd: 140ms"
+          data-test-id="house-product-soon"
+        >
+          <header class="ds-product-card__head">
+            <span class="ds-product-card__tier">Next room · drawing</span>
+            <span class="ds-product-card__price">
+              <span class="ds-product-card__amt-main">soon</span>
+              <span class="ds-product-card__amt-sub">in design</span>
+            </span>
+          </header>
+          <p class="ds-product-card__desc">
+            We are sketching the next work. If you carry the kind of
+            problem that wants patience and a long horizon, write to us
+            and we will read it carefully.
+          </p>
+          <ul class="ds-product-card__feats">
+            <li>Made in the same hand as menu</li>
+            <li>Plain language, hairline interfaces</li>
+            <li>Same prices, same restraint</li>
+          </ul>
+          <div class="ds-product-card__foot">
+            <a
+              class="ds-btn"
+              href={`mailto:${contactEmail}`}
+              data-test-id="house-product-soon-cta"
+            >
+              <span>Send a brief</span>
+            </a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Closing ─────────────────────────────────────────────── -->
+    <section class="ds-closing" id="contact" data-test-id="house-closing">
+      <div class="ds-closing__inner ds-reveal">
+        <span class="ds-eyebrow">
+          <span class="ds-eyebrow__idx">/ 03</span>
+          <span>At the door</span>
+        </span>
+        <h2 class="ds-closing__h">Pull up a chair</h2>
+        <div class="ds-closing__ctas">
+          <a
+            class="ds-btn ds-btn--primary"
+            href={`mailto:${contactEmail}`}
+            data-test-id="house-closing-cta"
+          >
+            <span>Write to {contactEmail}</span>
+            <span class="ds-btn__arrow" aria-hidden="true">→</span>
+          </a>
         </div>
-        <div class="ds-meta-strip__center"></div>
-        <div class="ds-meta-strip__right">
-          <a href="mailto:hi@iedora.com">Contact</a>
-        </div>
-      </nav>
+      </div>
+    </section>
 
-      <HouseHeader />
-    </div>
+    <!-- Footer ─────────────────────────────────────────────── -->
+    <footer class="ds-footer-bar" data-test-id="house-footer">
+      <div class="ds-footer-bar__inner">
+        <span>
+          Iedora · made in Oporto &amp; Lisboa · MMXXVI
+        </span>
+        <span class="ds-footer-bar__links">
+          <a
+            href={`mailto:${contactEmail}`}
+            data-test-id="house-footer-contact"
+          >
+            {contactEmail}
+          </a>
+          <a
+            href={menuUrl}
+            rel="noopener"
+            data-test-id="house-footer-menu"
+          >
+            menu.iedora.com
+          </a>
+        </span>
+      </div>
+    </footer>
 
-    <HouseAbout />
-    <HouseWorks />
-
-    <div class="ds-shell hub">
-      <HouseFooter />
+    <div class="ds-footer-sig" data-test-id="house-signature">
+      <div>
+        <span class="ds-footer-sig__built">
+          Built in Iedora<span class="ds-footer-sig__built-dot">.</span>
+        </span>
+      </div>
+      <div class="ds-footer-sig__center">
+        <span>MMXXVI</span>
+      </div>
+      <div class="ds-footer-sig__right">
+        <span>Index</span>
+        <span>Colophon</span>
+        <span>Press</span>
+      </div>
     </div>
   </main>
 </BaseLayout>
 
 <style>
-  /* .ds-shell carries the horizontal rhythm; .hub adds only the
-     vertical breathing room around the intro and footer. */
-  .hub {
+  /* House-specific composition tweaks. Everything chrome-y lives in the
+     design system; this file only carries the page-shell rhythm. */
+
+  .house-root {
     position: relative;
     z-index: 1;
-    padding-block: clamp(20px, 3vw, 36px);
   }
+
+  .house-brand {
+    display: inline-flex;
+    align-items: baseline;
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  /* Hero italic emphasis — the design-system rule for `<em>` keeps
+     its weight at 400 italic; nothing to override here. */
 </style>
 
 <!--
-  All choreography lives here:
-  - wordmark letter reveal + body.ds-loaded
-  - page-progress fill via --ds-pageprog-progress
-  - per-section scroll progress (--p on .ds-v-pin) driving:
-      • mission: line draw + door-knob / stamp fade
-      • slowly: timeline grow + mark lighting
-      • quietly: wave bar collapse
-      • work 01: QR tiles + analytics line + meta fade
-      • work 02: seal stroke-draw + sessions list + meta fade
-      • together: rooms fill room-by-room
-  - phrases crossfade keyed on the same --p
-  - scroll-hint hides after first scroll
-  Throttled by a single rAF. No form / no shoji — contact is a plain
-  mailto link in the header.
+  One-time motion init:
+  - Flag `body.ds-loaded` after first paint so the wordmark letter reveal
+    plays without gating the LCP (the wordmark is rendered statically;
+    we only animate post-paint).
+  - Flag the hero with `ds-hero--in` so its tagline/CTAs/trust line
+    cascade-fade once `ds-loaded` lands.
+  - Drive `.ds-pageprog__fill` via `--ds-pageprog-progress` on scroll/resize.
+  - Add `.in` to every `.ds-reveal` once it intersects the viewport
+    (single-shot — `unobserve` after firing).
+
+  Above-the-fold content is statically visible — animations never gate
+  the LCP candidate (the wordmark + the h1 paint immediately).
 -->
 <script is:inline>
   (() => {
@@ -80,202 +343,56 @@ import { PageProgress } from "@iedora/design-system";
       "(prefers-reduced-motion: reduce)",
     ).matches;
 
-    // ── Wordmark letter reveal (legacy: wm.classList.add('reveal') + body.loaded)
+    // ── Flag body.ds-loaded + cascade the hero in ────────────────────
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
         document
           .querySelectorAll(".ds-wordmark")
           .forEach((w) => w.classList.add("ds-wordmark--reveal"));
         document.body.classList.add("ds-loaded");
+        const hero = document.getElementById("hero");
+        if (hero) hero.classList.add("ds-hero--in");
       }),
     );
 
-    // ── Page progress
-    const pageFill = document.querySelector(".ds-pageprog__fill");
-
-    function updatePageProg() {
-      const doc = document.documentElement;
-      const max = doc.scrollHeight - window.innerHeight;
-      const p = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
-      if (pageFill)
-        pageFill.style.setProperty("--ds-pageprog-progress", p.toFixed(4));
+    // ── Page progress ───────────────────────────────────────────────
+    const fill = document.querySelector(".ds-pageprog__fill");
+    let raf = 0;
+    function update() {
+      raf = 0;
+      const h = document.documentElement;
+      const max = h.scrollHeight - h.clientHeight;
+      const p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+      if (fill) fill.style.setProperty("--ds-pageprog-progress", p.toFixed(4));
     }
-
-    // ── Per-section scroll progress + downstream animations
-    const values = Array.from(document.querySelectorAll(".ds-value"));
-
-    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-    const localRange = (p, start, end) => {
-      if (end <= start) return p >= start ? 1 : 0;
-      return clamp((p - start) / (end - start), 0, 1);
-    };
-
-    function setProgress(value, p) {
-      const pin = value.querySelector(".ds-v-pin");
-      if (pin) pin.style.setProperty("--p", p.toFixed(4));
-
-      // phrases crossfade
-      const phrasesBox = value.querySelector("[data-phrases]");
-      if (phrasesBox) {
-        const phrases = phrasesBox.querySelectorAll(".ds-phrase");
-        const N = phrases.length;
-        phrases.forEach((el, i) => {
-          const center = (i + 0.5) / N;
-          const halfSlot = 0.5 / N;
-          const norm = (p - center) / halfSlot;
-          let effectiveNorm = norm;
-          if (i === 0 && norm < 0) effectiveNorm = 0;
-          if (i === N - 1 && norm > 0) effectiveNorm = 0;
-          const ad = Math.abs(effectiveNorm);
-          let o;
-          if (ad <= 0.75) o = 1;
-          else if (ad <= 1.05) o = (1.05 - ad) / 0.30;
-          else o = 0;
-          el.style.opacity = o.toFixed(3);
-          let ty;
-          if ((i === 0 && norm < 0) || (i === N - 1 && norm > 0)) ty = 0;
-          else ty = clamp(norm, -1.2, 1.2) * -4;
-          el.style.transform = "translate3d(0," + ty.toFixed(1) + "px,0)";
-        });
-      }
-
-      // Mission: SVG stroke draw + fade
-      if (value.classList.contains("v-mission")) {
-        value
-          .querySelectorAll(".ds-house-svg__draw, .ds-house-svg__fade")
-          .forEach((el) => {
-            const len = parseFloat(el.dataset.len || "200");
-            const start = parseFloat(el.dataset.start || "0");
-            const end = parseFloat(el.dataset.end || "1");
-            const local = localRange(p, start, end);
-            el.style.setProperty("--len", len);
-            el.style.setProperty("--local", local.toFixed(4));
-          });
-      }
-
-      // Slowly: timeline grow + mark lighting
-      if (value.classList.contains("v-slowly")) {
-        const tl = value.querySelector(".ds-timeline");
-        if (tl) tl.style.setProperty("--p", p.toFixed(4));
-        value.querySelectorAll(".ds-timeline__mark").forEach((m) => {
-          const at = parseFloat(m.dataset.at || "0");
-          m.classList.toggle("ds-timeline__mark--on", p >= at);
-        });
-      }
-
-      // Quietly: wave bars collapse
-      if (value.classList.contains("v-quietly")) {
-        const ww = value.querySelector(".ds-wave");
-        if (ww) ww.style.setProperty("--p", p.toFixed(4));
-      }
-
-      // Work 02 (genkan): seal ring stroke-draws, then "i" + ticks fade
-      // in, then sessions list cascades, then meta fades. Sub-progresses:
-      //   seal-p: 0.00 → 0.55   (ring + i + ticks)
-      //   sess-p: 0.30 → 0.75   (4 hairline rows, --delay 0.00..0.30)
-      //   meta:   0.04 → 0.55   (matches w-meta's pacing)
-      if (value.classList.contains("w-sig")) {
-        const pin = value.querySelector(".ds-v-pin");
-        if (pin) {
-          pin.style.setProperty("--seal-p", localRange(p, 0, 0.55).toFixed(4));
-          pin.style.setProperty("--sess-p", localRange(p, 0.30, 0.75).toFixed(4));
-        }
-        const meta = value.querySelector(".work-meta");
-        if (meta) meta.style.setProperty("--meta", localRange(p, 0.04, 0.55).toFixed(4));
-      }
-
-      // Work 01: QR cascade + analytics line + meta fade
-      if (value.classList.contains("w-meta")) {
-        const tiles = value.querySelectorAll(".qr-big i");
-        const qrEnd = 0.5;
-        const qrP = clamp(p / qrEnd, 0, 1);
-        tiles.forEach((t) => {
-          const order = parseInt(t.dataset.order || "0", 10);
-          const threshold = order / 12;
-          const lit = clamp((qrP - threshold) * 5, 0, 1);
-          t.style.setProperty("--lit", lit.toFixed(3));
-        });
-        const ana = value.querySelector(".analytics-big");
-        if (ana)
-          ana.style.setProperty(
-            "--p",
-            localRange(p, 0, 0.55).toFixed(4),
-          );
-        const anaLine = value.querySelector(".ana-line");
-        if (anaLine && !anaLine.dataset.len) {
-          try {
-            const len = Math.ceil(anaLine.getTotalLength());
-            anaLine.dataset.len = String(len);
-            anaLine.style.setProperty("--len", String(len));
-          } catch (e) {
-            /* getTotalLength can throw on detached nodes; harmless */
-          }
-        }
-        const meta = value.querySelector(".work-meta");
-        if (meta)
-          meta.style.setProperty(
-            "--meta",
-            localRange(p, 0.04, 0.55).toFixed(4),
-          );
-      }
-
-      // Together: rooms light sequentially
-      if (value.classList.contains("v-together")) {
-        const rooms = value.querySelectorAll(".ds-room");
-        const N = rooms.length;
-        rooms.forEach((room, i) => {
-          const start = i / N;
-          const end = (i + 0.6) / N;
-          const lit = localRange(p, start, end);
-          room.style.setProperty("--lit", lit.toFixed(4));
-          room.classList.toggle("ds-room--on", lit > 0.5);
-        });
-      }
-    }
-
-    // initial render — hidden / 0 if motion is allowed, fully drawn otherwise
-    values.forEach((v) => setProgress(v, reduceMotion ? 1 : 0));
-
-    function progressFor(value) {
-      const track = value.querySelector(".ds-v-track");
-      if (!track) return 0;
-      const rect = track.getBoundingClientRect();
-      const vh = window.innerHeight;
-      const total = Math.max(1, rect.height - vh);
-      const scrolled = -rect.top;
-      return clamp(scrolled / total, 0, 1);
-    }
-
-    function updateAllValues() {
-      if (reduceMotion) return;
-      for (const v of values) setProgress(v, progressFor(v));
-    }
-
-    // scroll-hint: hides after the first scroll past 40px
-    const scrollHint = document.getElementById("scrollHint");
-    let firstScroll = true;
-    function maybeHideHint() {
-      if (firstScroll && scrollHint && window.scrollY > 40) {
-        scrollHint.classList.add("ds-scroll-hint--hide");
-        firstScroll = false;
-      }
-    }
-
-    let rafId = null;
     function onScroll() {
-      if (rafId !== null) return;
-      rafId = requestAnimationFrame(() => {
-        rafId = null;
-        updatePageProg();
-        updateAllValues();
-        maybeHideHint();
-      });
+      if (!raf) raf = requestAnimationFrame(update);
     }
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
+    update();
+    if (!reduceMotion) {
+      window.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", onScroll, { passive: true });
+    }
 
-    // initial paint
-    updatePageProg();
-    updateAllValues();
+    // ── Reveal on scroll (fires once per element) ───────────────────
+    if (!reduceMotion && typeof IntersectionObserver !== "undefined") {
+      const targets = document.querySelectorAll(".ds-reveal");
+      const io = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("in");
+              io.unobserve(entry.target);
+            }
+          }
+        },
+        { rootMargin: "0px 0px -10% 0px", threshold: 0.05 },
+      );
+      targets.forEach((el) => io.observe(el));
+    } else if (reduceMotion) {
+      document
+        .querySelectorAll(".ds-reveal")
+        .forEach((el) => el.classList.add("in"));
+    }
   })();
 </script>

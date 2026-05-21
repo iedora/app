@@ -33,6 +33,11 @@ describe("Button", () => {
     expect(html).toContain('class="ds-btn ds-btn--accent"');
   });
 
+  it("applies the primary variant (solid cinnabar destination)", () => {
+    const html = renderToStaticMarkup(<Button variant="primary">Begin</Button>);
+    expect(html).toContain('class="ds-btn ds-btn--primary"');
+  });
+
   it("renders a default cinnabar arrow when arrow=true", () => {
     const html = renderToStaticMarkup(<Button arrow>Begin</Button>);
     expect(html).toContain(

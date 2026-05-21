@@ -1786,3 +1786,501 @@
   outline: 2px solid var(--cinnabar);
   outline-offset: 4px;
 }
+
+/* ─────────────────────────────────────────────────────────────
+ * Shared editorial chrome — landing surfaces (house + menu)
+ *
+ * Promoted from menu's landing.css so both products read out of the
+ * same vocabulary. Naming: BEM-style under `.ds-` with explicit
+ * markers (e.g. `<span class="ds-eyebrow__idx">/ 01</span>`) instead
+ * of CSS-generated section indices — keeps the chrome reusable across
+ * any composition without scoping hacks.
+ * ───────────────────────────────────────────────────────────── */
+
+/* Eyebrow — mono caps with optional cinnabar `/ NN` index marker. */
+.ds-eyebrow {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-55);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.ds-eyebrow__idx {
+  color: var(--cinnabar);
+  letter-spacing: 0.14em;
+}
+
+/* Section — hairline-top divider + vertical breathing room. The first
+   section on a page (typically a hero) opts out via `--first`. */
+.ds-section {
+  border-top: 1px solid var(--ink-14);
+  padding: 96px 0;
+}
+.ds-section--first { border-top: 0; }
+@media (max-width: 760px) {
+  .ds-section { padding: 64px 0; }
+}
+
+.ds-section__head {
+  max-width: 38ch;
+  margin: 0 0 56px;
+}
+.ds-section__h {
+  margin: 16px 0 0;
+  font-family: var(--serif);
+  font-weight: 300;
+  font-variation-settings: "opsz" 144;
+  font-size: clamp(36px, min(5.5vw, 8vh), 64px);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+.ds-section__h--dot::after {
+  content: ".";
+  color: var(--cinnabar);
+  font-style: normal;
+}
+.ds-section__intro {
+  margin: 18px 0 0;
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 300;
+  font-size: var(--t-xl);
+  line-height: var(--lh-prose);
+  color: var(--ink-70);
+  text-wrap: pretty;
+}
+
+/* Hero — top of the page; no top border; large display headline. */
+.ds-hero {
+  padding: 88px 0 104px;
+  border-top: 0;
+}
+@media (max-width: 760px) {
+  .ds-hero { padding: 56px 0 64px; }
+}
+.ds-hero__h {
+  margin: 18px 0 0;
+  font-family: var(--serif);
+  font-weight: 300;
+  font-variation-settings: "opsz" 144;
+  font-size: clamp(52px, min(8vw, 12vh), 132px);
+  line-height: 0.94;
+  letter-spacing: -0.035em;
+  color: var(--ink);
+  text-wrap: balance;
+  max-width: 14ch;
+}
+.ds-hero__h--dot::after {
+  content: ".";
+  color: var(--cinnabar);
+  font-style: normal;
+}
+.ds-hero__tagline {
+  margin: 24px 0 0;
+  max-width: 44ch;
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 300;
+  font-size: var(--t-xl);
+  line-height: var(--lh-prose);
+  color: var(--ink-70);
+  text-wrap: pretty;
+}
+.ds-hero__ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 36px 0 0;
+}
+.ds-hero__trust {
+  margin: 18px 0 8px;
+  padding: 4px 0;
+  font-family: var(--serif);
+  font-size: var(--t-md);
+  line-height: 1.5;
+  color: var(--ink-70);
+  max-width: 44ch;
+  text-wrap: pretty;
+}
+
+/* Button — primary destination variant (solid cinnabar + arrow). Used
+   ONCE per screen for the principal call to action. Outline / ghost /
+   accent variants already live above in § VI.1. */
+.ds-btn--primary {
+  background: var(--cinnabar);
+  border-color: var(--cinnabar);
+  color: var(--paper);
+}
+.ds-btn--primary .ds-btn__arrow { color: var(--paper); }
+.ds-btn--primary:hover {
+  background: var(--cinnabar-deep);
+  border-color: var(--cinnabar-deep);
+  color: var(--paper);
+}
+.ds-btn--primary:hover .ds-btn__arrow {
+  color: var(--paper);
+  transform: translate(3px, -3px);
+}
+
+/* Feat grid — 3-column hairline-divided feature/step grid. Items use
+   the standard `.ds-feat` skeleton (num + h3 + p). Collapses to a
+   single column below 980px. */
+.ds-feat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border-top: 1px solid var(--ink-14);
+}
+@media (max-width: 980px) {
+  .ds-feat-grid { grid-template-columns: 1fr; }
+}
+.ds-feat {
+  padding: 36px 32px 32px;
+  border-right: 1px solid var(--ink-14);
+  border-bottom: 1px solid var(--ink-14);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--paper);
+  transition: background var(--d-3) var(--ease);
+}
+.ds-feat-grid > .ds-feat:last-child { border-right: 0; }
+@media (max-width: 980px) {
+  .ds-feat { border-right: 0; }
+}
+.ds-feat:hover { background: rgba(26, 24, 21, 0.014); }
+.ds-feat__num {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cinnabar);
+}
+.ds-feat__h {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: var(--t-2xl);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-wrap: balance;
+  max-width: 18ch;
+}
+.ds-feat__p {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: var(--t-md);
+  line-height: 1.55;
+  color: var(--ink-70);
+  text-wrap: pretty;
+}
+
+/* Product / pricing card — 2-card hairline-divided grid. Each card
+   has a tier label, a Fraunces opsz-144 amount, a desc paragraph, a
+   feature list (cinnabar mid-dot leader), and a foot row with a CTA. */
+.ds-product-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border-top: 1px solid var(--ink-14);
+  border-bottom: 1px solid var(--ink-14);
+}
+@media (max-width: 760px) {
+  .ds-product-grid { grid-template-columns: 1fr; }
+}
+.ds-product-card {
+  padding: 40px 36px 32px;
+  border-right: 1px solid var(--ink-14);
+  background: var(--paper);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  transition: background var(--d-3) var(--ease);
+}
+.ds-product-grid > .ds-product-card:last-child { border-right: 0; }
+@media (max-width: 760px) {
+  .ds-product-card {
+    border-right: 0;
+    border-bottom: 1px solid var(--ink-14);
+  }
+  .ds-product-grid > .ds-product-card:last-child { border-bottom: 0; }
+}
+.ds-product-card:hover { background: rgba(26, 24, 21, 0.014); }
+.ds-product-card__head {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.ds-product-card__tier {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-55);
+}
+.ds-product-card__price {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.ds-product-card__amt-main {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-variation-settings: "opsz" 144;
+  font-size: 72px;
+  line-height: 1;
+  letter-spacing: -0.035em;
+  color: var(--ink);
+}
+.ds-product-card__amt-sub {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: var(--t-md);
+  color: var(--ink-55);
+}
+.ds-product-card__desc {
+  margin: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--ink-14);
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: var(--t-md);
+  line-height: 1.55;
+  color: var(--ink-70);
+  text-wrap: pretty;
+}
+.ds-product-card__feats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.ds-product-card__feats li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ink-08);
+  font-family: var(--serif);
+  font-size: var(--t-md);
+  color: var(--ink);
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.ds-product-card__feats li::before {
+  content: "·";
+  color: var(--cinnabar);
+  font-family: var(--serif);
+  font-size: 18px;
+  line-height: 0;
+  position: relative;
+  top: -2px;
+}
+.ds-product-card__feats li:last-child { border-bottom: 0; }
+.ds-product-card__foot {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+/* Closing — quiet centered CTA strip closing the page. */
+.ds-closing {
+  border-top: 1px solid var(--ink-14);
+  padding: 96px 0;
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .ds-closing { padding: 64px 0; }
+}
+.ds-closing__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+.ds-closing__inner .ds-eyebrow { justify-content: center; }
+.ds-closing__h {
+  margin: 18px 0 0;
+  max-width: 18ch;
+  font-family: var(--serif);
+  font-weight: 300;
+  font-variation-settings: "opsz" 144;
+  font-size: clamp(36px, min(5.5vw, 8vh), 64px);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+.ds-closing__h::after {
+  content: ".";
+  color: var(--cinnabar);
+}
+.ds-closing__ctas {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  margin: 36px 0 0;
+}
+
+/* Footer-bar — page footer with a mono left-column and a links right-
+   column. Reads as a quiet hairline strip below the closing. */
+.ds-footer-bar {
+  border-top: 1px solid var(--ink-14);
+  padding: 24px 0 32px;
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-55);
+}
+.ds-footer-bar__inner {
+  width: min(var(--container), 100%);
+  margin: 0 auto;
+  padding: 0 var(--margin);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 24px;
+}
+.ds-footer-bar a {
+  color: inherit;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 1px;
+  transition: border-color var(--d-2) var(--ease), color var(--d-2) var(--ease);
+}
+.ds-footer-bar a:hover {
+  color: var(--ink);
+  border-bottom-color: var(--ink-40);
+}
+.ds-footer-bar__links {
+  display: inline-flex;
+  gap: 24px;
+  justify-self: end;
+}
+@media (max-width: 680px) {
+  .ds-footer-bar__inner {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+  .ds-footer-bar__links {
+    justify-self: start;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+}
+
+/* Reveal — staggered fade-up driven by an IntersectionObserver.
+ *
+ * Progressive enhancement contract:
+ *   - Initial hidden state ONLY kicks in once JS has flagged
+ *     `body.ds-loaded`. Without JS — or before the client script
+ *     runs — every `.ds-reveal` element is fully visible.
+ *   - Per-element delay knob via `--rd` (e.g. style="--rd: 120ms").
+ *   - `prefers-reduced-motion: reduce` short-circuits to instant visible.
+ *
+ * Host wires the observer once per page: add `.in` when intersecting.
+ * Pattern is identical to the menu landing — keep it portable so any
+ * editorial surface (house, menu, future product) can reuse. */
+body.ds-loaded .ds-reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity var(--d-4) var(--ease) var(--rd, 0ms),
+    transform var(--d-4) var(--ease) var(--rd, 0ms);
+}
+body.ds-loaded .ds-reveal.in {
+  opacity: 1;
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  body.ds-loaded .ds-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Hero entrance — above-the-fold copy animates IN post-paint without
+ * gating LCP. The eyebrow + headline render instantly (no opacity:0);
+ * the tagline, CTAs, and trust line fade up in a soft cascade once
+ * `body.ds-loaded` lands. Mirrors the legacy HouseHeader cascade. */
+body.ds-loaded .ds-hero__tagline,
+body.ds-loaded .ds-hero__ctas,
+body.ds-loaded .ds-hero__trust {
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity var(--d-5) var(--ease),
+    transform var(--d-5) var(--ease);
+}
+body.ds-loaded .ds-hero--in .ds-hero__tagline { opacity: 1; transform: translateY(0); transition-delay: 0.55s; }
+body.ds-loaded .ds-hero--in .ds-hero__ctas    { opacity: 1; transform: translateY(0); transition-delay: 0.75s; }
+body.ds-loaded .ds-hero--in .ds-hero__trust   { opacity: 1; transform: translateY(0); transition-delay: 0.95s; }
+@media (prefers-reduced-motion: reduce) {
+  body.ds-loaded .ds-hero__tagline,
+  body.ds-loaded .ds-hero__ctas,
+  body.ds-loaded .ds-hero__trust {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Footer-sig — three-column signature footer used as a quiet sign-off
+   below the bar (or as the only footer on storytelling pages). */
+.ds-footer-sig {
+  padding: 22px 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: baseline;
+  gap: 24px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-55);
+  border-top: 1px solid var(--ink-14);
+  margin-top: 36px;
+}
+.ds-footer-sig__built {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 15px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+}
+.ds-footer-sig__built-dot { color: var(--cinnabar); }
+.ds-footer-sig__center {
+  justify-self: center;
+  color: var(--ink-40);
+}
+.ds-footer-sig__right {
+  justify-self: end;
+  display: flex;
+  gap: 24px;
+}
+@media (max-width: 760px) {
+  .ds-footer-sig {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+    gap: 10px;
+    padding: 28px 0 24px;
+  }
+  .ds-footer-sig__right {
+    justify-self: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 16px;
+  }
+}

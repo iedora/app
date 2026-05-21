@@ -1,7 +1,7 @@
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
 import { cn } from "../lib/cn";
 
-type ButtonVariant = "default" | "solid" | "ghost" | "accent";
+type ButtonVariant = "default" | "solid" | "ghost" | "accent" | "primary";
 
 type CommonProps = {
   variant?: ButtonVariant;
@@ -34,6 +34,8 @@ function variantClass(variant: ButtonVariant | undefined) {
       return "ds-btn--ghost";
     case "accent":
       return "ds-btn--accent";
+    case "primary":
+      return "ds-btn--primary";
     default:
       return "";
   }
@@ -52,6 +54,7 @@ function isAnchor(props: ButtonProps): props is AsAnchorProps {
  *   - solid   — ink fill, paper text; hover inverts
  *   - ghost   — borderless; hover draws an underline
  *   - accent  — cinnabar border + text; hover fills with cinnabar
+ *   - primary — solid cinnabar destination CTA; one per screen
  *
  * Renders as <a> when `href` is provided, otherwise <button>.
  */
