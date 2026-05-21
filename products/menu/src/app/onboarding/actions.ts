@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { or, eq, like } from 'drizzle-orm'
 import { z } from 'zod'
 import { getEffectiveOrganizationId, getSession } from '@/features/auth'
 import {
@@ -14,15 +15,8 @@ import { menu, restaurant } from '@/shared/db/schema'
 import { canAddRestaurant } from '@/features/plans'
 import { enforceRateLimit } from '@/features/rate-limit'
 
-const slugRegex = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/
-
 const onboardingSchema = z.object({
   restaurantName: z.string().trim().min(2).max(80),
-  slug: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .regex(slugRegex, 'Use lowercase letters, numbers, and hyphens (2-40 chars)'),
 })
 
 export type OnboardingFormState =
@@ -32,6 +26,54 @@ export type OnboardingFormState =
 /** The tx handle Drizzle yields to its callback. Inferred so we don't drag in
  *  the upstream generics every time we want a typed transactional helper. */
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+/**
+ * Lowercase + ASCII-fold + dash-separated. Empty / non-text inputs (just
+ * emojis, just punctuation) fall back to `"restaurant"` so the caller
+ * always gets a valid slug seed to feed into `nextAvailableSlug`.
+ */
+function slugify(value: string): string {
+  const cleaned = value
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+  return cleaned || 'restaurant'
+}
+
+/**
+ * Returns the smallest unused slug in the `base`, `base-2`, `base-3`, …
+ * sequence. Scopes the search to anything matching the base prefix and
+ * picks the first gap.
+ *
+ * Race notes: two concurrent onboardings with the same name will both
+ * resolve to the same candidate and one will lose the insert. The action
+ * surfaces a friendly error in that case — the user retries and gets
+ * the next number. Acceptable at current onboarding rates; revisit if
+ * we ever see collisions in logs.
+ */
+async function nextAvailableSlug(base: string): Promise<string> {
+  const rows = await db
+    .select({ slug: restaurant.slug })
+    .from(restaurant)
+    .where(
+      or(
+        eq(restaurant.slug, base),
+        like(restaurant.slug, `${base}-%`),
+      ),
+    )
+  const used = new Set(rows.map((r) => r.slug))
+  if (!used.has(base)) return base
+  for (let i = 2; i <= 1000; i++) {
+    const candidate = `${base}-${i}`
+    if (!used.has(candidate)) return candidate
+  }
+  // 1000 collisions for the same base is implausible enough that giving
+  // up is fine; the caller surfaces an error and the operator can rename.
+  throw new Error(`unable to allocate slug after 1000 attempts for ${base}`)
+}
 
 async function insertRestaurantWithDefaultMenu(
   tx: Tx,
@@ -58,7 +100,6 @@ export async function completeOnboarding(
 ): Promise<OnboardingFormState> {
   const parsed = onboardingSchema.safeParse({
     restaurantName: formData.get('restaurantName'),
-    slug: formData.get('slug'),
   })
 
   if (!parsed.success) {
@@ -70,7 +111,7 @@ export async function completeOnboarding(
     return { fieldErrors }
   }
 
-  const { restaurantName, slug } = parsed.data
+  const { restaurantName } = parsed.data
 
   const session = await getSession()
   if (!session?.user) redirect(signInUrl('/onboarding'))
@@ -81,6 +122,13 @@ export async function completeOnboarding(
   if (!decision.ok) {
     return { error: `Too many attempts. Try again in ${decision.retryAfterSec}s.` }
   }
+
+  // Allocate the public slug HERE so the same value is consistent
+  // across the menu DB insert AND the Zitadel org create call below.
+  // Generating in the form would push the collision-handling onto the
+  // client, which both adds complexity to onboarding UX and races
+  // against concurrent operators.
+  const slug = await nextAvailableSlug(slugify(restaurantName))
 
   // Existing org? Add the restaurant under it (gated by plan limit). Brand-new
   // user? Create org on Genkan + first restaurant locally. Plans are scoped
@@ -113,7 +161,7 @@ async function addRestaurantToOrg(
     )
   } catch (err) {
     console.error('[onboarding] restaurant creation under existing org failed', err)
-    return { error: 'Could not create restaurant. The slug may already be taken.' }
+    return { error: 'Could not create restaurant. Please try again.' }
   }
 
   revalidatePath('/dashboard')
@@ -131,7 +179,7 @@ async function createOrgAndFirstRestaurant(
   // need to roll anything back since nothing local was written yet.
   const orgResult = await createOrganization(userId, restaurantName, slug)
   if (!orgResult.ok) {
-    return { error: 'Could not create organization. Slug may already be taken.' }
+    return { error: 'Could not create organization. Please try again.' }
   }
   const organization = orgResult.organization
 
