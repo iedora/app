@@ -9,17 +9,19 @@ import { seedRestaurant } from '@/features/restaurant-identity/testing'
  * `iedoraAdminProfile`). Route strings come from `qrCodesRoutes`.
  *
  * Selectors lean on stable IDs (`#qr-code`, `#qr-label`, `#qr-restaurant`)
- * and exact text matches where the layout uses generic words like "Single".
+ * and `data-test-id` (resolved via `getByTestId`) for compound widgets
+ * and rows.
  */
 
 test.describe('@smoke qr-codes admin', () => {
-  test('renders the two creation cards', async ({ signedInPage }) => {
+  test('renders both creation forms and the registry', async ({ signedInPage }) => {
     await signedInPage.goto(qrCodesRoutes.admin)
     await expect(signedInPage.locator('h1')).toContainText('QR codes (admin)')
 
-    // Stable IDs prove both cards are rendered.
+    await expect(signedInPage.getByTestId('qr-codes-create-panel')).toBeVisible()
     await expect(signedInPage.locator('#qr-code')).toBeVisible()
     await expect(signedInPage.locator('#qr-bulk-count')).toBeVisible()
+    await expect(signedInPage.getByTestId('qr-codes-registry')).toBeVisible()
   })
 
   test('binds a fresh QR code to a seeded restaurant', async ({ signIn }) => {
@@ -45,9 +47,9 @@ test.describe('@smoke qr-codes admin', () => {
     // (see packages/design-system/src/components/combobox.tsx).
     await page.locator('#qr-restaurant').click()
     await page.locator(`#ds-combobox-opt-${sushi.restaurantId}`).click()
-    await page.locator('button:has-text("Create QR Code")').click()
+    await page.getByTestId('qr-codes-create-one-submit').click()
 
-    const row = page.locator('tr:has-text("sticker_sushi_10")')
+    const row = page.getByTestId('qr-codes-row-sticker_sushi_10')
     await expect(row).toBeVisible()
     await expect(row).toContainText('Sushi Table 10')
     await expect(row).toContainText('Sushi Express')
@@ -56,13 +58,50 @@ test.describe('@smoke qr-codes admin', () => {
   test('bulk-generates unbound codes', async ({ signedInPage }) => {
     await signedInPage.goto(qrCodesRoutes.admin)
     await signedInPage.locator('#qr-bulk-count').fill('5')
-    await signedInPage.locator('button:has-text("Generate Batch")').click()
+    await signedInPage.getByTestId('qr-codes-bulk-submit').click()
 
-    const copyBlock = signedInPage.locator('div:has-text("Copy List")').first()
-    await expect(copyBlock).toBeVisible()
-    const text = await copyBlock.locator('pre').innerText()
+    const result = signedInPage.getByTestId('qr-codes-bulk-result')
+    await expect(result).toBeVisible()
+    const text = await result.locator('pre').innerText()
     const codes = text.trim().split('\n')
     expect(codes.length).toBe(5)
     for (const code of codes) expect(code).toMatch(/^[a-z0-9_-]{8}$/)
+  })
+
+  // Narrow viewport — the create panel collapses to a single column, the
+  // registry table becomes horizontally scrollable. The header row stays
+  // out of view; row cells are still reachable via scroll.
+  test('remains usable at phone width', async ({ signedInPage }) => {
+    await signedInPage.setViewportSize({ width: 390, height: 844 })
+    await signedInPage.goto(qrCodesRoutes.admin)
+
+    // Create panel is visible and both forms render in the column flow.
+    await expect(signedInPage.getByTestId('qr-codes-create-panel')).toBeVisible()
+    const createPanel = signedInPage.getByTestId('qr-codes-create-panel')
+    const singleForm = createPanel.getByTestId('qr-codes-create-one-form')
+    const bulkForm = createPanel.getByTestId('qr-codes-bulk-form')
+    await expect(singleForm).toBeVisible()
+    await expect(bulkForm).toBeVisible()
+
+    // Submit button reachable: scroll it into the viewport, then assert.
+    const submit = signedInPage.getByTestId('qr-codes-create-one-submit')
+    await submit.scrollIntoViewIfNeeded()
+    await expect(submit).toBeVisible()
+
+    // Registry table sits inside an overflow-x container; the inner table
+    // exceeds the viewport so the wrapper must be scrollable. Verify by
+    // measuring the scroll width vs client width.
+    const tableScroll = await signedInPage.evaluate(() => {
+      const wrap = document.querySelector(
+        '[data-test-id="qr-codes-registry"] .overflow-x-auto',
+      ) as HTMLElement | null
+      if (!wrap) return null
+      return { scrollWidth: wrap.scrollWidth, clientWidth: wrap.clientWidth }
+    })
+    // Empty registries skip the wrapper — guard against null. If it
+    // exists, the scroll width must exceed the visible width.
+    if (tableScroll) {
+      expect(tableScroll.scrollWidth).toBeGreaterThan(tableScroll.clientWidth)
+    }
   })
 })

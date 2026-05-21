@@ -24,6 +24,7 @@ function ControlledCombobox(props: { onChange?: (v: string | null) => void }) {
   const [value, setValue] = useState<string | null>(null);
   return (
     <Combobox
+      aria-label="pick one"
       options={SAMPLE}
       value={value}
       onChange={(v) => {
@@ -31,41 +32,46 @@ function ControlledCombobox(props: { onChange?: (v: string | null) => void }) {
         props.onChange?.(v);
       }}
       placeholder="— pick —"
-      searchPlaceholder="Type to filter"
     />
   );
 }
 
 describe("Combobox", () => {
-  it("renders the placeholder when nothing is selected", () => {
+  it("renders an input with the placeholder when nothing is selected", () => {
     render(<ControlledCombobox />);
-    expect(screen.getByRole("button", { name: /pick/i })).toBeDefined();
+    const input = screen.getByRole("combobox", { name: /pick one/i });
+    expect(input).toBeDefined();
+    expect((input as HTMLInputElement).value).toBe("");
+    expect(input.getAttribute("placeholder")).toMatch(/pick/i);
   });
 
-  it("opens the popover on trigger click", async () => {
+  it("opens the listbox on focus and shows every option", async () => {
     const user = u();
     render(<ControlledCombobox />);
-    await user.click(screen.getByRole("button", { name: /pick/i }));
+    const input = screen.getByRole("combobox", { name: /pick one/i });
+    await user.click(input);
+    expect(input.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getAllByRole("option")).toHaveLength(SAMPLE.length);
   });
 
-  it("filters as the user types, matching on label and hint", async () => {
+  it("filters as the user types — same input, no separate search field", async () => {
     const user = u();
     render(<ControlledCombobox />);
-    await user.click(screen.getByRole("button", { name: /pick/i }));
-    const search = screen.getByPlaceholderText(/type to filter/i);
-    await user.type(search, "beta");
-    expect(screen.getAllByRole("option")).toHaveLength(2); // "Beta" + "Beta Carotene"
-    // Alpha is gone
+    const input = screen.getByRole("combobox", { name: /pick one/i });
+    await user.click(input);
+    await user.type(input, "beta");
+    expect(screen.getAllByRole("option")).toHaveLength(2); // Beta + Beta Carotene
     expect(screen.queryByRole("option", { name: /alpha/i })).toBeNull();
+    // The input's value reflects the query while the dropdown is open.
+    expect((input as HTMLInputElement).value).toBe("beta");
   });
 
   it("matches via the hint field too (β resolves to Beta)", async () => {
     const user = u();
     render(<ControlledCombobox />);
-    await user.click(screen.getByRole("button", { name: /pick/i }));
-    const search = screen.getByPlaceholderText(/type to filter/i);
-    await user.type(search, "β");
+    const input = screen.getByRole("combobox", { name: /pick one/i });
+    await user.click(input);
+    await user.type(input, "β");
     const opts = screen.getAllByRole("option");
     expect(opts).toHaveLength(1);
     expect(opts[0]?.textContent).toContain("Beta");
@@ -75,58 +81,120 @@ describe("Combobox", () => {
   it("shows the empty message when nothing matches", async () => {
     const user = u();
     render(<ControlledCombobox />);
-    await user.click(screen.getByRole("button", { name: /pick/i }));
-    await user.type(screen.getByPlaceholderText(/type to filter/i), "zzz");
+    const input = screen.getByRole("combobox", { name: /pick one/i });
+    await user.click(input);
+    await user.type(input, "zzz");
     expect(screen.queryAllByRole("option")).toHaveLength(0);
     expect(screen.getByText(/no matches/i)).toBeDefined();
   });
 
-  it("selects via Enter on the active item", async () => {
+  it("selects via Enter on the active item and restores the label as the input value", async () => {
     const user = u();
     const onChange = vi.fn();
     render(<ControlledCombobox onChange={onChange} />);
-    await user.click(screen.getByRole("button", { name: /pick/i }));
-    const search = screen.getByPlaceholderText(/type to filter/i);
+    const input = screen.getByRole("combobox", { name: /pick one/i });
+    await user.click(input);
     await user.keyboard("{ArrowDown}{ArrowDown}{Enter}");
     expect(onChange).toHaveBeenCalledWith("betacarotene");
-    // Trigger now shows the picked label.
-    expect(screen.getByRole("button", { name: /beta carotene/i })).toBeDefined();
-    // And the search input never had to be focused away from.
-    expect(search).toBeDefined();
+    // After commit, dropdown closes and the input shows the selected label.
+    expect(input.getAttribute("aria-expanded")).toBe("false");
+    expect((input as HTMLInputElement).value).toBe("Beta Carotene");
   });
 
   it("selects on click", async () => {
     const user = u();
     const onChange = vi.fn();
     render(<ControlledCombobox onChange={onChange} />);
-    await user.click(screen.getByRole("button", { name: /pick/i }));
+    const input = screen.getByRole("combobox", { name: /pick one/i });
+    await user.click(input);
     await user.click(screen.getByRole("option", { name: /gamma/i }));
     expect(onChange).toHaveBeenCalledWith("gamma");
+    expect((input as HTMLInputElement).value).toBe("Gamma");
   });
 
   it("closes on Escape without changing the value", async () => {
     const user = u();
     const onChange = vi.fn();
     render(<ControlledCombobox onChange={onChange} />);
-    await user.click(screen.getByRole("button", { name: /pick/i }));
+    const input = screen.getByRole("combobox", { name: /pick one/i });
+    await user.click(input);
     await user.keyboard("{Escape}");
     expect(onChange).not.toHaveBeenCalled();
+    expect(input.getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("exposes a Clear button only when something is selected, and clearing emits null", async () => {
+  it("exposes an inline × clear button when something is selected; clearing emits null", async () => {
     const user = u();
     const onChange = vi.fn();
     render(<ControlledCombobox onChange={onChange} />);
-    // Before selection — no Clear visible.
-    await user.click(screen.getByRole("button", { name: /pick/i }));
+    const input = screen.getByRole("combobox", { name: /pick one/i });
+    // Before selection — no clear button.
     expect(screen.queryByRole("button", { name: /clear/i })).toBeNull();
     // Pick one.
+    await user.click(input);
     await user.click(screen.getByRole("option", { name: /alpha/i }));
-    // Re-open and the Clear button is there.
-    await user.click(screen.getByRole("button", { name: /alpha/i }));
+    // The clear button appears in the input chrome.
     const clear = screen.getByRole("button", { name: /clear/i });
     await user.click(clear);
     expect(onChange).toHaveBeenLastCalledWith(null);
+    expect((input as HTMLInputElement).value).toBe("");
+  });
+
+  it("Backspace on empty query clears the current selection", async () => {
+    const user = u();
+    const onChange = vi.fn();
+    render(<ControlledCombobox onChange={onChange} />);
+    const input = screen.getByRole("combobox", { name: /pick one/i });
+    await user.click(input);
+    await user.click(screen.getByRole("option", { name: /alpha/i }));
+    // Re-focus and press Backspace with no query typed.
+    await user.click(input);
+    await user.keyboard("{Backspace}");
+    expect(onChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it("sets title on label + hint spans so truncated text is still readable on hover", async () => {
+    const longOptions: ComboboxOption[] = [
+      {
+        value: "long",
+        label: "A Cantinho da Avó Maria — Tasca de Bairro",
+        hint: "a-cantinho-da-avo-maria-tasca",
+      },
+    ];
+    function LongLabelCombobox() {
+      const [v, setV] = useState<string | null>(null);
+      return (
+        <Combobox
+          aria-label="pick"
+          options={longOptions}
+          value={v}
+          onChange={setV}
+        />
+      );
+    }
+    const user = u();
+    render(<LongLabelCombobox />);
+    await user.click(screen.getByRole("combobox", { name: /pick/i }));
+    const labelSpan = screen.getByText(/Cantinho da Avó Maria/);
+    const hintSpan = screen.getByText(/a-cantinho-da-avo-maria-tasca/);
+    expect(labelSpan.getAttribute("title")).toBe(
+      "A Cantinho da Avó Maria — Tasca de Bairro",
+    );
+    expect(hintSpan.getAttribute("title")).toBe(
+      "a-cantinho-da-avo-maria-tasca",
+    );
+  });
+
+  it("sets title on the input to the current selection's label (for hover-to-read when truncated)", async () => {
+    const user = u();
+    render(<ControlledCombobox />);
+    const input = screen.getByRole("combobox", { name: /pick one/i });
+    // No selection yet → no title.
+    expect(input.getAttribute("title")).toBeNull();
+    await user.click(input);
+    await user.click(screen.getByRole("option", { name: /beta carotene/i }));
+    // After commit + close, the title carries the full label.
+    expect(input.getAttribute("title")).toBe("Beta Carotene");
   });
 
   it("renders a hidden form-input when `name` is provided", () => {

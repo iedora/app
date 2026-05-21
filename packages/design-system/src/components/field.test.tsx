@@ -66,6 +66,16 @@ describe("FieldInput", () => {
     expect(html).toMatch(/<input[^>]*type="email"[^>]*\/>/);
     expect(html).toContain('placeholder="name@iedora.com"');
   });
+
+  it("adds ds-input--compact when compact is set", () => {
+    const html = renderToStaticMarkup(<FieldInput compact />);
+    expect(html).toContain("ds-input ds-input--compact");
+  });
+
+  it("omits ds-input--compact by default", () => {
+    const html = renderToStaticMarkup(<FieldInput />);
+    expect(html).not.toContain("ds-input--compact");
+  });
 });
 
 describe("FieldTextarea", () => {
@@ -75,5 +85,10 @@ describe("FieldTextarea", () => {
     );
     expect(html).toMatch(/<textarea[^>]*name="message"[^>]*>/);
     expect(html).toContain('placeholder="—"');
+  });
+
+  it("adds ds-textarea--compact when compact is set", () => {
+    const html = renderToStaticMarkup(<FieldTextarea compact />);
+    expect(html).toContain("ds-textarea ds-textarea--compact");
   });
 });

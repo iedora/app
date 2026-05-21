@@ -469,68 +469,42 @@
 
 .ds-textarea { resize: vertical; min-height: 64px; line-height: 1.45; }
 
-/* Combobox — searchable dropdown. See components/combobox.tsx.
-
-   The trigger reads as a `<Field>`-style underline input: serif body,
-   12px vertical padding, hairline bottom border, chevron on the right.
-   When nothing is selected, the visible value sits in `--ink-40` italic
-   (matches `::placeholder` rules above).
-
-   The popover paints on `--paper` with a hairline frame and a thin
-   shadow; the search input inside the header reuses the same underline
-   treatment so the visual rhythm stays editorial.
-
-   The width matches the trigger via Radix's
-   `--radix-popover-trigger-width` CSS var so the dropdown lines up
-   under the field on any viewport; `max-height: clamp(...)` keeps it
-   inside the viewport on mobile and scrolls internally.
-*/
-.ds-combobox__trigger {
-  appearance: none;
-  /* Compact submenu trigger — hairline frame on all sides, sharp
-     corners. Reads as a SELECTOR, not as another text field. The
-     `--paper-2` tint nudges "tap me" without screaming chrome. */
+/* Compact variant — sized to match `.ds-combobox__trigger` so an input
+   and a Combobox can sit on the same row without visual rhythm breaks.
+   Higher specificity required to defeat the underline rules above. */
+.ds-input--compact,
+.ds-textarea--compact,
+.ds-field input.ds-input--compact,
+.ds-field textarea.ds-textarea--compact {
   background: var(--paper-2);
   border: 1px solid var(--ink-14);
   border-radius: 0;
-  padding: 5px 8px 5px 10px;
+  padding: 5px 10px;
   font-family: var(--serif);
   font-size: 14px;
   line-height: 1.3;
-  color: var(--ink);
-  outline: none;
-  width: 100%;
-  text-align: left;
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  cursor: pointer;
+  min-height: 28px;
   transition:
     border-color var(--d-2) var(--ease),
     background-color var(--d-2) var(--ease);
-  position: relative;
-  min-height: 28px;
 }
-.ds-combobox__trigger:hover:not(:disabled) {
+.ds-input--compact:hover:not(:disabled),
+.ds-textarea--compact:hover:not(:disabled),
+.ds-field input.ds-input--compact:hover:not(:disabled),
+.ds-field textarea.ds-textarea--compact:hover:not(:disabled) {
   border-color: var(--ink-40);
 }
-.ds-combobox__trigger[aria-expanded="true"] {
+.ds-input--compact:focus,
+.ds-textarea--compact:focus,
+.ds-field input.ds-input--compact:focus,
+.ds-field textarea.ds-textarea--compact:focus {
   border-color: var(--ink);
   background: var(--paper);
-}
-.ds-combobox__trigger:focus-visible {
-  border-color: var(--ink);
   outline: 1px solid var(--ink);
   outline-offset: 1px;
 }
-.ds-combobox__trigger:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-/* Placeholder reads in mono uppercase — "chrome", not content. Selected
-   value uses serif (the content). Editorial split: chrome vs body. */
-.ds-combobox__trigger[data-placeholder] .ds-combobox__value {
+.ds-input--compact::placeholder,
+.ds-textarea--compact::placeholder {
   font-family: var(--mono);
   font-size: 10.5px;
   letter-spacing: 0.18em;
@@ -538,22 +512,107 @@
   color: var(--ink-55);
   font-style: normal;
 }
-.ds-combobox__value {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+
+/* Combobox — typeahead input. See components/combobox.tsx.
+
+   One input. Typing filters the list below; the chevron toggles the
+   dropdown; the inline × clears the selection. There is no separate
+   search input — the input IS the search field.
+
+   Sized identically to `.ds-input--compact` (28px min-height, 14px
+   serif, hairline ink-14 frame, paper-2 tint). The popover paints on
+   --paper with a hairline frame, width-matched to the input via
+   Radix's `--radix-popover-trigger-width`, max-height clamped to
+   viewport so long lists scroll internally instead of pushing the
+   page.
+*/
+.ds-combobox {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  background: var(--paper-2);
+  border: 1px solid var(--ink-14);
+  min-height: 28px;
+  transition:
+    border-color var(--d-2) var(--ease),
+    background-color var(--d-2) var(--ease);
 }
+.ds-combobox:hover:not(.ds-combobox--disabled) {
+  border-color: var(--ink-40);
+}
+.ds-combobox[data-state="open"],
+.ds-combobox:focus-within {
+  border-color: var(--ink);
+  background: var(--paper);
+}
+.ds-combobox--disabled {
+  opacity: 0.5;
+}
+
+.ds-combobox__input {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  padding: 5px 8px 5px 10px;
+  font-family: var(--serif);
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--ink);
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+  text-overflow: ellipsis;
+  cursor: text;
+}
+.ds-combobox--disabled .ds-combobox__input {
+  cursor: not-allowed;
+}
+/* Placeholder reads in mono uppercase — "chrome", not content. */
+.ds-combobox__input::placeholder {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-55);
+  font-style: normal;
+}
+
 .ds-combobox__chevron {
   display: inline-flex;
   color: var(--ink-55);
   flex: none;
-  transition: transform var(--d-2) var(--ease);
+  padding: 0 8px 0 4px;
+  cursor: pointer;
+  transition:
+    transform var(--d-2) var(--ease),
+    color var(--d-2) var(--ease);
 }
-.ds-combobox__trigger[aria-expanded="true"] .ds-combobox__chevron {
+.ds-combobox[data-state="open"] .ds-combobox__chevron {
   transform: rotate(180deg);
   color: var(--ink);
+}
+.ds-combobox--disabled .ds-combobox__chevron {
+  cursor: not-allowed;
+}
+
+.ds-combobox__clear {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1;
+  color: var(--ink-55);
+  cursor: pointer;
+  padding: 0 4px;
+  flex: none;
+  transition: color var(--d-2) var(--ease);
+}
+.ds-combobox__clear:hover {
+  color: var(--cinnabar);
 }
 
 .ds-combobox__popover {
@@ -583,46 +642,6 @@
   to   { opacity: 0; transform: translateY(-2px); }
 }
 
-.ds-combobox__searchbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--ink-14);
-  background: var(--paper-2);
-}
-.ds-combobox__search {
-  flex: 1;
-  appearance: none;
-  background: transparent;
-  border: 0;
-  outline: none;
-  padding: 2px 0;
-  font-family: var(--serif);
-  font-size: 13px;
-  color: var(--ink);
-  width: 100%;
-}
-.ds-combobox__search::placeholder {
-  color: var(--ink-40);
-  font-style: italic;
-}
-.ds-combobox__clear {
-  appearance: none;
-  background: transparent;
-  border: 0;
-  font-family: var(--mono);
-  font-size: var(--t-2xs);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-55);
-  cursor: pointer;
-  padding: 2px 4px;
-}
-.ds-combobox__clear:hover {
-  color: var(--cinnabar);
-}
-
 .ds-combobox__list {
   list-style: none;
   margin: 0;
@@ -635,10 +654,14 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 10px;
-  padding: 6px 10px 6px 8px;
+  gap: 12px;
+  /* 14px right balances against the 2px cinnabar rail on the left so a
+     selected row reads as evenly padded. Vertical 8px gives the text
+     air without dropping the list density. */
+  padding: 8px 14px 8px 12px;
   font-family: var(--serif);
   font-size: 13px;
+  line-height: 1.35;
   color: var(--ink);
   cursor: pointer;
   /* Hairline left rail flips to cinnabar when selected. */
@@ -657,12 +680,20 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Hint truncates too — without `min-width: 0` a long slug would push
+   the label out of the visible area. Capping at 45% keeps the label
+   readable when both strings are long. */
 .ds-combobox__item-hint {
   font-family: var(--mono);
   font-size: var(--t-2xs);
   letter-spacing: 0.10em;
   color: var(--ink-40);
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ds-combobox__empty {
@@ -1632,4 +1663,126 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .ds-scroll-hint__nub::after { animation: none; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * Nav — editorial chrome shared by every product surface.
+ *
+ * Mobile-first 2-row layout (brand+actions on row 1, links scroll-x
+ * on row 2). Collapses to a single row at ≥1080px (brand · links ·
+ * actions). The links row vanishes when `<NavLinks>` is absent —
+ * `:has(.ds-nav__links)` swaps the `grid-template-areas` so the
+ * empty row never claims height.
+ * ───────────────────────────────────────────────────────────── */
+
+.ds-nav {
+  border-bottom: 1px solid var(--ink-14);
+  background: var(--paper);
+}
+.ds-nav--sticky {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.ds-nav__inner {
+  width: min(var(--container), 100%);
+  margin: 0 auto;
+  padding: 12px var(--margin);
+  display: grid;
+  column-gap: 24px;
+  row-gap: 8px;
+  align-items: center;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "brand actions";
+}
+.ds-nav__inner:has(.ds-nav__links) {
+  grid-template-areas:
+    "brand actions"
+    "links links";
+}
+
+.ds-nav__brand {
+  grid-area: brand;
+  justify-self: start;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ds-nav__actions {
+  grid-area: actions;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Links row — horizontal scroll on narrow widths so every link stays
+   reachable without a hamburger. Scrollbar is hidden cross-browser. */
+.ds-nav__links {
+  grid-area: links;
+  display: flex;
+  align-items: center;
+  gap: 4px 18px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin-inline: calc(var(--margin) * -1);
+  padding-inline: var(--margin);
+  /* Faint cinnabar fade on the right edge to hint at overflow on
+     mobile — only when actually scrollable. Implementation note:
+     the gradient sits in the background; when content doesn't
+     overflow, the user perceives a plain paper bg. */
+}
+.ds-nav__links::-webkit-scrollbar {
+  display: none;
+}
+
+@media (min-width: 1080px) {
+  .ds-nav__inner {
+    padding: 14px var(--margin);
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas: "brand actions actions";
+    column-gap: 32px;
+  }
+  .ds-nav__inner:has(.ds-nav__links) {
+    grid-template-areas: "brand links actions";
+  }
+  .ds-nav__links {
+    justify-self: center;
+    overflow: visible;
+    margin-inline: 0;
+    padding-inline: 0;
+    flex-wrap: wrap;
+    gap: 4px 22px;
+  }
+}
+
+.ds-nav__link {
+  position: relative;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-55);
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 6px 0;
+  border-bottom: 1px solid transparent;
+  transition:
+    color var(--d-2) var(--ease),
+    border-color var(--d-2) var(--ease);
+}
+.ds-nav__link:hover {
+  color: var(--ink);
+  border-bottom-color: var(--ink-40);
+}
+.ds-nav__link[data-active="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--cinnabar);
+}
+.ds-nav__link:focus-visible {
+  outline: 2px solid var(--cinnabar);
+  outline-offset: 4px;
 }

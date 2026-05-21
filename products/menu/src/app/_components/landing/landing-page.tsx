@@ -2,58 +2,43 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { Nav, NavActions, NavBrand, PageProgress, Wordmark } from "@iedora/design-system";
 import { APP_HOSTNAME, BRAND_NAME, BRAND_URL, CONTACT_EMAIL, SIGN_IN_PATH } from "@/shared/brand";
 import "./landing.css";
 
 /**
  * Sign-in / sign-up share the same destination: `/api/auth/login` is a
  * server-side handler that mints the PKCE-state cookie and 302s the
- * browser to Zitadel's /oauth/v2/authorize. From the user's perspective
- * "Sign in" and "Get started" are the same OIDC flow — Zitadel decides
- * whether to render its login or registration form.
+ * browser to Zitadel's /oauth/v2/authorize. "Sign in" and "Get started"
+ * are the same OIDC flow — Zitadel decides whether to render login or
+ * registration based on session state.
  */
 const AUTH_HREF = SIGN_IN_PATH;
 
 type LangCode = "en" | "pt" | "es" | "fr";
 
-type MetaPart = string | { italic: string; rest: string };
-
 type Headline = { roman: string; tagline: string };
 
 type Copy = {
-  nav: { features: string; how: string; pricing: string; signin: string; cta: string };
+  nav: { signin: string; cta: string };
   hero: {
     eyebrow: string;
     headline: Headline;
     ctaPrimary: string;
-    meta: MetaPart[];
+    trust: string;
   };
-  features: {
-    eyebrow: string;
-    h: string;
-    p: string;
-    items: { n: string; h: string; p: string }[];
-  };
-  how: {
-    eyebrow: string;
-    h: string;
-    p: string;
-    steps: { n: string; h: string; p: string; ill: string }[];
-  };
+  /** One quiet line under the simulator. No eyebrow, no title — just the
+   *  value prop in a single sentence. Read like a printed statement. */
+  statement: string;
   pricing: {
     eyebrow: string;
     h: string;
-    p: string;
     free: { tier: string; priceMain: string; priceSub: string; desc: string; cta: string; feats: string[] };
     pro: { tier: string; priceMain: string; priceSub: string; desc: string; cta: string; feats: string[] };
     foot: string;
   };
-  closing: { eyebrow: string; h: string; p: string; ctaPrimary: string; ctaGhost: string };
-  // `left` accepts inline parts so the brand name can be a real anchor
-  // pointing at the parent brand site (BRAND_URL). Plain strings render
-  // as text; objects render as anchors.
-  footer: { left: (string | { text: string; href: string })[]; links: string[] };
-  boa: string;
+  closing: { eyebrow: string; h: string; ctaPrimary: string };
+  footer: { left: (string | { text: string; href: string })[]; contact: string };
   editor: { title: string; restaurant: string; item: string; desc: string; section: string; price: string; publish: string; live: string; add: string };
   phone: { eyebrow: string; live: string };
 };
@@ -67,37 +52,17 @@ const LANGS: { code: LangCode; label: string; name: string; flag: string }[] = [
 
 const COPY: Record<LangCode, Copy> = {
   en: {
-    nav: { features: "What it does", how: "How it works", pricing: "Pricing", signin: "Sign in", cta: "Get started" },
+    nav: { signin: "Log in", cta: "Get started" },
     hero: {
       eyebrow: "at the table",
-      headline: { roman: "One menu. Every screen it lives on.", tagline: "A good menu, always current, on every screen." },
+      headline: { roman: "One menu. Every screen it lives on.", tagline: "Always current. Always honest about the kitchen." },
       ctaPrimary: "Try it with your menu",
-      meta: ["Always free for one restaurant", "No card. No setup call.", { italic: "to go", rest: ", your menu wherever guests are." }],
+      trust: "Always free for one restaurant · No card · No setup call",
     },
-    features: {
-      eyebrow: "your menu",
-      h: "Three things, done with care.",
-      p: "Menu is small on purpose. It does the menu, the bit guests actually look at, and tries not to do anything else.",
-      items: [
-        { n: "i.", h: "One QR. Always today's menu.", p: "Stick a code on the table once. Edit prices, swap a daily special, mark something out of stock. It lands instantly. No reprinting, no Wi-Fi gymnastics." },
-        { n: "ii.", h: "Written for guests, not for SEO.", p: "Add translations once and the menu speaks back in the guest's language. Allergens sit in a line under each dish, photos are optional. Reads like a printed menu, not a marketplace listing." },
-        { n: "iii.", h: "A quiet measure of the room.", p: "A small, calm dashboard tells you which hours get the most scans, which dishes get tapped open, and which sections quietly get skipped. No funnels. No heat-maps that look like the weather." },
-      ],
-    },
-    how: {
-      eyebrow: "how it works",
-      h: "From printed menu to QR in an afternoon.",
-      p: "Most kitchens are open by Tuesday. The slow part is deciding which dishes earn their place. That bit's still on you.",
-      steps: [
-        { n: "step one", h: "Upload, paste, or photograph.", p: "Drop a PDF of your existing menu, paste a Word doc, or shoot the printed card. We tidy it into sections you can edit.", ill: "menu.pdf  →  parsed" },
-        { n: "step two", h: "Adjust until it sounds like you.", p: "Rename a section. Bump a price. Add the dessert that only happens on Saturdays. Save.", ill: "edit · preview · save" },
-        { n: "step three", h: "Print the QR. Hang it up.", p: "Brass plate, table tent, or a sticker on the window. Same code forever. The menu behind it changes whenever you want.", ill: "[ QR ] static" },
-      ],
-    },
+    statement: "One QR on the table. The menu behind it changes whenever you want.",
     pricing: {
       eyebrow: "plans",
       h: "Two prices. Both honest.",
-      p: "Start free, always. Upgrade when you outgrow it, not before.",
       free: {
         tier: "Free", priceMain: "€0", priceSub: "forever",
         desc: "For the corner café and the place that opens four nights a week.",
@@ -115,47 +80,24 @@ const COPY: Record<LangCode, Copy> = {
     closing: {
       eyebrow: "at the table",
       h: "Put your menu online this afternoon.",
-      p: "Always free for one restaurant. Bring your existing menu and leave with a QR you can print before service.",
       ctaPrimary: "Bring your menu over",
-      ctaGhost: "Email us instead",
     },
-    footer: { left: ["Menu · an ", { text: BRAND_NAME, href: BRAND_URL }, " product · made in Lisbon"], links: ["Privacy", "Contact"] },
-    boa: "Enjoy your meal.",
+    footer: { left: ["Menu · an ", { text: BRAND_NAME, href: BRAND_URL }, " product · made in Lisbon"], contact: CONTACT_EMAIL },
     editor: { title: "Menu", restaurant: "Restaurant", item: "Item name", desc: "Description", section: "Section", price: "Price (€)", publish: "⌘ S to save", live: "live", add: "+ add item" },
     phone: { eyebrow: "at the table", live: "updated just now" },
   },
   pt: {
-    nav: { features: "à vossa carta", how: "como funciona", pricing: "modelos", signin: "Entrar", cta: "Começar" },
+    nav: { signin: "Entrar", cta: "Começar" },
     hero: {
       eyebrow: "à mesa",
-      headline: { roman: "Uma carta. Em todos os ecrãs onde vive.", tagline: "Uma boa carta. Sempre actual, em qualquer ecrã." },
+      headline: { roman: "Uma carta. Em todos os ecrãs onde vive.", tagline: "Sempre actual. Honesta com a cozinha." },
       ctaPrimary: "Experimente com a sua carta",
-      meta: ["Grátis em beta", "Sem cartão. Sem chamada.", { italic: "para levar", rest: " a sua carta para todo o lado." }],
+      trust: "Grátis para um restaurante · Sem cartão · Sem chamada",
     },
-    features: {
-      eyebrow: "a vossa carta",
-      h: "Três coisas, feitas com cuidado.",
-      p: "O Menu é pequeno de propósito. Trata da carta. É isso que os clientes vêem mesmo, e tenta não fazer mais nada.",
-      items: [
-        { n: "i.", h: "Um QR. A carta de hoje, sempre.", p: "Cole o código na mesa uma vez. Mude preços, troque o prato do dia, marque um esgotado. Chega lá no momento. Sem reimpressão, sem ginástica de Wi-Fi." },
-        { n: "ii.", h: "Escrito para o cliente, não para o Google.", p: "Entradas multilingues com um botão, alergénios numa linha por baixo, fotos se quiser. Lê-se como uma carta impressa." },
-        { n: "iii.", h: "Uma medida tranquila da sala.", p: "Um painel pequeno e calmo diz-lhe que horas têm mais leituras, que pratos são abertos e que secções passam ao lado. Sem funis. Sem mapas de calor." },
-      ],
-    },
-    how: {
-      eyebrow: "como funciona",
-      h: "De carta impressa a QR numa tarde.",
-      p: "A maioria das cozinhas está pronta até terça. A parte lenta é decidir que pratos merecem entrar. Isso continua convosco.",
-      steps: [
-        { n: "passo um", h: "Carregar, colar ou fotografar.", p: "Deixe cair um PDF, cole um Word ou tire uma foto à carta. Arrumamos por secções editáveis.", ill: "menu.pdf  →  lido" },
-        { n: "passo dois", h: "Ajustar até soar a vocês.", p: "Renomeie uma secção. Suba um preço. Acrescente a sobremesa que só há ao sábado. Guardar.", ill: "editar · pré-ver · guardar" },
-        { n: "passo três", h: "Imprimir o QR. Pendurar.", p: "Placa em latão, em cima da mesa ou autocolante na montra. O mesmo código para sempre. A carta por trás muda quando quiser.", ill: "[ QR ] fixo" },
-      ],
-    },
+    statement: "Um QR na mesa. A carta por trás muda quando quiser.",
     pricing: {
       eyebrow: "modelos",
       h: "Dois preços. Ambos honestos.",
-      p: "Comece grátis, sempre. Passe a Casa quando precisar, não antes.",
       free: {
         tier: "Grátis", priceMain: "€0", priceSub: "para sempre",
         desc: "Para o café da esquina e a casa que abre quatro noites por semana.",
@@ -173,47 +115,24 @@ const COPY: Record<LangCode, Copy> = {
     closing: {
       eyebrow: "à mesa",
       h: "Coloque a carta online esta tarde.",
-      p: "Grátis em beta. Traga a sua carta, saia com um QR pronto a imprimir antes do serviço.",
       ctaPrimary: "Traga a sua carta",
-      ctaGhost: "Escreva-nos",
     },
-    footer: { left: ["Menu · um produto ", { text: BRAND_NAME, href: BRAND_URL }, " · feito em Lisboa"], links: ["Privacidade", "Contacto"] },
-    boa: "Boa mesa.",
+    footer: { left: ["Menu · um produto ", { text: BRAND_NAME, href: BRAND_URL }, " · feito em Lisboa"], contact: CONTACT_EMAIL },
     editor: { title: "Carta", restaurant: "Restaurante", item: "Nome do prato", desc: "Descrição", section: "Secção", price: "Preço (€)", publish: "⌘ S para guardar", live: "ao vivo", add: "+ adicionar" },
     phone: { eyebrow: "à mesa", live: "actualizado agora" },
   },
   es: {
-    nav: { features: "Qué hace", how: "Cómo funciona", pricing: "Precios", signin: "Entrar", cta: "Empezar" },
+    nav: { signin: "Entrar", cta: "Empezar" },
     hero: {
       eyebrow: "à mesa",
-      headline: { roman: "Una carta. En cada pantalla donde vive.", tagline: "Una buena carta. Siempre al día, en cualquier pantalla." },
+      headline: { roman: "Una carta. En cada pantalla donde vive.", tagline: "Siempre al día. Honesta con la cocina." },
       ctaPrimary: "Pruébalo con tu carta",
-      meta: ["Gratis durante la beta", "Sin tarjeta. Sin llamadas.", { italic: "para llevar", rest: " tu carta a todas partes." }],
+      trust: "Gratis para un restaurante · Sin tarjeta · Sin llamadas",
     },
-    features: {
-      eyebrow: "vuestra carta",
-      h: "Tres cosas, hechas con cuidado.",
-      p: "Menu es pequeño a propósito. Hace la carta, la parte que los clientes miran, y procura no hacer nada más.",
-      items: [
-        { n: "i.", h: "Un QR. Siempre la carta de hoy.", p: "Pega el código en la mesa una vez. Cambia precios, intercambia un plato del día, marca un agotado. Aparece al instante." },
-        { n: "ii.", h: "Escrito para el cliente, no para Google.", p: "Entradas multilingües con un toque, alérgenos en una línea, fotos opcionales. Se lee como una carta impresa." },
-        { n: "iii.", h: "Una medida tranquila de la sala.", p: "Un panel pequeño y calmo te dice qué horas tienen más escaneos, qué platos se abren y qué secciones pasan desapercibidas." },
-      ],
-    },
-    how: {
-      eyebrow: "cómo funciona",
-      h: "De carta impresa a QR en una tarde.",
-      p: "La mayoría de cocinas estará lista el martes. La parte lenta es decidir qué platos entran. Eso sigue siendo cosa vuestra.",
-      steps: [
-        { n: "paso uno", h: "Sube, pega o fotografía.", p: "Suelta un PDF, pega un Word o saca una foto. Lo ordenamos en secciones editables.", ill: "menu.pdf  →  leído" },
-        { n: "paso dos", h: "Ajusta hasta que suene a ti.", p: "Renombra una sección. Sube un precio. Añade el postre que solo hay los sábados. Guardar.", ill: "editar · ver · guardar" },
-        { n: "paso tres", h: "Imprime el QR. Cuélgalo.", p: "Placa de latón, atril de mesa o pegatina en el escaparate. El mismo código para siempre.", ill: "[ QR ] fijo" },
-      ],
-    },
+    statement: "Un QR en la mesa. La carta detrás cambia cuando quieras.",
     pricing: {
       eyebrow: "modelos",
       h: "Dos precios. Los dos honestos.",
-      p: "Empieza gratis, siempre. Pasa a Casa cuando lo necesites, no antes.",
       free: {
         tier: "Gratis", priceMain: "€0", priceSub: "para siempre",
         desc: "Para la cafetería de barrio y el sitio que abre cuatro noches.",
@@ -231,47 +150,24 @@ const COPY: Record<LangCode, Copy> = {
     closing: {
       eyebrow: "à mesa",
       h: "Pon tu carta online esta tarde.",
-      p: "Gratis durante la beta. Trae tu carta, vete con un QR listo para imprimir.",
       ctaPrimary: "Trae tu carta",
-      ctaGhost: "Escríbenos",
     },
-    footer: { left: ["Menu · un producto ", { text: BRAND_NAME, href: BRAND_URL }, " · hecho en Lisboa"], links: ["Privacidad", "Contacto"] },
-    boa: "Boa mesa.",
+    footer: { left: ["Menu · un producto ", { text: BRAND_NAME, href: BRAND_URL }, " · hecho en Lisboa"], contact: CONTACT_EMAIL },
     editor: { title: "Carta", restaurant: "Restaurante", item: "Nombre del plato", desc: "Descripción", section: "Sección", price: "Precio (€)", publish: "⌘ S para guardar", live: "en vivo", add: "+ añadir" },
     phone: { eyebrow: "à mesa", live: "actualizado ahora" },
   },
   fr: {
-    nav: { features: "Ce qu'il fait", how: "Comment", pricing: "Tarifs", signin: "Se connecter", cta: "Commencer" },
+    nav: { signin: "Se connecter", cta: "Commencer" },
     hero: {
       eyebrow: "à mesa",
-      headline: { roman: "Une carte. Sur chaque écran où elle vit.", tagline: "Une bonne carte. Toujours à jour, sur chaque écran." },
+      headline: { roman: "Une carte. Sur chaque écran où elle vit.", tagline: "Toujours à jour. Honnête avec la cuisine." },
       ctaPrimary: "Essayez avec votre carte",
-      meta: ["Gratuit en bêta", "Pas de carte. Pas d'appel.", { italic: "para levar", rest: ". Votre carte vous suit partout." }],
+      trust: "Gratuit pour un restaurant · Pas de carte · Pas d'appel",
     },
-    features: {
-      eyebrow: "votre carte",
-      h: "Trois choses, faites avec soin.",
-      p: "Menu est petit, c'est voulu. Il s'occupe de la carte, la seule chose que vos clients regardent, et essaie de ne rien faire d'autre.",
-      items: [
-        { n: "i.", h: "Un QR. Toujours la carte du jour.", p: "Collez le code une fois. Modifiez prix et plats du jour, marquez un épuisé. C'est en ligne aussitôt." },
-        { n: "ii.", h: "Écrit pour les clients, pas pour Google.", p: "Entrées multilingues d'un clic, allergènes en une ligne, photos optionnelles. Ça se lit comme une vraie carte." },
-        { n: "iii.", h: "Une mesure discrète de la salle.", p: "Un petit tableau de bord calme indique quelles heures sont les plus scannées, quels plats sont ouverts et quelles sections passent inaperçues." },
-      ],
-    },
-    how: {
-      eyebrow: "comment ça marche",
-      h: "De la carte papier au QR en un après-midi.",
-      p: "La plupart des cuisines sont prêtes mardi. Le plus long, c'est de choisir quels plats gardent leur place. Ça, c'est à vous.",
-      steps: [
-        { n: "étape un", h: "Importez, collez ou photographiez.", p: "Déposez un PDF, collez un Word, ou photographiez la carte. On range tout en sections éditables.", ill: "menu.pdf  →  analysé" },
-        { n: "étape deux", h: "Ajustez à votre voix.", p: "Renommez une section. Changez un prix. Ajoutez le dessert du samedi. Enregistrer.", ill: "éditer · aperçu · publier" },
-        { n: "étape trois", h: "Imprimez le QR. Affichez-le.", p: "Plaque en laiton, chevalet de table, sticker en vitrine. Le même code à vie. La carte derrière change quand vous voulez.", ill: "[ QR ] fixe" },
-      ],
-    },
+    statement: "Un QR sur la table. La carte derrière change quand vous voulez.",
     pricing: {
       eyebrow: "modèles",
       h: "Deux prix. Tous deux honnêtes.",
-      p: "Commencez gratuitement, toujours. Passez à Casa quand il le faut, pas avant.",
       free: {
         tier: "Gratuit", priceMain: "0 €", priceSub: "pour toujours",
         desc: "Pour le café du coin et l'adresse qui ouvre quatre soirs par semaine.",
@@ -289,12 +185,9 @@ const COPY: Record<LangCode, Copy> = {
     closing: {
       eyebrow: "à mesa",
       h: "Mettez votre carte en ligne cet après-midi.",
-      p: "Gratuit en bêta. Apportez votre carte, repartez avec un QR à imprimer avant le service.",
       ctaPrimary: "Apportez votre carte",
-      ctaGhost: "Écrivez-nous",
     },
-    footer: { left: ["Menu · un produit ", { text: BRAND_NAME, href: BRAND_URL }, " · fait à Lisbonne"], links: ["Confidentialité", "Contact"] },
-    boa: "Boa mesa.",
+    footer: { left: ["Menu · un produit ", { text: BRAND_NAME, href: BRAND_URL }, " · fait à Lisbonne"], contact: CONTACT_EMAIL },
     editor: { title: "Carte", restaurant: "Restaurant", item: "Nom du plat", desc: "Description", section: "Section", price: "Prix (€)", publish: "⌘ S pour enregistrer", live: "en direct", add: "+ ajouter" },
     phone: { eyebrow: "à mesa", live: "mis à jour à l'instant" },
   },
@@ -361,41 +254,13 @@ const DEMO_MENUS: Record<LangCode, DemoMenu> = {
   },
 };
 
-function ScrollProgress() {
-  const fillRef = React.useRef<HTMLSpanElement>(null);
-  React.useEffect(() => {
-    let raf = 0;
-    const update = () => {
-      raf = 0;
-      const h = document.documentElement;
-      const max = h.scrollHeight - h.clientHeight;
-      const p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
-      if (fillRef.current) fillRef.current.style.transform = `scaleX(${p})`;
-    };
-    const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
-    update();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, []);
-  return (
-    <span className="nav-progress-track" aria-hidden="true">
-      <span ref={fillRef} className="nav-progress-fill" />
-    </span>
-  );
-}
+// ── Lang switcher (flag-only — same control on every viewport) ─────────────
 
 function LangSwitcher({ lang, setLang }: { lang: LangCode; setLang: (l: LangCode) => void }) {
   const [open, setOpen] = React.useState(false);
   const rootRef = React.useRef<HTMLDivElement>(null);
-  // LANGS is a non-empty constant array, so the [0]! fallback can't be undefined.
   const current = LANGS.find((l) => l.code === lang) ?? LANGS[0]!;
 
-  // close the compact-mode popover on outside click / escape
   React.useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
@@ -412,7 +277,7 @@ function LangSwitcher({ lang, setLang }: { lang: LangCode; setLang: (l: LangCode
 
   return (
     <div className="lang-switch" role="group" aria-label="Language" ref={rootRef}>
-      {/* inline row — visible on tablet+ */}
+      {/* inline row — tablet+ */}
       <div className="lang-row">
         {LANGS.map((l) => (
           <button
@@ -423,12 +288,13 @@ function LangSwitcher({ lang, setLang }: { lang: LangCode; setLang: (l: LangCode
             title={l.name}
             aria-label={l.name}
             aria-pressed={lang === l.code}
+            data-test-id={`landing-lang-${l.code}`}
           >
             <span className="flag" aria-hidden="true">{l.flag}</span>
           </button>
         ))}
       </div>
-      {/* compact — visible on phone only via CSS */}
+      {/* compact — phone only via CSS */}
       <div className="lang-compact">
         <button
           type="button"
@@ -437,6 +303,7 @@ function LangSwitcher({ lang, setLang }: { lang: LangCode; setLang: (l: LangCode
           aria-haspopup="true"
           aria-expanded={open}
           aria-label={current.name}
+          data-test-id="landing-lang-trigger"
         >
           <span className="flag" aria-hidden="true">{current.flag}</span>
         </button>
@@ -451,6 +318,7 @@ function LangSwitcher({ lang, setLang }: { lang: LangCode; setLang: (l: LangCode
                 onClick={() => { setLang(l.code); setOpen(false); }}
                 title={l.name}
                 aria-label={l.name}
+                data-test-id={`landing-lang-${l.code}`}
               >
                 <span className="flag" aria-hidden="true">{l.flag}</span>
               </button>
@@ -462,34 +330,42 @@ function LangSwitcher({ lang, setLang }: { lang: LangCode; setLang: (l: LangCode
   );
 }
 
-function smoothScrollTo(id: string) {
-  const el = document.getElementById(id);
-  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-}
+// ── Nav: brand + lang + log in + get started. No anchor links. ─────────────
 
-function Nav({ c, lang, setLang }: { c: Copy; lang: LangCode; setLang: (l: LangCode) => void }) {
+function LandingNav({ c, lang, setLang }: { c: Copy; lang: LangCode; setLang: (l: LangCode) => void }) {
   return (
-    <nav className="nav" aria-label="Primary">
-      <div className="nav-inner">
-        <Link className="brand" href="#top" aria-label="Menu home">
-          <span className="mark" aria-hidden="true">⁋</span>
-          <span className="word"><em>Menu</em></span>
+    <Nav data-test-id="landing-nav">
+      <NavBrand>
+        <Link className="brand" href="#top" aria-label="Menu home" data-test-id="landing-brand">
+          {/* `ds-wordmark--reveal` is set statically so the letters are
+              visible at first paint — no LCP penalty. The letter-by-letter
+              animation only plays when a host adds the class POST-paint
+              (the house product does that; we don't). */}
+          <Wordmark word="menu" variant="inline" className="ds-wordmark--reveal" />
         </Link>
-        <ul>
-          <li><Link href="#features" onClick={(e) => { e.preventDefault(); smoothScrollTo("features"); }}>{c.nav.features}</Link></li>
-          <li><Link href="#how" onClick={(e) => { e.preventDefault(); smoothScrollTo("how"); }}>{c.nav.how}</Link></li>
-          <li><Link href="#pricing" onClick={(e) => { e.preventDefault(); smoothScrollTo("pricing"); }}>{c.nav.pricing}</Link></li>
-        </ul>
-        <div className="nav-right">
-          <LangSwitcher lang={lang} setLang={setLang} />
-          <Link href={AUTH_HREF} className="nav-link">{c.nav.signin}</Link>
-          <Link href={AUTH_HREF} className="nav-cta">{c.nav.cta}</Link>
-        </div>
-      </div>
-      <ScrollProgress />
-    </nav>
+      </NavBrand>
+      <NavActions>
+        <LangSwitcher lang={lang} setLang={setLang} />
+        <Link
+          href={AUTH_HREF}
+          className="nav-link"
+          data-test-id="landing-signin"
+        >
+          {c.nav.signin}
+        </Link>
+        <Link
+          href={AUTH_HREF}
+          className="nav-cta"
+          data-test-id="landing-cta"
+        >
+          {c.nav.cta}
+        </Link>
+      </NavActions>
+    </Nav>
   );
 }
+
+// ── Phone preview ──────────────────────────────────────────────────────────
 
 function PhonePreview({
   menu,
@@ -503,7 +379,7 @@ function PhonePreview({
   onPick: (id: number) => void;
 }) {
   return (
-    <div className="phone reveal">
+    <div className="phone">
       <div className="phone-shell">
         <div className="phone-screen">
           <div className="phone-notch" />
@@ -529,6 +405,7 @@ function PhonePreview({
                       onClick={() => onPick(it.id)}
                       className={"menu-item" + (active ? " highlight" : "")}
                       aria-pressed={active}
+                      data-test-id={`landing-phone-item-${it.id}`}
                     >
                       <span className="menu-item-text">
                         <span className="name">{it.name}</span>
@@ -551,6 +428,8 @@ function PhonePreview({
   );
 }
 
+// ── Editor mock (laptop) ───────────────────────────────────────────────────
+
 function EditorMock({
   menu,
   c,
@@ -566,13 +445,12 @@ function EditorMock({
     for (const s of menu.sections)
       for (const it of s.items)
         if (it.id === highlightId) return { item: it, section: s };
-    // Demo menu is a non-empty constant — sections[1] and its first item exist.
     const section = menu.sections[1]!;
     return { item: section.items[0]!, section };
   })();
 
   return (
-    <div className="laptop reveal">
+    <div className="laptop">
       <div className="laptop-screen">
         <div className="laptop-bar" aria-hidden="true">
           <i></i><i></i><i></i>
@@ -594,6 +472,7 @@ function EditorMock({
                           className="editor-row-btn"
                           onClick={() => onPick(it.id)}
                           aria-pressed={active}
+                          data-test-id={`landing-editor-row-${it.id}`}
                         >
                           {it.name.length > 18 ? it.name.slice(0, 18) + "…" : it.name}
                         </button>
@@ -638,6 +517,8 @@ function EditorMock({
   );
 }
 
+// ── Hero: eyebrow + headline + tagline + one CTA + simulator ───────────────
+
 function Hero({
   c,
   menu,
@@ -656,22 +537,17 @@ function Hero({
           <div className="hero-copy">
             <div className="eyebrow">{c.hero.eyebrow}</div>
             <h1>{c.hero.headline.roman}</h1>
-            <p className="tagline">{c.hero.headline.tagline}</p>
+            <p className="tagline">{c.statement}</p>
             <div className="hero-ctas">
-              <Link className="btn btn-primary" href={AUTH_HREF}>{c.hero.ctaPrimary}</Link>
+              <Link
+                className="btn btn-primary"
+                href={AUTH_HREF}
+                data-test-id="landing-hero-cta"
+              >
+                {c.hero.ctaPrimary}
+              </Link>
             </div>
-            <div className="meta-line">
-              {c.hero.meta.map((m, i) => (
-                <React.Fragment key={i}>
-                  {i > 0 && <span className="dotsep">·</span>}
-                  {typeof m === "string" ? (
-                    <span className="meta-part">{m}</span>
-                  ) : (
-                    <span className="meta-part"><span className="serif-it">{m.italic}</span>{m.rest}</span>
-                  )}
-                </React.Fragment>
-              ))}
-            </div>
+            <p className="trust-line">{c.hero.trust}</p>
           </div>
           <div className="devices">
             <EditorMock menu={menu} c={c} highlightId={highlightId} onPick={onPick} />
@@ -683,54 +559,7 @@ function Hero({
   );
 }
 
-function Features({ c }: { c: Copy }) {
-  return (
-    <section id="features">
-      <div className="container">
-        <div className="features-head reveal">
-          <div className="eyebrow">{c.features.eyebrow}</div>
-          <h2>{c.features.h}</h2>
-          <p>{c.features.p}</p>
-          <div className="ornament" aria-hidden="true"><span /><i>·</i><span /></div>
-        </div>
-        <div className="feat-grid">
-          {c.features.items.map((it, i) => (
-            <div className="feat reveal" key={i} style={{ ["--rd" as string]: i * 120 + "ms" } as React.CSSProperties}>
-              <div className="swash" aria-hidden="true">❦</div>
-              <div className="num">{it.n}</div>
-              <h3>{it.h}</h3>
-              <p>{it.p}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function HowItWorks({ c }: { c: Copy }) {
-  return (
-    <section id="how">
-      <div className="container">
-        <div className="sec-head reveal">
-          <div className="eyebrow">{c.how.eyebrow}</div>
-          <h2>{c.how.h}</h2>
-          <p>{c.how.p}</p>
-        </div>
-        <div className="steps">
-          {c.how.steps.map((s, i) => (
-            <div className="step reveal" key={i} style={{ ["--rd" as string]: i * 140 + "ms" } as React.CSSProperties}>
-              <div className="step-n">{s.n}</div>
-              <h3>{s.h}</h3>
-              <p>{s.p}</p>
-              <div className="ill">{s.ill}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
+// ── Pricing: two cards, hairline framed ────────────────────────────────────
 
 function Pricing({ c }: { c: Copy }) {
   return (
@@ -739,10 +568,9 @@ function Pricing({ c }: { c: Copy }) {
         <div className="sec-head reveal">
           <div className="eyebrow">{c.pricing.eyebrow}</div>
           <h2>{c.pricing.h}</h2>
-          <p>{c.pricing.p}</p>
         </div>
         <div className="price-cards">
-          <article className="menu-card reveal">
+          <article className="menu-card reveal" data-test-id="landing-pricing-free">
             <header className="menu-card-head">
               <span className="menu-card-tier">{c.pricing.free.tier}</span>
               <span className="menu-card-price">
@@ -755,11 +583,13 @@ function Pricing({ c }: { c: Copy }) {
               {c.pricing.free.feats.map((f, i) => <li key={i}>{f}</li>)}
             </ul>
             <div className="menu-card-foot">
-              <Link className="btn btn-ghost" href={AUTH_HREF}>{c.pricing.free.cta}</Link>
+              <Link className="btn btn-ghost" href={AUTH_HREF} data-test-id="landing-pricing-free-cta">
+                {c.pricing.free.cta}
+              </Link>
             </div>
           </article>
 
-          <article className="menu-card reveal" style={{ ["--rd" as string]: "120ms" } as React.CSSProperties}>
+          <article className="menu-card reveal" data-test-id="landing-pricing-pro" style={{ ["--rd" as string]: "120ms" } as React.CSSProperties}>
             <header className="menu-card-head">
               <span className="menu-card-tier">{c.pricing.pro.tier}</span>
               <span className="menu-card-price">
@@ -772,7 +602,9 @@ function Pricing({ c }: { c: Copy }) {
               {c.pricing.pro.feats.map((f, i) => <li key={i}>{f}</li>)}
             </ul>
             <div className="menu-card-foot">
-              <Link className="btn btn-primary" href={AUTH_HREF}>{c.pricing.pro.cta}</Link>
+              <Link className="btn btn-primary" href={AUTH_HREF} data-test-id="landing-pricing-pro-cta">
+                {c.pricing.pro.cta}
+              </Link>
             </div>
           </article>
         </div>
@@ -782,6 +614,8 @@ function Pricing({ c }: { c: Copy }) {
   );
 }
 
+// ── Closing + footer (a single quiet strip) ────────────────────────────────
+
 function Closing({ c }: { c: Copy }) {
   return (
     <>
@@ -789,18 +623,13 @@ function Closing({ c }: { c: Copy }) {
         <div className="container">
           <span className="eyebrow">{c.closing.eyebrow}</span>
           <h2>{c.closing.h}</h2>
-          <p>{c.closing.p}</p>
           <div className="hero-ctas" style={{ justifyContent: "center" }}>
-            <Link className="btn btn-primary" href={AUTH_HREF}>{c.closing.ctaPrimary}</Link>
-            <Link className="btn btn-ghost" href={`mailto:${CONTACT_EMAIL}`}>{c.closing.ctaGhost}</Link>
+            <Link className="btn btn-primary" href={AUTH_HREF} data-test-id="landing-closing-cta">
+              {c.closing.ctaPrimary}
+            </Link>
           </div>
         </div>
       </section>
-      <div className="signoff reveal">
-        <div className="container">
-          <span className="boa">{c.boa}</span>
-        </div>
-      </div>
       <footer className="footer">
         <div className="container">
           <span>
@@ -808,13 +637,14 @@ function Closing({ c }: { c: Copy }) {
               typeof part === "string" ? (
                 <React.Fragment key={i}>{part}</React.Fragment>
               ) : (
-                <Link key={i} href={part.href}>{part.text}</Link>
+                <Link key={i} href={part.href} data-test-id="landing-footer-brand">{part.text}</Link>
               ),
             )}
           </span>
           <span className="footer-links">
-            {c.footer.links.map((l, i) => <Link key={i} href="#">{l}</Link>)}
-            <Link href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</Link>
+            <Link href={`mailto:${c.footer.contact}`} data-test-id="landing-footer-contact">
+              {c.footer.contact}
+            </Link>
           </span>
         </div>
       </footer>
@@ -822,23 +652,73 @@ function Closing({ c }: { c: Copy }) {
   );
 }
 
+/**
+ * One-time motion init.
+ *
+ * Two deliberately small jobs:
+ *   - Flag `body.ds-loaded` once we're past first paint. The CSS gates
+ *     `.reveal`'s hidden state on this flag, so no-JS and pre-hydration
+ *     users render with everything fully visible (no FOUC, no blank
+ *     section on a slow client). Above-the-fold content (the hero) is
+ *     NOT marked `.reveal` and renders synchronously — LCP stays clean.
+ *   - PageProgress: write `--ds-pageprog-progress` (0..1) from
+ *     `scrollY / (scrollHeight - innerHeight)` on every scroll/resize
+ *     frame. One rAF, passive listener; cinnabar rail at the top.
+ *
+ * Skipped on purpose: the wordmark letter-reveal animation. Toggling
+ * it would gate the brand text behind hydration and worsen the LCP of
+ * the nav — the wordmark already renders statically with
+ * `ds-wordmark--reveal` so the letters paint immediately.
+ */
+function useLandingMotion() {
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.body.classList.add("ds-loaded");
+      });
+    });
+
+    const fill = document.querySelector<HTMLElement>(
+      ".landing-root .ds-pageprog__fill",
+    );
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const h = document.documentElement;
+      const max = h.scrollHeight - h.clientHeight;
+      const p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+      if (fill) fill.style.setProperty("--ds-pageprog-progress", p.toFixed(4));
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+}
+
 function useReveal(deps: React.DependencyList) {
   React.useEffect(() => {
-    const els = document.querySelectorAll<HTMLElement>(".landing-root .reveal:not(.in)");
-    if (typeof IntersectionObserver === "undefined") {
-      els.forEach((el) => el.classList.add("in"));
-      return;
-    }
+    if (typeof IntersectionObserver === "undefined") return;
+    const els = document.querySelectorAll<HTMLElement>(".reveal");
     const io = new IntersectionObserver(
       (entries) => {
-        entries.forEach((e) => {
+        for (const e of entries) {
           if (e.isIntersecting) {
             e.target.classList.add("in");
             io.unobserve(e.target);
           }
-        });
+        }
       },
-      { rootMargin: "0px 0px -8% 0px", threshold: 0.12 },
+      { rootMargin: "0px 0px -10% 0px", threshold: 0.05 },
     );
     els.forEach((el) => io.observe(el));
     return () => io.disconnect();
@@ -851,7 +731,6 @@ export default function LandingPage() {
   const c = COPY[lang];
   const menu = DEMO_MENUS[lang];
 
-  // every item id that exists in the demo menu — drives the auto-cycle
   const itemIds = React.useMemo(() => {
     const ids: number[] = [];
     for (const s of menu.sections) for (const it of s.items) ids.push(it.id);
@@ -861,8 +740,6 @@ export default function LandingPage() {
   const [rawHighlightId, setHighlightId] = React.useState<number>(3);
   const [userInteracted, setUserInteracted] = React.useState(false);
 
-  // Derived: if the current language doesn't have this id, fall back to the
-  // first item. Avoids a synchronous setState-in-effect on lang flip.
   const highlightId = itemIds.includes(rawHighlightId) ? rawHighlightId : (itemIds[0] ?? 1);
 
   const pick = React.useCallback((id: number) => {
@@ -870,8 +747,6 @@ export default function LandingPage() {
     setUserInteracted(true);
   }, []);
 
-  // Idle auto-cycle: after 6s of no click, rotate every 4s.
-  // Pauses when tab is hidden. Disabled when prefers-reduced-motion.
   React.useEffect(() => {
     if (userInteracted) return;
     if (typeof window === "undefined") return;
@@ -887,7 +762,6 @@ export default function LandingPage() {
         if (document.hidden) return;
         setHighlightId((prev) => {
           const i = itemIds.indexOf(prev);
-          // itemIds.length >= 2 was guarded above, so the wrap always hits a value.
           return itemIds[(i + 1) % itemIds.length]!;
         });
       }, 4000);
@@ -913,21 +787,13 @@ export default function LandingPage() {
   }, [itemIds, userInteracted]);
 
   useReveal([lang]);
-
-  React.useEffect(() => {
-    const mark = document.querySelector<HTMLElement>(".landing-root .brand .mark");
-    if (!mark) return;
-    mark.style.transform = "translateY(2px) rotate(-12deg)";
-    const id = window.setTimeout(() => { mark.style.transform = ""; }, 360);
-    return () => window.clearTimeout(id);
-  }, [lang]);
+  useLandingMotion();
 
   return (
     <div className="landing-root" lang={lang}>
-      <Nav c={c} lang={lang} setLang={setLang} />
+      <PageProgress />
+      <LandingNav c={c} lang={lang} setLang={setLang} />
       <Hero c={c} menu={menu} highlightId={highlightId} onPick={pick} />
-      <Features c={c} />
-      <HowItWorks c={c} />
       <Pricing c={c} />
       <Closing c={c} />
     </div>

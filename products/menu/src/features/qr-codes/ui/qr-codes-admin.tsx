@@ -12,12 +12,6 @@ import {
   Table,
   Td,
   Th,
-  Card,
-  CardIndex,
-  CardTitle,
-  CardDesc,
-  Badge,
-  Separator,
   type ComboboxOption,
 } from '@iedora/design-system'
 import { Histogram, Stat, StatsPanel } from '@/shared/ui/admin-stats'
@@ -33,21 +27,10 @@ import type { QrStats } from '../stats'
 
 type RestaurantOption = { id: string; name: string; slug: string }
 
-/** Project a restaurant list into ds Combobox options (label = name, hint = slug). */
 function restaurantOptions(rs: ReadonlyArray<RestaurantOption>): ComboboxOption[] {
   return rs.map((r) => ({ value: r.id, label: r.name, hint: r.slug }))
 }
 
-/**
- * Admin surface — three things on one page:
- *   1. Create one code (custom name OR auto-generated).
- *   2. Bulk-generate N codes (unbound).
- *   3. Registry table: bind / unbind / delete each row.
- *
- * Server actions revalidate `/dashboard/admin/qr-codes` after every
- * mutation, so this component just submits and waits for the RSC payload
- * to refresh. Local error / status surfaces stay client-side.
- */
 export function QrCodesAdmin({
   rows,
   restaurants,
@@ -59,51 +42,13 @@ export function QrCodesAdmin({
   restaurants: RestaurantOption[]
   publicOrigin: string
   stats: QrStats
-  /** ISO timestamp captured server-side when the page rendered. */
   snapshotAt: string
 }) {
   return (
-    <div className="space-y-12">
+    <div className="space-y-6" data-test-id="qr-codes-admin">
       <QrCodesStatsPanel stats={stats} snapshotAt={snapshotAt} />
 
-      <Separator />
-
-      {/* Forms Grid */}
-      <div className="grid gap-8 lg:grid-cols-2">
-        <Card className="min-h-fit flex flex-col justify-between">
-          <div>
-            <CardIndex>
-              <span>Option 01</span>
-              <Badge variant="accent">Single</Badge>
-            </CardIndex>
-            <CardTitle as="h3" className="mt-4">Create One</CardTitle>
-            <CardDesc className="mt-2 text-sm text-[var(--ink-55)]">
-              Generate a single QR code, optionally binding it to a restaurant and adding an administrative label.
-            </CardDesc>
-          </div>
-          <div className="mt-6 flex-1">
-            <CreateOneForm restaurants={restaurants} />
-          </div>
-        </Card>
-
-        <Card className="min-h-fit flex flex-col justify-between">
-          <div>
-            <CardIndex>
-              <span>Option 02</span>
-              <Badge variant="ink">Bulk</Badge>
-            </CardIndex>
-            <CardTitle as="h3" className="mt-4">Bulk Generate</CardTitle>
-            <CardDesc className="mt-2 text-sm text-[var(--ink-55)]">
-              Batch generate multiple unbound QR codes in a single operation.
-            </CardDesc>
-          </div>
-          <div className="mt-6 flex-1">
-            <BulkGenerateForm />
-          </div>
-        </Card>
-      </div>
-
-      <Separator />
+      <CreatePanel restaurants={restaurants} />
 
       <CodesTable
         rows={rows}
@@ -114,8 +59,6 @@ export function QrCodesAdmin({
     </div>
   )
 }
-
-// ── Stats panel ─────────────────────────────────────────────────────────────
 
 function QrCodesStatsPanel({
   stats,
@@ -131,43 +74,45 @@ function QrCodesStatsPanel({
       stats={[
         <Stat key="total" label="Codes" value={String(stats.total)} />,
         <Stat key="bound" label="Bound" value={String(stats.bound)} />,
-        <Stat
-          key="unbound"
-          label="Unbound"
-          value={String(stats.unbound)}
-          hint="ready to claim"
-        />,
-        <Stat
-          key="labeled"
-          label="Labeled"
-          value={String(stats.withLabel)}
-          hint="physical tag"
-        />,
-        <Stat
-          key="new24"
-          label="New 24h"
-          value={String(stats.created24h)}
-          hint="minted"
-        />,
-        <Stat
-          key="bound24"
-          label="Bound 24h"
-          value={String(stats.boundLast24h)}
-          hint="claimed"
-        />,
+        <Stat key="unbound" label="Unbound" value={String(stats.unbound)} hint="ready to claim" />,
+        <Stat key="labeled" label="Labeled" value={String(stats.withLabel)} hint="physical tag" />,
+        <Stat key="new24" label="New 24h" value={String(stats.created24h)} hint="minted" />,
+        <Stat key="bound24" label="Bound 24h" value={String(stats.boundLast24h)} hint="claimed" />,
       ]}
       histograms={[
-        <Histogram
-          key="restaurants"
-          label="Top restaurants"
-          entries={stats.topRestaurants}
-        />,
+        <Histogram key="restaurants" label="Top restaurants" entries={stats.topRestaurants} />,
       ]}
     />
   )
 }
 
-// ── Create one ────────────────────────────────────────────────────────────────
+function SectionHeader({ title, hint }: { title: string; hint?: string }) {
+  return (
+    <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--ink-55)]">
+        {title}
+      </h2>
+      {hint && (
+        <p className="text-[10.5px] font-[family-name:var(--mono)] uppercase tracking-[0.18em] text-[var(--ink-40)]">
+          {hint}
+        </p>
+      )}
+    </header>
+  )
+}
+
+function CreatePanel({ restaurants }: { restaurants: RestaurantOption[] }) {
+  return (
+    <section className="space-y-3" data-test-id="qr-codes-create-panel">
+      <SectionHeader title="Create codes" hint="single or batch" />
+      <div className="grid gap-4 border border-[var(--ink-14)] bg-[var(--paper)] p-4 md:grid-cols-[1fr_auto_minmax(0,18rem)]">
+        <CreateOneForm restaurants={restaurants} />
+        <div className="hidden md:block w-px self-stretch bg-[var(--ink-14)]" aria-hidden="true" />
+        <BulkGenerateForm />
+      </div>
+    </section>
+  )
+}
 
 function CreateOneForm({ restaurants }: { restaurants: RestaurantOption[] }) {
   const [code, setCode] = useState('')
@@ -191,66 +136,82 @@ function CreateOneForm({ restaurants }: { restaurants: RestaurantOption[] }) {
         setError(res.error)
         return
       }
-      setSuccess(`Created code: ${res.data.code}`)
+      setSuccess(`Created ${res.data.code}`)
       setCode('')
       setLabel('')
     })
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col h-full justify-between space-y-6">
-      <div className="space-y-6">
+    <form
+      onSubmit={onSubmit}
+      className="space-y-3"
+      data-test-id="qr-codes-create-one-form"
+      aria-label="Create one QR code"
+    >
+      <div className="grid gap-3 sm:grid-cols-3">
         <Field>
           <FieldLabel htmlFor="qr-code">Code</FieldLabel>
           <FieldInput
             id="qr-code"
+            data-test-id="qr-codes-create-one-code"
             name="code"
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            placeholder="Auto-generated if left blank"
+            placeholder="auto"
             maxLength={64}
+            compact
           />
         </Field>
-
         <Field>
-          <FieldLabel htmlFor="qr-restaurant">Bind to restaurant</FieldLabel>
+          <FieldLabel htmlFor="qr-restaurant">Bind to</FieldLabel>
           <Combobox
             id="qr-restaurant"
+            data-test-id="qr-codes-create-one-restaurant"
             options={restaurantOptions(restaurants)}
             value={restaurantId || null}
             onChange={(v) => setRestaurantId(v ?? '')}
             placeholder="— unbound —"
-            searchPlaceholder="Search restaurants…"
             emptyMessage="No restaurants match."
           />
         </Field>
-
         <Field>
-          <FieldLabel htmlFor="qr-label">Administrative Label</FieldLabel>
+          <FieldLabel htmlFor="qr-label">Label</FieldLabel>
           <FieldInput
             id="qr-label"
+            data-test-id="qr-codes-create-one-label"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             placeholder="e.g. Box A — May 2026"
             maxLength={200}
+            compact
           />
         </Field>
       </div>
-
-      <div className="pt-4 space-y-3">
-        <div className="flex justify-end">
-          <Button variant="solid" type="submit" disabled={pending} arrow>
-            {pending ? 'Creating…' : 'Create QR Code'}
-          </Button>
-        </div>
-        {error && <p className="text-sm text-[var(--cinnabar)]">{error}</p>}
-        {success && <p className="text-sm text-[var(--ink-55)]">{success}</p>}
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {error && (
+          <p className="text-xs text-[var(--cinnabar)]" data-test-id="qr-codes-create-one-error">
+            {error}
+          </p>
+        )}
+        {success && (
+          <p className="text-xs text-[var(--ink-55)]" data-test-id="qr-codes-create-one-success">
+            {success}
+          </p>
+        )}
+        <Button
+          variant="solid"
+          type="submit"
+          disabled={pending}
+          arrow
+          data-test-id="qr-codes-create-one-submit"
+        >
+          {pending ? 'Creating…' : 'Create QR Code'}
+        </Button>
       </div>
     </form>
   )
 }
-
-// ── Bulk generate ─────────────────────────────────────────────────────────────
 
 function BulkGenerateForm() {
   const [count, setCount] = useState(10)
@@ -282,57 +243,73 @@ function BulkGenerateForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col h-full justify-between space-y-6">
-      <div className="space-y-6">
-        <Field>
-          <FieldLabel htmlFor="qr-bulk-count">Quantity to generate</FieldLabel>
+    <form
+      onSubmit={onSubmit}
+      className="space-y-3"
+      data-test-id="qr-codes-bulk-form"
+      aria-label="Bulk generate QR codes"
+    >
+      <Field>
+        <FieldLabel htmlFor="qr-bulk-count">Bulk batch</FieldLabel>
+        <div className="flex gap-2">
           <FieldInput
             id="qr-bulk-count"
+            data-test-id="qr-codes-bulk-count"
             type="number"
             min={1}
             max={500}
             value={count}
             onChange={(e) => setCount(Number(e.target.value))}
-            className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            compact
+            className="w-24 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
-          <FieldHint>Supports generating between 1 and 500 codes per batch.</FieldHint>
-        </Field>
-      </div>
-
-      <div className="pt-4 space-y-4">
-        <div className="flex justify-end">
-          <Button variant="solid" type="submit" disabled={pending} arrow>
+          <Button
+            variant="solid"
+            type="submit"
+            disabled={pending}
+            arrow
+            data-test-id="qr-codes-bulk-submit"
+            className="flex-1"
+          >
             {pending ? 'Generating…' : 'Generate Batch'}
           </Button>
         </div>
-        {error && <p className="text-sm text-[var(--cinnabar)]">{error}</p>}
+        <FieldHint>1–500 unbound codes per batch.</FieldHint>
+      </Field>
 
-        {generated && (
-          <div className="mt-4 border border-[var(--ink-14)] p-4 bg-[var(--paper-2)] transition-all duration-300">
-            <div className="flex items-center justify-between border-b border-[var(--ink-14)] pb-2 mb-2">
-              <span className="font-mono text-[10.5px] text-[var(--ink-55)] uppercase tracking-wider">
-                Generated {generated.length} code{generated.length === 1 ? '' : 's'}
-              </span>
-              <Button
-                variant="ghost"
-                type="button"
-                onClick={handleCopy}
-                className="text-[10px] py-1 px-2 h-7"
-              >
-                {copied ? 'Copied!' : 'Copy List'}
-              </Button>
-            </div>
-            <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all font-mono text-xs text-[var(--ink-70)]">
-              {generated.join('\n')}
-            </pre>
+      {error && (
+        <p className="text-xs text-[var(--cinnabar)]" data-test-id="qr-codes-bulk-error">
+          {error}
+        </p>
+      )}
+
+      {generated && (
+        <div
+          className="border border-[var(--ink-14)] p-3 bg-[var(--paper-2)]"
+          data-test-id="qr-codes-bulk-result"
+        >
+          <div className="flex items-center justify-between border-b border-[var(--ink-14)] pb-2 mb-2">
+            <span className="font-mono text-[10.5px] text-[var(--ink-55)] uppercase tracking-wider">
+              {generated.length} code{generated.length === 1 ? '' : 's'}
+            </span>
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={handleCopy}
+              className="text-[10px] py-1 px-2 h-7"
+              data-test-id="qr-codes-bulk-copy"
+            >
+              {copied ? 'Copied!' : 'Copy List'}
+            </Button>
           </div>
-        )}
-      </div>
+          <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all font-mono text-xs text-[var(--ink-70)]">
+            {generated.join('\n')}
+          </pre>
+        </div>
+      )}
     </form>
   )
 }
-
-// ── Codes table ───────────────────────────────────────────────────────────────
 
 function CodesTable({
   rows,
@@ -346,17 +323,15 @@ function CodesTable({
   snapshotAt: string
 }) {
   return (
-    <section className="space-y-4">
-      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--ink-55)]">
-          Registry ({rows.length})
-        </h2>
-        <p className="text-[10.5px] font-[family-name:var(--mono)] uppercase tracking-[0.18em] text-[var(--ink-40)]">
-          snapshot @ {snapshotAt.slice(11, 19)}Z
-        </p>
-      </header>
+    <section className="space-y-3" data-test-id="qr-codes-registry">
+      <SectionHeader
+        title={`Registry (${rows.length})`}
+        hint={`snapshot @ ${snapshotAt.slice(11, 19)}Z`}
+      />
       {rows.length === 0 ? (
-        <p className="text-sm text-[var(--ink-55)]">No codes yet.</p>
+        <p className="text-sm text-[var(--ink-55)]" data-test-id="qr-codes-registry-empty">
+          No codes yet.
+        </p>
       ) : (
         <div className="overflow-x-auto border border-[var(--ink-14)]">
           <Table className="min-w-[760px]">
@@ -397,14 +372,8 @@ function CodeRow({
 }) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  // Sticker URL — what is printed on the QR. Canonical entry-point for
-  // scanners (no redirect; the page renders directly at /q/[code]).
   const stickerUrl = `${publicOrigin}/q/${row.code}`
-  // Branded URL — vanity / marketing alias. Only relevant once a code
-  // is bound; an unbound code has no slug to show.
-  const brandedUrl = row.restaurant
-    ? `${publicOrigin}/r/${row.restaurant.slug}`
-    : null
+  const brandedUrl = row.restaurant ? `${publicOrigin}/r/${row.restaurant.slug}` : null
 
   function onBindChange(next: string | null) {
     setError(null)
@@ -426,7 +395,7 @@ function CodeRow({
   }
 
   return (
-    <tr>
+    <tr data-test-id={`qr-codes-row-${row.code}`}>
       <Td>
         <span className="font-mono text-xs text-[var(--ink)]">{row.code}</span>
       </Td>
@@ -437,6 +406,7 @@ function CodeRow({
             target="_blank"
             rel="noopener noreferrer"
             title="Printed on the QR sticker"
+            data-test-id={`qr-codes-row-sticker-${row.code}`}
             className="font-mono text-xs text-[var(--ink)] hover:text-[var(--cinnabar)] hover:underline inline-flex items-center gap-1 transition-colors"
           >
             <span className="truncate">{stickerUrl.replace(/^https?:\/\//, '')}</span>
@@ -448,9 +418,12 @@ function CodeRow({
               target="_blank"
               rel="noopener noreferrer"
               title="Vanity URL for marketing / Instagram bio"
+              data-test-id={`qr-codes-row-alias-${row.code}`}
               className="font-mono text-[10px] text-[var(--ink-40)] hover:text-[var(--ink-55)] hover:underline inline-flex items-center gap-1 transition-colors"
             >
-              <span className="font-[family-name:var(--mono)] uppercase tracking-[0.18em]">alias</span>
+              <span className="font-[family-name:var(--mono)] uppercase tracking-[0.18em]">
+                alias
+              </span>
               <span className="truncate">{brandedUrl.replace(/^https?:\/\//, '')}</span>
             </Link>
           )}
@@ -459,16 +432,23 @@ function CodeRow({
       <Td>
         <div className="w-full max-w-[240px]">
           <Combobox
+            data-test-id={`qr-codes-row-bind-${row.code}`}
             options={restaurantOptions(restaurants)}
             value={row.restaurantId ?? null}
             onChange={onBindChange}
             disabled={pending}
             placeholder="— unbound —"
-            searchPlaceholder="Search restaurants…"
             emptyMessage="No matches."
           />
         </div>
-        {error && <p className="mt-1 text-xs text-[var(--cinnabar)]">{error}</p>}
+        {error && (
+          <p
+            className="mt-1 text-xs text-[var(--cinnabar)]"
+            data-test-id={`qr-codes-row-error-${row.code}`}
+          >
+            {error}
+          </p>
+        )}
       </Td>
       <Td>
         {row.label ? (
@@ -478,7 +458,13 @@ function CodeRow({
         )}
       </Td>
       <Td className="text-right">
-        <Button variant="ghost" type="button" onClick={onDelete} disabled={pending}>
+        <Button
+          variant="ghost"
+          type="button"
+          onClick={onDelete}
+          disabled={pending}
+          data-test-id={`qr-codes-row-delete-${row.code}`}
+        >
           Delete
         </Button>
       </Td>

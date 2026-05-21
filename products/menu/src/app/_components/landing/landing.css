@@ -86,88 +86,16 @@
   color: var(--ink);
 }
 
-/* ── nav (opaque paper bar, hairline at the bottom) ───────────── */
+/* ── nav — chrome shell comes from `<Nav>` in @iedora/design-system.
+   Only the custom brand mark + action chips below are landing-local.   */
 
-.landing-root .nav {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: var(--paper);
-  border-bottom: 1px solid var(--ink-14);
-}
-.landing-root .nav-inner {
-  width: min(var(--container), 100%);
-  margin: 0 auto;
-  padding: 16px var(--margin);
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 32px;
-}
-@media (max-width: 1080px) {
-  .landing-root .nav-inner { padding: 14px 32px; }
-}
-@media (max-width: 680px) {
-  .landing-root .nav-inner { padding: 12px 20px; gap: 18px; }
-}
-
+/* Brand wraps the iedora `<Wordmark word="menu">` primitive. Anchor
+   reset only — typography comes from the design-system rules. */
 .landing-root .brand {
   display: inline-flex;
   align-items: baseline;
-  gap: 10px;
   color: var(--ink);
-  justify-self: start;
-}
-.landing-root .brand .mark {
-  font-family: var(--serif);
-  font-style: italic;
-  font-weight: 400;
-  font-size: 22px;
-  color: var(--cinnabar);
-  line-height: 1;
-  transform: translateY(2px);
-  transition: transform 0.6s var(--ease), color var(--d-2) var(--ease);
-}
-.landing-root .brand .word {
-  font-family: var(--serif);
-  font-weight: 400;
-  font-size: 22px;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-.landing-root .brand .word em {
-  font-style: italic;
-  font-weight: 400;
-  color: var(--ink);
-}
-
-/* center nav links — JBMono, ink-55 */
-.landing-root .nav ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  gap: 28px;
-  justify-self: center;
-  align-items: center;
-}
-.landing-root .nav ul a {
-  font-family: var(--mono);
-  font-size: var(--t-xs);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-55);
-  padding: 4px 0;
-  border-bottom: 1px solid transparent;
-  transition: color var(--d-2) var(--ease), border-color var(--d-2) var(--ease);
-}
-.landing-root .nav ul a:hover { color: var(--ink); border-bottom-color: var(--ink-40); }
-
-.landing-root .nav-right {
-  justify-self: end;
-  display: flex;
-  align-items: center;
-  gap: 18px;
+  text-decoration: none;
 }
 
 .landing-root .nav-link {
@@ -197,25 +125,6 @@
   transition: background var(--d-2) var(--ease), color var(--d-2) var(--ease);
 }
 .landing-root .nav-cta:hover { background: var(--ink); color: var(--paper); }
-
-/* scroll progress rail (cinnabar fill on ink-08 track) */
-.landing-root .nav-progress-track {
-  position: absolute;
-  inset: auto 0 -1px 0;
-  height: 1.5px;
-  background: transparent;
-  pointer-events: none;
-  overflow: hidden;
-}
-.landing-root .nav-progress-fill {
-  display: block;
-  height: 100%;
-  width: 100%;
-  background: var(--cinnabar);
-  transform-origin: left center;
-  transform: scaleX(0);
-  transition: transform 80ms linear;
-}
 
 /* language switcher — flags only, hairline between, ink-08 on active.
    Has two children: `.lang-row` (full inline list, desktop default)
@@ -276,18 +185,10 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-@media (max-width: 900px) {
-  .landing-root .nav-inner { grid-template-columns: auto 1fr auto; }
-  .landing-root .nav ul { display: none; }
-}
-@media (max-width: 720px) {
-  /* tablet/portrait: move language to footer (i.e. hide inline) */
-  .landing-root .nav .lang-switch { display: none; }
-}
+/* Lang switcher swaps to a single-flag trigger on phone. The wider
+   inline row stays available everywhere else — every feature on PC is
+   reachable on mobile, just compacted. */
 @media (max-width: 520px) {
-  .landing-root .nav-link { display: none; }
-  /* phone: language returns as a single trigger button */
-  .landing-root .nav .lang-switch { display: inline-flex; }
   .landing-root .lang-row { display: none; }
   .landing-root .lang-compact { display: inline-flex; }
 }
@@ -394,6 +295,20 @@
   flex-wrap: wrap;
   gap: 16px;
   margin: 36px 0 0;
+}
+
+/* "Always free for one restaurant · No card · No setup call" — small
+   trust footnote under the CTA. The vertical padding lifts it off the
+   button and gives it air before the simulator block below. */
+.landing-root .trust-line {
+  margin: 18px 0 8px;
+  padding: 4px 0;
+  font-family: var(--serif);
+  font-size: var(--t-md);
+  line-height: 1.5;
+  color: var(--ink-70);
+  max-width: 44ch;
+  text-wrap: pretty;
 }
 
 .landing-root .meta-line {
@@ -1172,21 +1087,26 @@
   }
 }
 
-/* ── reveal animation (staggered fade-up) ─────────────────────── */
+/* ── reveal animation (staggered fade-up) ───────────────────────
+   Progressive enhancement: the initial hidden state only kicks in
+   once JS has flagged `body.ds-loaded`. Without JS — or before the
+   client script runs — every `.reveal` element is fully visible.
+   This avoids the no-JS-equals-blank-page footgun and prevents any
+   FOUC during hydration. */
 
-.landing-root .reveal {
+body.ds-loaded .landing-root .reveal {
   opacity: 0;
   transform: translateY(14px);
   transition:
     opacity var(--d-4) var(--ease) var(--rd, 0ms),
     transform var(--d-4) var(--ease) var(--rd, 0ms);
 }
-.landing-root .reveal.in {
+body.ds-loaded .landing-root .reveal.in {
   opacity: 1;
   transform: translateY(0);
 }
 @media (prefers-reduced-motion: reduce) {
-  .landing-root .reveal {
+  body.ds-loaded .landing-root .reveal {
     opacity: 1;
     transform: none;
     transition: none;
@@ -1292,9 +1212,39 @@
   .landing-root .features-head,
   .landing-root .sec-head { margin-bottom: 28px; }
   .landing-root .feat,
-  .landing-root .step,
-  .landing-root .menu-card { padding: 22px 18px; }
-  .landing-root .amt-main { font-size: clamp(44px, 12vw, 56px); }
+  .landing-root .step { padding: 22px 18px; }
+
+  /* Pricing on phone — tier + price share a baseline row so the eye
+     doesn't drop the full card height between them. Price size drops
+     to something proportional, feature list densifies, and both CTAs
+     stretch full-width with visible chrome so the ghost reads as a
+     button (not body text). */
+  .landing-root .menu-card { padding: 22px 18px 18px; gap: 14px; }
+  .landing-root .menu-card-head {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .landing-root .menu-card-price { gap: 8px; }
+  .landing-root .amt-main {
+    font-size: clamp(34px, 9.5vw, 44px);
+    letter-spacing: -0.04em;
+  }
+  .landing-root .amt-sub { font-size: var(--t-sm); }
+  .landing-root .menu-card-desc { padding-top: 12px; font-size: var(--t-sm); }
+  .landing-root .menu-card-feats li { padding: 8px 0; font-size: var(--t-sm); }
+  .landing-root .menu-card-foot { padding-top: 4px; }
+  .landing-root .menu-card-foot .btn {
+    width: 100%;
+    justify-content: center;
+    padding: 12px 16px;
+  }
+  .landing-root .menu-card-foot .btn-ghost {
+    border-color: var(--ink);
+    padding-inline: 16px;
+  }
 
   /* signoff trimmed */
   .landing-root .signoff { padding: 36px 0; }
@@ -1309,12 +1259,12 @@
     opacity var(--d-4) var(--ease-open),
     transform var(--d-4) var(--ease-open);
 }
-.landing-root .laptop.reveal,
-.landing-root .phone.reveal {
+body.ds-loaded .landing-root .laptop.reveal,
+body.ds-loaded .landing-root .phone.reveal {
   transform: translateY(12px);
 }
-.landing-root .laptop.reveal.in,
-.landing-root .phone.reveal.in {
+body.ds-loaded .landing-root .laptop.reveal.in,
+body.ds-loaded .landing-root .phone.reveal.in {
   transform: translateY(0);
 }
 

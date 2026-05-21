@@ -38,6 +38,23 @@ export { Shoji, ShojiReceipt } from "./components/shoji";
 export { VisuallyHidden } from "./components/visually-hidden";
 export { Separator } from "./components/separator";
 
+// Editorial nav — shared chrome shell used by every product surface
+// (menu landing, menu dashboard, house). Slot-based composition so the
+// same primitive renders a marketing nav, a product chrome, and a
+// minimal brand strip without copy-paste.
+export {
+  Nav,
+  NavBrand,
+  NavLinks,
+  NavLink,
+  NavActions,
+  type NavProps,
+  type NavBrandProps,
+  type NavLinksProps,
+  type NavLinkProps,
+  type NavActionsProps,
+} from "./components/nav";
+
 export { Button, type ButtonProps } from "./components/button";
 export { Badge } from "./components/badge";
 export {

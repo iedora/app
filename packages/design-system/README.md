@@ -26,13 +26,43 @@ export default function Page() {
 }
 ```
 
-For Next.js, prefer `next/font` over the bundled `fonts.css` (no Google Fonts roundtrip in production):
+### Fonts — the cross-product contract
+
+The visual chrome is identical across products only if both products load the same Fraunces + JetBrains Mono cuts. Two surfaces, one contract:
+
+| Font | Required cuts |
+|---|---|
+| **Fraunces** | opsz axis 9–144, full variable `wght`, both `normal` and `italic` styles |
+| **JetBrains Mono** | full variable `wght` (or 400/500 if fixed) |
+
+If italic isn't loaded, `<em>` and the editorial italic body text fall back to a browser faux-slant — visibly off from the real Fraunces italic cuts that the Wordmark + the headlines rely on.
+
+**Astro / static HTML** — load via `<link>` (matches the legacy site):
+
+```html
+<link
+  href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,400&family=JetBrains+Mono:wght@400;500&display=swap"
+  rel="stylesheet"
+/>
+```
+
+**Next.js** — use `next/font/google` (self-hosted, no Google Fonts roundtrip):
 
 ```tsx
 import { Fraunces, JetBrains_Mono } from "next/font/google";
 
-const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces", axes: ["opsz"] });
-const jbMono   = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jbmono" });
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  axes: ["opsz"],
+  style: ["normal", "italic"],  // ← real italics, not faux-slant
+  subsets: ["latin"],
+  display: "swap",
+});
+const jbMono = JetBrains_Mono({
+  variable: "--font-jbmono",
+  subsets: ["latin"],
+  display: "swap",
+});
 
 <html
   className={`${fraunces.variable} ${jbMono.variable}`}
@@ -42,6 +72,8 @@ const jbMono   = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jbmono" 
   }}
 >
 ```
+
+Omitting `weight` keeps both fonts as variable (full wght range). Adding a weight array would freeze them to discrete weights — only do that if you've measured a bundle-size win.
 
 ## The language
 
@@ -56,9 +88,14 @@ const jbMono   = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jbmono" 
 | **Stroke** | `--hairline` (1px) · `--rule-line` (1.5px) · `--thick` (2px) |
 | **Motion** | `--ease` `--ease-soft` `--ease-open` `--ease-close` · `--d-1` (120ms) → `--d-6` (1400ms) |
 
-Two principles thread through every primitive:
+Six principles thread through every primitive:
+
 1. **Hairlines, not boxes.** Sections divide by 1px `--ink-14` rules. Card edges are seams, not containers.
 2. **Italics carry emphasis.** Wrap a word in `<em>` inside a headline to mark it; close statements with a cinnabar `.` (the wordmark dot pattern).
+3. **Mobile-first, no feature hidden by viewport.** Every action available on PC is reachable on phone — the chrome may compact (e.g. lang switcher row → single-flag trigger; nav links scroll horizontally) but nothing disappears behind a hamburger or `display: none` breakpoint. `<Nav>` enforces this by design: the links row scrolls horizontally on narrow widths instead of collapsing.
+4. **No animations gating LCP.** Above-the-fold content — headlines, brand wordmarks, hero CTAs, primary illustrations — renders synchronously with full opacity at first paint. Decorative reveal/fade-in animations live only below the fold (`.reveal` + `IntersectionObserver`) and are gated on `body.ds-loaded` so no-JS readers still see content. The wordmark letter-by-letter animation is opt-in via the `ds-wordmark--reveal` class — pin it statically when the wordmark is above-the-fold; toggle it post-paint only on quiet brand surfaces where the LCP candidate is something else.
+5. **Editorial primitives forward `data-test-id`.** Every interactive element (Button, NavLink, Combobox trigger, FieldInput, FieldTextarea, …) accepts a `data-test-id` and forwards it to its root via the standard prop-spread. Consumers target by intent (`page.getByTestId('qr-codes-create-button')`), never by visible text or class — both drift with i18n and Tailwind refactors. Playwright is wired with `testIdAttribute: 'data-test-id'`.
+6. **Slot composition over `props` configuration.** Chrome primitives (`Nav`, `Card`, `Field`, `Dialog`) accept children in named slots rather than configuration props. A nav with no links is a `<Nav>` with no `<NavLinks>` child — not a `<Nav showLinks={false}>`. Layout primitives use CSS `:has()` to react to slot presence.
 
 ## What's in the package
 

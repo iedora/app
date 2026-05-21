@@ -24,12 +24,20 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Iedora editorial fonts re-pointed to design-system tokens (--serif / --mono)
-// below so design-system primitives render in Fraunces / JetBrains Mono
-// without pulling Google Fonts CSS at runtime.
+// Iedora editorial fonts — match house exactly so any glyph rendered by
+// a design-system primitive (Wordmark, statements, eyebrows) looks
+// identical across products. House loads Fraunces with opsz axis +
+// every weight from 300 to 600 and italic at 300/400 via a Google
+// Fonts <link>; we mirror that here through next/font.
+//
+// Omitting `weight` keeps it a variable font (full wght range);
+// `style: ['normal', 'italic']` pulls both upright and italic cuts so
+// `<em>` / italic body text picks up real Fraunces italic instead of
+// browser faux-slant. See design-system README §Fonts for the contract.
 const fraunces = Fraunces({
   variable: "--font-fraunces",
   axes: ["opsz"],
+  style: ["normal", "italic"],
   subsets: ["latin"],
   display: "swap",
 });

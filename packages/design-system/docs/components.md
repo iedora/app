@@ -71,6 +71,31 @@ SR-only text helper. Polymorphic via `as`.
 <VisuallyHidden as="span">Close menu</VisuallyHidden>
 ```
 
+### `Nav` family — `Nav`, `NavBrand`, `NavLinks`, `NavLink`, `NavActions`
+Editorial chrome shared by every product surface (menu landing, menu dashboard, house). Slot-based composition: `<Nav>` is the sticky-friendly shell, brand sits left, optional links in the middle, actions pin right.
+```tsx
+<Nav sticky data-test-id="dashboard-chrome">
+  <NavBrand>
+    <Link href="/dashboard"><Wordmark word="menu" variant="inline" className="ds-wordmark--reveal" /></Link>
+  </NavBrand>
+  <NavLinks aria-label="Dashboard">
+    <NavLink href="/dashboard/analytics" active data-test-id="dashboard-nav-analytics">Analytics</NavLink>
+    <NavLink href="/dashboard/billing" data-test-id="dashboard-nav-billing">Billing</NavLink>
+  </NavLinks>
+  <NavActions>
+    <LangSwitcher />
+    <LogoutButton />
+  </NavActions>
+</Nav>
+```
+Layout (mobile-first, no hamburger — every link reachable at every width):
+- **≤ 1080px**: row 1 brand + actions; row 2 links scrolling horizontally (hidden scrollbar).
+- **≥ 1080px**: single row, brand · links · actions.
+- Omitting `<NavLinks>` collapses the link row to zero height via `:has(.ds-nav__links)`.
+- `<NavLink active>` paints the cinnabar underline + sets `aria-current="page"` + exposes `data-active="true"`.
+
+Props: `Nav { sticky?, ...HTMLAttributes }`, `NavLink { active?, ...AnchorHTMLAttributes }`. All slots forward `data-test-id` via HTML attribute spread.
+
 ---
 
 ## Manual § VI primitives
@@ -114,6 +139,27 @@ The form pattern. No boxes — labelled inputs with cinnabar focus underline.
 </Field>
 ```
 `FieldInput` and `FieldTextarea` work standalone too (carry `ds-input` / `ds-textarea` classes).
+
+Pass `compact` when an input sits beside a `<Combobox>` so both controls share the same chip frame (28px min-height, ink-14 hairline, paper-2 tint) — without it the underline-style input and the framed combobox don't line up.
+```tsx
+<FieldInput compact placeholder="auto" />
+<Combobox ... />        {/* both render at the same height + frame */}
+```
+
+### `Combobox`
+Typeahead input. **The input IS the search field** — typing filters the list; the chevron toggles open; an inline `×` clears; Backspace on empty query clears the selection. No separate search bar inside the popover.
+```tsx
+<Combobox
+  id="qr-restaurant"
+  data-test-id="qr-codes-create-one-restaurant"
+  aria-label="Bind to restaurant"
+  options={[{ value: "1", label: "House Tavern", hint: "house-tavern" }]}
+  value={restaurantId}
+  onChange={setRestaurantId}
+  placeholder="— unbound —"
+/>
+```
+Sized identically to `<FieldInput compact>`. Options carry `id="ds-combobox-opt-{value}"` so Playwright can target them without the popover being open at SSR time. Label + hint truncate independently; hint capped at 45% of the row so a long slug never pushes the label out.
 
 ### `Checkbox` · `Toggle`
 Square ink checkbox; sliding mono toggle.

@@ -21,8 +21,14 @@ type FieldHintProps = HTMLAttributes<HTMLSpanElement> & {
   children: ReactNode;
 };
 
-type FieldInputProps = InputHTMLAttributes<HTMLInputElement>;
-type FieldTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement>;
+type FieldInputProps = InputHTMLAttributes<HTMLInputElement> & {
+  /** Render as a framed compact chip — sized to match `<Combobox>`. */
+  compact?: boolean;
+};
+type FieldTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  /** Render as a framed compact chip — sized to match `<Combobox>`. */
+  compact?: boolean;
+};
 
 /**
  * Iedora Manual § VI.4. A label, a bare input with an underline, and a hint.
@@ -71,10 +77,28 @@ export function FieldHint({ className, children, ...rest }: FieldHintProps) {
  * (e.g. inline in a dashboard cell). Inside a Field, `.ds-field input` also
  * matches — both rules share the same declarations.
  */
-export function FieldInput({ className, ...rest }: FieldInputProps) {
-  return <input {...rest} className={cn("ds-input", className)} />;
+export function FieldInput({ className, compact, ...rest }: FieldInputProps) {
+  return (
+    <input
+      {...rest}
+      className={cn("ds-input", compact && "ds-input--compact", className)}
+    />
+  );
 }
 
-export function FieldTextarea({ className, ...rest }: FieldTextareaProps) {
-  return <textarea {...rest} className={cn("ds-textarea", className)} />;
+export function FieldTextarea({
+  className,
+  compact,
+  ...rest
+}: FieldTextareaProps) {
+  return (
+    <textarea
+      {...rest}
+      className={cn(
+        "ds-textarea",
+        compact && "ds-textarea--compact",
+        className,
+      )}
+    />
+  );
 }
