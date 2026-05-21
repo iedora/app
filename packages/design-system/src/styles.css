@@ -469,15 +469,18 @@
 
 .ds-textarea { resize: vertical; min-height: 64px; line-height: 1.45; }
 
-/* Compact variant — sized to match `.ds-combobox__trigger` so an input
-   and a Combobox can sit on the same row without visual rhythm breaks.
+/* Compact variant — sized to match `.ds-combobox` so an input and a
+   Combobox can sit on the same row without visual rhythm breaks. The
+   frame reads as a "tap me" chip in the same family as `.ds-btn`:
+   transparent paper, a visible hairline in `--ink-40` (not the faint
+   `--ink-14` which looked disabled), serif body, mono-caps placeholder.
    Higher specificity required to defeat the underline rules above. */
 .ds-input--compact,
 .ds-textarea--compact,
 .ds-field input.ds-input--compact,
 .ds-field textarea.ds-textarea--compact {
-  background: var(--paper-2);
-  border: 1px solid var(--ink-14);
+  background: transparent;
+  border: 1px solid var(--ink-40);
   border-radius: 0;
   padding: 5px 10px;
   font-family: var(--serif);
@@ -492,14 +495,13 @@
 .ds-textarea--compact:hover:not(:disabled),
 .ds-field input.ds-input--compact:hover:not(:disabled),
 .ds-field textarea.ds-textarea--compact:hover:not(:disabled) {
-  border-color: var(--ink-40);
+  border-color: var(--ink);
 }
 .ds-input--compact:focus,
 .ds-textarea--compact:focus,
 .ds-field input.ds-input--compact:focus,
 .ds-field textarea.ds-textarea--compact:focus {
   border-color: var(--ink);
-  background: var(--paper);
   outline: 1px solid var(--ink);
   outline-offset: 1px;
 }
@@ -531,20 +533,23 @@
   display: inline-flex;
   align-items: center;
   width: 100%;
-  background: var(--paper-2);
-  border: 1px solid var(--ink-14);
+  background: transparent;
+  /* `--ink-40` (not the faint `--ink-14`) — reads as a tap target in
+     the same chip family as `.ds-btn`. Sibling `.ds-input--compact`
+     uses the same border so a row mixing inputs + comboboxes lines up
+     visually and conveys the same affordance. */
+  border: 1px solid var(--ink-40);
   min-height: 28px;
   transition:
     border-color var(--d-2) var(--ease),
     background-color var(--d-2) var(--ease);
 }
 .ds-combobox:hover:not(.ds-combobox--disabled) {
-  border-color: var(--ink-40);
+  border-color: var(--ink);
 }
 .ds-combobox[data-state="open"],
 .ds-combobox:focus-within {
   border-color: var(--ink);
-  background: var(--paper);
 }
 .ds-combobox--disabled {
   opacity: 0.5;
