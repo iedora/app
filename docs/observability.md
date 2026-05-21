@@ -158,6 +158,24 @@ just infra::logs openobserve      # tail container logs
 bin/with-secrets tofu -chdir=infra/tofu apply -replace=random_password.openobserve_password
 ```
 
+## Pre-built dashboards
+
+Three dashboards live in git at `infra/openobserve/dashboards/`:
+
+| Dashboard | What it shows |
+|---|---|
+| `business.json` — **Business** | Views (24h/30d), active restaurants (7d), new orgs (7d), top-10 tenants, language distribution. The Monday-morning view. |
+| `technical.json` — **Technical** | HTTP p95 by route, 5xx error rate, active requests, Zitadel call p95/failures, snapshot-loader bimodal (cache hit vs miss), S3 op p95, rate-limit denies. Page-on-call. |
+| `correlation.json` — **Correlation** | p95 latency by tenant, errors by tenant, views vs p95 scatter, Zitadel cascade, multi-service traces. Where business and technical signals cross. |
+
+Apply (or sync after edits) with:
+
+```bash
+bin/with-secrets infra/openobserve/bin/apply-dashboards
+```
+
+The script is idempotent — matches by title, PUTs with optimistic-concurrency hash. Edit the JSON, run the script, commit the change — OO state is now versioned in git. See `infra/openobserve/README.md` for the schema (v5) and editing guidance.
+
 ## Querying — common recipes
 
 Open `https://obs.iedora.com` → log in → Traces tab.
