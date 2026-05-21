@@ -56,9 +56,16 @@ deploy *FLAGS:
 # modules with dev inputs (local docker daemon, host-published ports,
 # LocalStack instead of R2). No docker-compose.
 #
-# `just dev --destroy` tears the dev stack down (was the old `just dev-down`
-# recipe; folded into the Go orchestrator at `infra/cmd/dev/`).
-[doc("boot the dev stack via OpenTofu (--destroy to wipe everything)")]
+# Modes:
+#   just dev                   bring everything up (~30s cold, ~5s warm)
+#   just dev --destroy         tear the dev stack down (was `just dev-down`)
+#   just dev --reset-db menu   drop + recreate the menu DB only (fast)
+#   just dev --reset-db zitadel   full Zitadel rebootstrap (~30s — touches bootstrap volume)
+#   just dev --only menu       boot menu + its transitive deps
+#   just dev --except menu     boot everything except menu (for HMR via bun run dev)
+#
+# See docs/dev.md for the full flag table.
+[doc("boot the dev stack (--destroy / --reset-db <svc> / --only / --except)")]
 dev *FLAGS:
     @cd infra && go run ./cmd/dev {{FLAGS}}
 

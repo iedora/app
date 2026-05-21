@@ -79,7 +79,7 @@ just deploy               # → bin/iedora deploy (Go orchestrator — see cmd/i
 just deploy --destroy     # → bin/iedora deploy --destroy (same binary, flag picks direction)
 just deploy -d            # short form of --destroy
 just doctor               # → bin/iedora doctor (preflight: PATH, BWS auth, bootstrap secrets)
-just dev                  # → infra/cmd/dev (local OpenTofu dev stack; --destroy to wipe)
+just dev                  # → infra/cmd/dev (local OpenTofu dev stack; --destroy to wipe, --reset-db <service> to scope a DB reset)
 ```
 
 Day-2 ops (logs, psql, backup, restore, secret rotation, postgres wipe,

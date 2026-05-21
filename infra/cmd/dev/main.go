@@ -85,6 +85,17 @@ func main() {
 		return
 	}
 
+	// --reset-db is a scoped reset for ONE service's database. The dev
+	// stack uses a single shared infra-postgres container with multiple
+	// databases inside (`menu`, `zitadel`), so the operator MUST name
+	// which one to reset. Selection flags (--only/--except) are ignored
+	// — this is a single well-defined operation against the running
+	// stack.
+	if sel.resetDB != "" {
+		resetDB(sel.resetDB, repoRoot, devTofuDir)
+		return
+	}
+
 	selected, err := sel.resolve()
 	if err != nil {
 		fail("%v", err)

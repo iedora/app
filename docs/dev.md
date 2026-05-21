@@ -20,8 +20,9 @@ The orchestrator (`infra/dev/`, Go) does a 4-step Tofu choreography: init → ta
 ## Quickstart
 
 ```bash
-just dev               # bring everything up (~30s cold, ~5s warm)
-just dev --destroy     # tear down + wipe volumes / state / .env.local
+just dev                   # bring everything up (~30s cold, ~5s warm)
+just dev --destroy         # tear down + wipe volumes / state / .env.local
+just dev --reset-db menu   # drop+create the menu DB only (postgres stays up)
 ```
 
 That's it for the golden path. Zero env vars to set, no `BWS_ACCESS_TOKEN` needed (BWS only kicks in for prod). The first apply builds the menu + house images from source.
@@ -34,6 +35,7 @@ That's it for the golden path. Zero env vars to set, no `BWS_ACCESS_TOKEN` neede
 just dev -i                          # interactive TUI per category
 just dev --only menu                 # menu + its deps (postgres + localstack + openobserve)
 just dev --except openobserve        # everything else; openobserve stays off
+just dev --reset-db menu             # see "Reset one service's DB" below
 ```
 
 | Flag | Effect |
@@ -42,6 +44,7 @@ just dev --except openobserve        # everything else; openobserve stays off
 | `--only X,Y` | bring up only X, Y, and their transitive deps |
 | `--except X,Y` | bring up everything except X, Y; their env keys go to `.env.local` as `<please_fill>` for manual override |
 | `--destroy` | tear the whole stack down (see *Tear-down* below). Ignores `--only` / `--except`. |
+| `--reset-db <service>` | drop + recreate one service's database inside the running `infra-postgres` (see *Reset one service's DB* below). Ignores `--only` / `--except`. |
 
 `--only` and `--except` are mutually exclusive. Both close over the dep graph: `--only menu` boots postgres + localstack + openobserve too, since menu needs them.
 
@@ -89,6 +92,26 @@ just dev --destroy
 Wipes containers, network, volumes, the Zitadel bootstrap dir, the Tofu state, and `products/menu/.env.local`. Everything regenerates on the next `just dev` — fresh PATs, fresh Zitadel DB, fresh OIDC client secret.
 
 `just dev --destroy` is best-effort: each step continues on failure (matching the throwaway nature of the dev stack — partial state should never block a reset).
+
+---
+
+## Reset one service's DB
+
+```bash
+just dev --reset-db menu       # drop + create the `menu` database
+just dev --reset-db zitadel    # full Zitadel rebootstrap (heavier — ~30s)
+```
+
+The dev stack runs ONE shared `infra-postgres` container with multiple databases inside (`menu`, `zitadel`, future SQL-backed products). `--destroy` is too coarse when you only want to wipe one — re-bootstrapping Zitadel isn't usually what you want just because you're tinkering with menu's schema. `--reset-db <service>` is the scoped alternative:
+
+| `<service>` | What happens | Wall-clock |
+|---|---|---|
+| `menu` | `DROP DATABASE menu WITH (FORCE); CREATE DATABASE menu;` inside the running container. Nothing else touched — Zitadel, LocalStack, OpenObserve stay up. Next `bun run dev` re-runs every Drizzle migration. | ~1s |
+| `zitadel` | Stop `infra-zitadel{,-login}`, drop+create the `zitadel` DB, wipe the bootstrap SA-key file + Docker volume, `tofu state rm` every `zitadel_*` resource, then `applyDevStack` re-runs the 4-pass dance — FirstInstance regenerates the SA key, the seed pass re-imports org/project/PAT. Equivalent to the old `just infra::zitadel-rebootstrap` recipe, scoped to dev. | ~30s |
+
+Anything else: `--reset-db: unknown service "X" (supported: menu, zitadel)`. Adding a new SQL-backed service is one case in `infra/cmd/dev/resetdb.go`.
+
+Selection flags (`--only` / `--except`) are ignored when `--reset-db` is set — it's a single well-defined operation against the running stack. `infra-postgres` must already be up; otherwise the orchestrator bails with a hint to run `just dev` first.
 
 ---
 

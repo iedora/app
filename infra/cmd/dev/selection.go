@@ -15,6 +15,7 @@ type selection struct {
 	only        string
 	except      string
 	destroy     bool
+	resetDB     string // service whose database to reset ("menu" / "zitadel")
 }
 
 // parseFlags reads the CLI flags into a typed value. No defaults
@@ -27,6 +28,7 @@ func parseFlags() selection {
 	flag.StringVar(&sel.only, "only", "", "comma-separated services to start (+ their deps); skips everything else")
 	flag.StringVar(&sel.except, "except", "", "comma-separated services to skip; everything else (+ their deps) starts")
 	flag.BoolVar(&sel.destroy, "destroy", false, "tear down the dev stack: tofu destroy + remove infra-* containers + remove docker network + wipe volumes + wipe bootstrap dir + wipe tfstate + wipe .env.local. Ignores --only/--except (always full teardown).")
+	flag.StringVar(&sel.resetDB, "reset-db", "", "reset ONE service's database (postgres is shared — must scope explicitly): `menu` drops + recreates the menu DB; `zitadel` stops the zitadel containers, drops its DB, wipes the bootstrap key, and re-applies (FirstInstance regenerates the SA key). Anything else: error.")
 	flag.Parse()
 	return sel
 }

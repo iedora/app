@@ -105,7 +105,7 @@ Menu's `infra/` owns a Dockerfile (built by CI into the GHCR image) plus a tiny 
 
 - `just deploy` — one `tofu apply` provisions the Hetzner VPS, every Cloudflare resource, the GH Actions config, and every container (`infra-postgres`, `infra-backups`, `infra-openobserve`, `infra-zitadel`, `infra-zitadel-login`, `infra-caddy`, `menu_web`). Idempotent day-1 and day-N.
 - `just deploy --destroy` (or `-d`) — tears down the VPS + every Tofu-managed resource. Same Go binary, flag picks direction.
-- `just dev` — boots the local dev stack (`just dev --destroy` wipes it).
+- `just dev` — boots the local dev stack. `just dev --destroy` wipes it; `just dev --reset-db <service>` (e.g. `menu` or `zitadel`) drops + recreates one database without touching the rest.
 - `just doctor` — preflight on the operator's machine (PATH, BWS auth, bootstrap secrets).
 - `just menu::infra` — applies the menu-local Tofu (R2 assets bucket + `assets.iedora.com`). Rare.
 - House (iedora.com) deploys via its own CI workflow on push to main. For ad-hoc local deploys: `cd products/house/infra && just deploy` (or `just destroy`).
