@@ -45,6 +45,10 @@ export default defineConfig({
     trace: 'on-first-retry',
     video: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    // CLAUDE.md rule 17: components expose `data-test-id`. Wire
+    // `getByTestId()` to that attribute (Playwright's default is the
+    // non-hyphenated `data-testid`).
+    testIdAttribute: 'data-test-id',
   },
 
   projects: [

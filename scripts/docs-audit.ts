@@ -85,7 +85,7 @@ const CHECKS: Check[] = [
   {
     name: 'CLAUDE.md rule count matches AGENTS.md',
     reason: 'AGENTS.md advertises "N rules" — keep it in sync with menu/CLAUDE.md.',
-    find: /16 rules/,
+    find: /17 rules/,
     mode: 'require',
     paths: ['AGENTS.md'],
     fix: 'Bump the rule count in AGENTS.md (or trim CLAUDE.md back to match).',
