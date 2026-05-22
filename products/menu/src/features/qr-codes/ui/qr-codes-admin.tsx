@@ -44,7 +44,7 @@ export function QrCodesAdmin({
   snapshotAt: string
 }) {
   return (
-    <div className="space-y-6" data-test-id="qr-codes-admin">
+    <div className="space-y-6" data-test-id="qr-codes-admin-content">
       <QrCodesStatsPanel stats={stats} snapshotAt={snapshotAt} />
 
       <CreatePanel restaurants={restaurants} />

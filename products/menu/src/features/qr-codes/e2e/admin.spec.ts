@@ -82,8 +82,13 @@ test.describe('@smoke qr-codes admin', () => {
     const label = page.getByTestId('qr-codes-row-label-sticker_edit_1')
     await label.fill('Re-labelled inline')
     await label.blur()
+    // The blur queues a server action via `startTransition`; without
+    // waiting for it to settle, the reload below races the revalidate
+    // and the label still reads empty. `toBeEnabled` auto-polls — the
+    // input toggles `disabled` while the transition is pending and
+    // returns to enabled once the action resolves.
+    await expect(label).toBeEnabled()
 
-    // Reload — server replays the new value, the row's label input shows it.
     await page.reload()
     await expect(
       page.getByTestId('qr-codes-row-label-sticker_edit_1'),
