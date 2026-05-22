@@ -10,6 +10,7 @@ import { unbindCode } from './use-cases/unbind'
 import { deleteCode } from './use-cases/delete-code'
 import { resolveCode } from './use-cases/resolve'
 import { listCodes } from './use-cases/list-codes'
+import { updateLabel } from './use-cases/update-label'
 
 vi.mock('server-only', () => ({}))
 
@@ -68,6 +69,14 @@ function makeGateway(testDb: TestDb): QrCodesGateway {
     async deleteCode(code) {
       const rows = await db
         .delete(schema.qrCode)
+        .where(eq(schema.qrCode.code, code))
+        .returning({ code: schema.qrCode.code })
+      return { found: rows.length > 0 }
+    },
+    async updateLabel({ code, label }) {
+      const rows = await db
+        .update(schema.qrCode)
+        .set({ label })
         .where(eq(schema.qrCode.code, code))
         .returning({ code: schema.qrCode.code })
       return { found: rows.length > 0 }
@@ -282,6 +291,43 @@ describe('deleteCode + list', () => {
     const map = new Map(rows.map((r) => [r.code, r]))
     expect(map.get('bound')?.restaurant?.slug).toBe('sushi')
     expect(map.get('free')?.restaurant).toBeNull()
+  })
+})
+
+describe('updateLabel', () => {
+  it('trims + sets the label', async () => {
+    const gw = makeGateway(t)
+    await createCode(gw, { code: 'lbl1' })
+    expect(await updateLabel(gw, { code: 'lbl1', label: '  Box A · May  ' })).toEqual({
+      ok: true,
+    })
+    const rows = await listCodes(gw)
+    expect(rows.find((r) => r.code === 'lbl1')?.label).toBe('Box A · May')
+  })
+
+  it('an empty string clears the label (sets it to null)', async () => {
+    const gw = makeGateway(t)
+    await createCode(gw, { code: 'lbl2', label: 'starts-with' })
+    expect(await updateLabel(gw, { code: 'lbl2', label: '' })).toEqual({ ok: true })
+    const rows = await listCodes(gw)
+    expect(rows.find((r) => r.code === 'lbl2')?.label).toBeNull()
+  })
+
+  it('rejects a label over 200 chars', async () => {
+    const gw = makeGateway(t)
+    await createCode(gw, { code: 'lbl3' })
+    expect(await updateLabel(gw, { code: 'lbl3', label: 'x'.repeat(201) })).toEqual({
+      ok: false,
+      error: 'invalid_label',
+    })
+  })
+
+  it('errors when the code does not exist', async () => {
+    const gw = makeGateway(t)
+    expect(await updateLabel(gw, { code: 'nope', label: 'x' })).toEqual({
+      ok: false,
+      error: 'code_not_found',
+    })
   })
 })
 

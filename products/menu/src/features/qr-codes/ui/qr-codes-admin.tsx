@@ -1,5 +1,6 @@
 'use client'
 
+import * as React from 'react'
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import {
@@ -9,9 +10,6 @@ import {
   FieldInput,
   FieldLabel,
   FieldHint,
-  Table,
-  Td,
-  Th,
   type ComboboxOption,
 } from '@iedora/design-system'
 import { Histogram, Stat, StatsPanel } from '@/shared/ui/admin-stats'
@@ -21,6 +19,7 @@ import {
   createCodeAction,
   deleteCodeAction,
   unbindCodeAction,
+  updateLabelAction,
 } from '../actions'
 import type { QrCodeListRow } from '../ports'
 import type { QrStats } from '../stats'
@@ -311,34 +310,27 @@ function CodesTable({
           No codes yet.
         </p>
       ) : (
-        <div className="overflow-x-auto border border-[var(--ink-14)]">
-          <Table className="min-w-[760px]">
-            <thead>
-              <tr>
-                <Th className="w-[12%]">Code</Th>
-                <Th className="w-[36%]">URL</Th>
-                <Th className="w-[28%]">Bound to</Th>
-                <Th className="w-[14%]">Label</Th>
-                <Th className="w-[10%] text-right">Actions</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <CodeRow
-                  key={row.code}
-                  row={row}
-                  restaurants={restaurants}
-                  publicOrigin={publicOrigin}
-                />
-              ))}
-            </tbody>
-          </Table>
-        </div>
+        <ul
+          className="divide-y divide-[var(--ink-14)] border-y border-[var(--ink-14)]"
+          data-test-id="qr-codes-registry-list"
+        >
+          {rows.map((row) => (
+            <CodeRow
+              key={row.code}
+              row={row}
+              restaurants={restaurants}
+              publicOrigin={publicOrigin}
+            />
+          ))}
+        </ul>
       )}
     </section>
   )
 }
 
+// Mobile-first row. One stacked column on phone, four logical columns
+// (identity · bind · label · delete) at lg+. The same `<li>` morphs;
+// no separate mobile/desktop layouts.
 function CodeRow({
   row,
   restaurants,
@@ -352,6 +344,7 @@ function CodeRow({
   const [error, setError] = useState<string | null>(null)
   const stickerUrl = `${publicOrigin}/q/${row.code}`
   const brandedUrl = row.restaurant ? `${publicOrigin}/r/${row.restaurant.slug}` : null
+  const createdAgo = formatRelative(row.createdAt)
 
   function onBindChange(next: string | null) {
     setError(null)
@@ -373,69 +366,70 @@ function CodeRow({
   }
 
   return (
-    <tr data-test-id={`qr-codes-row-${row.code}`}>
-      <Td>
-        <span className="font-mono text-xs text-[var(--ink)]">{row.code}</span>
-      </Td>
-      <Td>
-        <div className="flex flex-col gap-1">
+    <li
+      data-test-id={`qr-codes-row-${row.code}`}
+      className="grid gap-4 py-4 lg:grid-cols-[minmax(0,1fr)_220px_220px_auto] lg:items-start lg:gap-6"
+    >
+      {/* Identity column — code + created date + the two URLs. */}
+      <div className="min-w-0 space-y-1.5">
+        <div className="flex items-baseline gap-3">
+          <span className="font-mono text-sm text-[var(--ink)] break-all">{row.code}</span>
+          <time
+            dateTime={row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt)}
+            className="font-[family-name:var(--mono)] text-[10px] uppercase tracking-[0.18em] text-[var(--ink-40)]"
+            data-test-id={`qr-codes-row-created-${row.code}`}
+          >
+            {createdAgo}
+          </time>
+        </div>
+        <Link
+          href={`/q/${row.code}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Printed on the QR sticker"
+          data-test-id={`qr-codes-row-sticker-${row.code}`}
+          className="font-mono text-xs text-[var(--ink)] hover:text-[var(--cinnabar)] hover:underline inline-flex items-center gap-1 transition-colors max-w-full"
+        >
+          <span className="truncate">{stickerUrl.replace(/^https?:\/\//, '')}</span>
+          <span className="text-[10px] text-[var(--cinnabar)]">↗</span>
+        </Link>
+        {brandedUrl && row.restaurant && (
           <Link
-            href={`/q/${row.code}`}
+            href={`/r/${row.restaurant.slug}`}
             target="_blank"
             rel="noopener noreferrer"
-            title="Printed on the QR sticker"
-            data-test-id={`qr-codes-row-sticker-${row.code}`}
-            className="font-mono text-xs text-[var(--ink)] hover:text-[var(--cinnabar)] hover:underline inline-flex items-center gap-1 transition-colors"
+            title="Vanity URL for marketing / Instagram bio"
+            data-test-id={`qr-codes-row-alias-${row.code}`}
+            className="font-mono text-[10px] text-[var(--ink-40)] hover:text-[var(--ink-55)] hover:underline inline-flex items-center gap-1 transition-colors max-w-full"
           >
-            <span className="truncate">{stickerUrl.replace(/^https?:\/\//, '')}</span>
-            <span className="text-[10px] text-[var(--cinnabar)]">↗</span>
+            <span className="font-[family-name:var(--mono)] uppercase tracking-[0.18em]">
+              alias
+            </span>
+            <span className="truncate">{brandedUrl.replace(/^https?:\/\//, '')}</span>
           </Link>
-          {brandedUrl && row.restaurant && (
-            <Link
-              href={`/r/${row.restaurant.slug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Vanity URL for marketing / Instagram bio"
-              data-test-id={`qr-codes-row-alias-${row.code}`}
-              className="font-mono text-[10px] text-[var(--ink-40)] hover:text-[var(--ink-55)] hover:underline inline-flex items-center gap-1 transition-colors"
-            >
-              <span className="font-[family-name:var(--mono)] uppercase tracking-[0.18em]">
-                alias
-              </span>
-              <span className="truncate">{brandedUrl.replace(/^https?:\/\//, '')}</span>
-            </Link>
-          )}
-        </div>
-      </Td>
-      <Td>
-        <div className="w-full max-w-[240px]">
-          <Combobox
-            data-test-id={`qr-codes-row-bind-${row.code}`}
-            options={restaurantOptions(restaurants)}
-            value={row.restaurantId ?? null}
-            onChange={onBindChange}
-            disabled={pending}
-            placeholder="— unbound —"
-            emptyMessage="No matches."
-          />
-        </div>
-        {error && (
-          <p
-            className="mt-1 text-xs text-[var(--cinnabar)]"
-            data-test-id={`qr-codes-row-error-${row.code}`}
-          >
-            {error}
-          </p>
         )}
-      </Td>
-      <Td>
-        {row.label ? (
-          <span className="text-sm text-[var(--ink-70)]">{row.label}</span>
-        ) : (
-          <span className="text-sm text-[var(--ink-40)]">—</span>
-        )}
-      </Td>
-      <Td className="text-right">
+      </div>
+
+      {/* Bind column. */}
+      <Field>
+        <FieldLabel htmlFor={`qr-row-bind-${row.code}`}>Bind to</FieldLabel>
+        <Combobox
+          id={`qr-row-bind-${row.code}`}
+          data-test-id={`qr-codes-row-bind-${row.code}`}
+          options={restaurantOptions(restaurants)}
+          value={row.restaurantId ?? null}
+          onChange={onBindChange}
+          disabled={pending}
+          placeholder="— unbound —"
+          emptyMessage="No matches."
+        />
+      </Field>
+
+      {/* Label column — inline edit; commits on blur. */}
+      <InlineLabelField row={row} disabled={pending} onError={setError} />
+
+      {/* Actions — right-justified at lg+, full-width on mobile. */}
+      <div className="flex justify-end lg:pt-[26px]">
         <Button
           variant="ghost"
           type="button"
@@ -445,7 +439,94 @@ function CodeRow({
         >
           Delete
         </Button>
-      </Td>
-    </tr>
+      </div>
+
+      {error && (
+        <p
+          className="text-xs text-[var(--cinnabar)] lg:col-span-4"
+          data-test-id={`qr-codes-row-error-${row.code}`}
+        >
+          {error}
+        </p>
+      )}
+    </li>
   )
+}
+
+// Editable label — commits on blur or Enter. Optimistic state so the
+// input stays responsive while the server action revalidates.
+function InlineLabelField({
+  row,
+  disabled,
+  onError,
+}: {
+  row: QrCodeListRow
+  disabled: boolean
+  onError: (msg: string | null) => void
+}) {
+  const [value, setValue] = useState(row.label ?? '')
+  const [pending, startTransition] = useTransition()
+
+  // Sync from prop when the server replays a new value (e.g. after
+  // revalidate). Skips when the user has unsaved local edits.
+  const lastRemote = React.useRef(row.label ?? '')
+  React.useEffect(() => {
+    const remote = row.label ?? ''
+    if (remote !== lastRemote.current && value === lastRemote.current) {
+      setValue(remote)
+    }
+    lastRemote.current = remote
+  }, [row.label, value])
+
+  function commit() {
+    const next = value.trim()
+    const current = row.label ?? ''
+    if (next === current) return
+    onError(null)
+    startTransition(async () => {
+      const res = await updateLabelAction({ code: row.code, label: next })
+      if (!res.ok) {
+        onError(res.error)
+        // revert local state on error
+        setValue(current)
+      }
+    })
+  }
+
+  return (
+    <Field>
+      <FieldLabel htmlFor={`qr-row-label-${row.code}`}>Label</FieldLabel>
+      <FieldInput
+        id={`qr-row-label-${row.code}`}
+        data-test-id={`qr-codes-row-label-${row.code}`}
+        compact
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            ;(e.currentTarget as HTMLInputElement).blur()
+          }
+        }}
+        disabled={disabled || pending}
+        maxLength={200}
+        placeholder="— none —"
+      />
+    </Field>
+  )
+}
+
+// Short relative date — "today", "yesterday", "Nd ago", or "DD MMM" if
+// more than a week. Mono-caps short so it sits next to the code without
+// fighting for attention.
+function formatRelative(input: Date | string): string {
+  const d = input instanceof Date ? input : new Date(input)
+  const ms = Date.now() - d.getTime()
+  const day = 24 * 60 * 60 * 1000
+  if (ms < day) return 'today'
+  if (ms < 2 * day) return 'yesterday'
+  const days = Math.floor(ms / day)
+  if (days < 7) return `${days}d ago`
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
 }

@@ -50,7 +50,7 @@ export default async function QrCodesAdminPage() {
   const snapshotAt = new Date().toISOString()
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       <Breadcrumb
         aria-label="Breadcrumb"
         data-test-id="qr-codes-admin-breadcrumbs"

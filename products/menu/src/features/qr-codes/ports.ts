@@ -64,6 +64,14 @@ export interface QrCodesGateway {
   deleteCode(code: string): Promise<{ found: boolean }>
 
   /**
+   * Inline label edit from the admin registry. `null` clears the label.
+   * Returns `found: false` when the code doesn't exist.
+   */
+  updateLabel(input: { code: string; label: string | null }): Promise<{
+    found: boolean
+  }>
+
+  /**
    * Full list — admin surface is small (printed-sticker registry), so we
    * don't paginate yet. Add a cursor here when batches grow past a screen.
    */

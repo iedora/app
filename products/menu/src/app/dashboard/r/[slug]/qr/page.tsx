@@ -39,7 +39,7 @@ export default async function QrPage({
   }))
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       <Breadcrumb data-test-id="qr-breadcrumbs">
         <BreadcrumbLink asChild data-test-id="qr-breadcrumbs-back">
           <Link href="/dashboard">{t('back')}</Link>

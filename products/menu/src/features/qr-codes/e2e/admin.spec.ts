@@ -42,27 +42,52 @@ test.describe('@smoke qr-codes admin', () => {
     await page.goto(qrCodesRoutes.admin)
     await page.locator('#qr-code').fill('sticker_sushi_10')
     await page.locator('#qr-label').fill('Sushi Table 10')
-    // #qr-restaurant is a Combobox button (Manual § VI.4) — open the
-    // popover, then click the option. Options are id'd by their value
-    // (see packages/design-system/src/components/combobox.tsx).
     await page.locator('#qr-restaurant').click()
     await page.locator(`#ds-combobox-opt-${sushi.restaurantId}`).click()
     await page.getByTestId('qr-codes-create-one-submit').click()
 
     const row = page.getByTestId('qr-codes-row-sticker_sushi_10')
     await expect(row).toBeVisible()
-    await expect(row).toContainText('Sushi Table 10')
-    // The row's Combobox renders the selected label inside an
-    // `<input value>` — `toContainText()` doesn't read input values, so
-    // assert via `toHaveValue` on the combobox input directly. The alias
-    // link in the URL column encodes the restaurant slug; check both so
-    // a regression in either surface is caught.
+    // The row's label cell is now an `<input value>`, so assert via
+    // toHaveValue (toContainText reads text nodes, not input values).
+    await expect(
+      row.getByTestId('qr-codes-row-label-sticker_sushi_10'),
+    ).toHaveValue('Sushi Table 10')
     await expect(
       row.getByTestId('qr-codes-row-bind-sticker_sushi_10'),
     ).toHaveValue('Sushi Express')
     await expect(
       row.getByTestId('qr-codes-row-alias-sticker_sushi_10'),
     ).toContainText('sushi-express')
+    // Created badge shows the relative date for the freshly-minted code.
+    await expect(
+      row.getByTestId('qr-codes-row-created-sticker_sushi_10'),
+    ).toContainText('today')
+  })
+
+  test('inline label edit persists on blur', async ({ signIn }) => {
+    const org = seedOrg({ id: 'o2', name: 'Org Two' })
+    const { page, user } = await signIn({
+      email: 'admin2@iedora.test',
+      name: 'Iedora Admin Two',
+      profile: qrCodesAdminProfile,
+      organizationId: org.organizationId,
+    })
+    await bindUserToOrg(user.userId, org)
+
+    await page.goto(qrCodesRoutes.admin)
+    await page.locator('#qr-code').fill('sticker_edit_1')
+    await page.getByTestId('qr-codes-create-one-submit').click()
+
+    const label = page.getByTestId('qr-codes-row-label-sticker_edit_1')
+    await label.fill('Re-labelled inline')
+    await label.blur()
+
+    // Reload — server replays the new value, the row's label input shows it.
+    await page.reload()
+    await expect(
+      page.getByTestId('qr-codes-row-label-sticker_edit_1'),
+    ).toHaveValue('Re-labelled inline')
   })
 
   test('bulk-generates unbound codes', async ({ signedInPage }) => {
@@ -71,49 +96,36 @@ test.describe('@smoke qr-codes admin', () => {
     await signedInPage.getByTestId('qr-codes-bulk-submit').click()
 
     // Bulk no longer renders the code list inline — confirmation is a
-    // mono-caps line; the codes flow into the registry table below
-    // when the action's revalidate completes.
+    // mono-caps line; the codes flow into the registry list below when
+    // the action's revalidate completes.
     await expect(signedInPage.getByTestId('qr-codes-bulk-success')).toContainText(
       'Generated 5',
     )
-    const registry = signedInPage.getByTestId('qr-codes-registry')
-    await expect(registry.locator('tbody > tr')).toHaveCount(5)
+    const registry = signedInPage.getByTestId('qr-codes-registry-list')
+    await expect(registry.locator('> li')).toHaveCount(5)
   })
 
-  // Narrow viewport — the create panel collapses to a single column, the
-  // registry table becomes horizontally scrollable. The header row stays
-  // out of view; row cells are still reachable via scroll.
+  // Mobile-first contract — the row collapses to a single column at
+  // phone widths and never demands horizontal scrolling.
   test('remains usable at phone width', async ({ signedInPage }) => {
     await signedInPage.setViewportSize({ width: 390, height: 844 })
     await signedInPage.goto(qrCodesRoutes.admin)
 
-    // Create panel is visible and both forms render in the column flow.
     await expect(signedInPage.getByTestId('qr-codes-create-panel')).toBeVisible()
     const createPanel = signedInPage.getByTestId('qr-codes-create-panel')
-    const singleForm = createPanel.getByTestId('qr-codes-create-one-form')
-    const bulkForm = createPanel.getByTestId('qr-codes-bulk-form')
-    await expect(singleForm).toBeVisible()
-    await expect(bulkForm).toBeVisible()
+    await expect(createPanel.getByTestId('qr-codes-create-one-form')).toBeVisible()
+    await expect(createPanel.getByTestId('qr-codes-bulk-form')).toBeVisible()
 
-    // Submit button reachable: scroll it into the viewport, then assert.
     const submit = signedInPage.getByTestId('qr-codes-create-one-submit')
     await submit.scrollIntoViewIfNeeded()
     await expect(submit).toBeVisible()
 
-    // Registry table sits inside an overflow-x container; the inner table
-    // exceeds the viewport so the wrapper must be scrollable. Verify by
-    // measuring the scroll width vs client width.
-    const tableScroll = await signedInPage.evaluate(() => {
-      const wrap = document.querySelector(
-        '[data-test-id="qr-codes-registry"] .overflow-x-auto',
-      ) as HTMLElement | null
-      if (!wrap) return null
-      return { scrollWidth: wrap.scrollWidth, clientWidth: wrap.clientWidth }
-    })
-    // Empty registries skip the wrapper — guard against null. If it
-    // exists, the scroll width must exceed the visible width.
-    if (tableScroll) {
-      expect(tableScroll.scrollWidth).toBeGreaterThan(tableScroll.clientWidth)
-    }
+    // The page itself must not overflow horizontally — the registry is
+    // a flowed list now, not an overflow-x table.
+    const overflow = await signedInPage.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      client: document.documentElement.clientWidth,
+    }))
+    expect(overflow.scroll).toBeLessThanOrEqual(overflow.client)
   })
 })

@@ -59,6 +59,15 @@ export const drizzleQrCodesGateway: QrCodesGateway = {
     return { found: rows.length > 0 }
   },
 
+  async updateLabel({ code, label }) {
+    const rows = await db
+      .update(qrCode)
+      .set({ label })
+      .where(eq(qrCode.code, code))
+      .returning({ code: qrCode.code })
+    return { found: rows.length > 0 }
+  },
+
   async list() {
     // Left join — unbound rows still appear with restaurant=null.
     const rows = await db

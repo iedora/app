@@ -8,6 +8,7 @@ import { bulkGenerate as runBulkGenerate } from './use-cases/bulk-generate'
 import { createCode as runCreateCode } from './use-cases/create-code'
 import { deleteCode as runDeleteCode } from './use-cases/delete-code'
 import { unbindCode as runUnbind } from './use-cases/unbind'
+import { updateLabel as runUpdateLabel } from './use-cases/update-label'
 
 /**
  * Server actions for the admin QR-binding surface. Each action gates on
@@ -39,6 +40,8 @@ function errMsg(code: string): string {
       return 'No such code.'
     case 'restaurant_not_found':
       return 'No such restaurant.'
+    case 'invalid_label':
+      return 'Label must be 200 chars or fewer.'
     default:
       return 'Action failed.'
   }
@@ -80,6 +83,17 @@ export async function bindCodeAction(input: {
 export async function unbindCodeAction(code: string): Promise<ActionResult> {
   await requireScope(SCOPES.QR_CODES_UPDATE)
   const res = await runUnbind(drizzleQrCodesGateway, code)
+  if (!res.ok) return { ok: false, error: errMsg(res.error) }
+  revalidatePath(ADMIN_PATH)
+  return { ok: true }
+}
+
+export async function updateLabelAction(input: {
+  code: string
+  label: string
+}): Promise<ActionResult> {
+  await requireScope(SCOPES.QR_CODES_UPDATE)
+  const res = await runUpdateLabel(drizzleQrCodesGateway, input)
   if (!res.ok) return { ok: false, error: errMsg(res.error) }
   revalidatePath(ADMIN_PATH)
   return { ok: true }
