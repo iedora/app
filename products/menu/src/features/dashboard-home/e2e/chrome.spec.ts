@@ -74,6 +74,7 @@ test.describe('@smoke dashboard chrome', () => {
 
     const sidebar = signedInPage.getByTestId('dashboard-chrome')
     const trigger = signedInPage.getByTestId('dashboard-sidebar-trigger')
+    const close = signedInPage.getByTestId('dashboard-sidebar-close')
 
     await expect(trigger).toBeVisible()
     await expect(sidebar).toHaveAttribute('data-open', 'false')
@@ -82,8 +83,13 @@ test.describe('@smoke dashboard chrome', () => {
     await expect(sidebar).toHaveAttribute('data-open', 'true')
     await expect(trigger).toHaveAttribute('aria-expanded', 'true')
 
-    // Tapping the trigger a second time closes the drawer.
-    await trigger.click()
+    // Trigger hides while the drawer is open (CSS rule on
+    // `[aria-expanded="true"]`). Close goes through the in-drawer X —
+    // matches the shadcn Sheet convention. Scrim/ESC also close, covered
+    // by the design-system unit suite.
+    await expect(trigger).toBeHidden()
+    await close.click()
     await expect(sidebar).toHaveAttribute('data-open', 'false')
+    await expect(trigger).toBeVisible()
   })
 })

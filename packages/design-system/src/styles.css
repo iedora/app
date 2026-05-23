@@ -2132,13 +2132,7 @@
   position: fixed;
   top: max(12px, env(safe-area-inset-top));
   right: max(12px, env(safe-area-inset-right));
-  /* Must sit above the overlay (49) AND the drawer (50). The drawer
-     spans up to 86vw from the left; the trigger lives in the top-right
-     corner outside that footprint, so the stacking decision matters
-     only against the overlay scrim. Keeping the trigger above both
-     preserves the toggle UX (tap to open, tap again to close) — the
-     overlay's own onClick still handles "tap the scrim to close". */
-  z-index: 51;
+  z-index: 35;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2161,6 +2155,17 @@
 .ds-sidebar-trigger:focus-visible {
   outline: 2px solid var(--cinnabar);
   outline-offset: 2px;
+}
+/* Hide the trigger while the drawer is open. Closing is the drawer's
+   own affordance now — `<SidebarClose>` (X), the dim scrim's onClick,
+   or ESC. This is the shadcn Sheet / Material navigation-drawer
+   convention: trigger opens; the surface owns its own close. Keeps
+   stacking honest (no need to leapfrog the overlay's z-index) and
+   matches every modal pattern in the design system. The attribute
+   `aria-expanded` is set by `<SidebarTrigger>` itself — no extra
+   class needed. */
+.ds-sidebar-trigger[aria-expanded="true"] {
+  display: none;
 }
 
 @media (min-width: 1024px) {
