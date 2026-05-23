@@ -1,5 +1,15 @@
 import type { LocalizedText } from '@/features/i18n'
 
+/**
+ * Ad-hoc price variant on an item — "Meia dose", "Imperial", "Jarra 1L".
+ * Some restaurants carry 3–4 variants per dish (Dose / Meia dose /
+ * Cuvete / Take-away). The builder UI must scale to N variants.
+ */
+export type BuilderVariant = {
+  label: string
+  priceCents: number
+}
+
 export type BuilderItem = {
   id: string
   categoryId: string
@@ -12,6 +22,7 @@ export type BuilderItem = {
   available: boolean
   position: number
   imageUrl: string | null
+  variants: BuilderVariant[]
 }
 
 export type BuilderCategory = {

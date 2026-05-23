@@ -13,6 +13,7 @@ import { CreateMenuDialog } from '@/features/menu-builder/ui/create-menu-dialog'
 import { DeleteMenuButton } from '@/features/menu-builder/ui/delete-menu-button'
 import { SeedSampleButton } from '@/features/menu-builder/ui/seed-sample-button'
 import { ImportMenuDialog } from '@/features/menu-import/ui/import-menu-dialog'
+import { RefreshTranslationsButton } from '@/features/menu-translation/ui/refresh-translations-button'
 
 export default async function RestaurantPage({
   params,
@@ -81,6 +82,7 @@ export default async function RestaurantPage({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-lg font-medium">{t('menus')}</h2>
             <div className="flex flex-wrap items-center gap-2">
+              <RefreshTranslationsButton slug={slug} />
               <SeedSampleButton slug={slug} />
               <ImportMenuDialog slug={slug} restaurantId={r.id} />
               <CreateMenuDialog slug={slug} />

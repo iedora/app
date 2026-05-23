@@ -146,6 +146,7 @@
     "importMenuDetected": "Suggested: {language} · {currency}",
     "importMenuApplyLanguage": "Use {language} as this restaurant's default language",
     "importMenuApplyLanguageHint": "Only applied when you import. Uncheck to keep your current setting.",
+    "importMenuApplyLanguageNote": "Your restaurant's default language will be set to {language}. You can change it later in Settings.",
     "importMenuReviewMarker": "review",
     "importMenuReviewTooltip": "The AI was unsure about this row — double-check the name and price.",
     "importMenuSuccessDescription": "Your menu has been created from the photo. Open it to add photos, adjust prices, and reorder dishes.",
@@ -154,7 +155,13 @@
     "noMenusHint": "Create one to start adding categories.",
     "categoryCount": "{count, plural, =0 {No categories} =1 {1 category} other {# categories}}",
     "dishCount": "{count, plural, =0 {No dishes} =1 {1 dish} other {# dishes}}",
-    "saving": "Saving…"
+    "saving": "Saving…",
+    "refreshTranslations": "Refresh translations",
+    "refreshTranslationsPending": "Translating…",
+    "refreshTranslationsSuccess": "{rows, plural, =1 {# row} other {# rows}} synced to {languages}",
+    "refreshTranslationsUpToDate": "Translations are up to date",
+    "refreshTranslationsNoTargets": "Add another language in Settings first",
+    "refreshTranslationsError": "Could not refresh translations. Try again."
   },
   "Settings": {
     "livePreview": "Live preview",

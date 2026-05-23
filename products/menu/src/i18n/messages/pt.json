@@ -146,6 +146,7 @@
     "importMenuDetected": "Sugerido: {language} · {currency}",
     "importMenuApplyLanguage": "Usar {language} como idioma predefinido deste restaurante",
     "importMenuApplyLanguageHint": "Só aplicado quando importares. Desmarca para manter a definição atual.",
+    "importMenuApplyLanguageNote": "O idioma predefinido do restaurante será definido como {language}. Podes alterar mais tarde nas Definições.",
     "importMenuReviewMarker": "rever",
     "importMenuReviewTooltip": "A IA não tinha a certeza desta linha — confirma o nome e o preço.",
     "importMenuSuccessDescription": "O teu menu foi criado a partir da foto. Abre-o para adicionar fotos, ajustar preços e reordenar pratos.",
@@ -154,7 +155,13 @@
     "noMenusHint": "Cria um para começar a adicionar categorias.",
     "categoryCount": "{count, plural, =0 {Sem categorias} =1 {1 categoria} other {# categorias}}",
     "dishCount": "{count, plural, =0 {Sem pratos} =1 {1 prato} other {# pratos}}",
-    "saving": "A guardar…"
+    "saving": "A guardar…",
+    "refreshTranslations": "Atualizar traduções",
+    "refreshTranslationsPending": "A traduzir…",
+    "refreshTranslationsSuccess": "{rows, plural, =1 {# linha} other {# linhas}} sincronizadas para {languages}",
+    "refreshTranslationsUpToDate": "Traduções estão atualizadas",
+    "refreshTranslationsNoTargets": "Adiciona outro idioma nas Definições primeiro",
+    "refreshTranslationsError": "Não foi possível atualizar as traduções. Tenta novamente."
   },
   "Settings": {
     "livePreview": "Pré-visualização",

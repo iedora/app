@@ -125,17 +125,51 @@ Rules:
 - Detect the currency from the visible price symbol and return the ISO 4217
   code ('EUR' for €, 'USD' for $, 'GBP' for £, etc.). Return an empty string
   when no currency symbol is visible.
-- Preserve the original language of the menu text in names and descriptions.
-- Keep names and descriptions exactly as written (correct obvious OCR errors).
+- TRANSLATION-READY OUTPUT — the extracted menu will be machine-translated
+  into other languages downstream, so the source text must be clean:
+  * Every \`name\` and \`description\` must be in EXACTLY ONE language —
+    the menu's source language (the same code you return in \`language\`).
+    Do NOT mix English glosses into a Portuguese name. Do NOT append
+    "(salt cod)" after "Bacalhau". If the menu itself prints a
+    translation next to the original (rare), keep ONLY the source.
+  * Use the menu's wording verbatim. Do NOT paraphrase, expand
+    abbreviations, or substitute synonyms. "Café (Bica)" stays as-is.
+  * Strip pricing fragments and variant labels from names — those live
+    on \`priceCents\` and \`variants\`, never duplicated into \`name\`.
+    E.g. a menu showing "Bacalhau à brás · 14,50 / 8,00" yields
+    \`name = "Bacalhau à brás"\`, never "Bacalhau à brás 14,50 / 8,00".
+  * Drop noise that wouldn't survive translation: stars/stickers,
+    seasonal hand-scribbled tags ("HOJE!"), index numbers ("01.",
+    "12)") before names. Keep printed allergen markers ("(v)", "(gf)")
+    only when they're part of the original copy and inside descriptions.
+  * Correct only OBVIOUS OCR errors (transposed letters, dropped
+    accents). Do not "improve" capitalisation or punctuation.
 - Convert prices to integer cents (€12.50 → 1250, $8 → 800). Use 0 when no
   price is visible.
-- If a single dish lists multiple prices (full / half dose, small / large,
-  lunch / dinner, by-the-glass / by-the-bottle, jarra 0.5L / 1L), use the
-  LEFTMOST / PRIMARY price for \`priceCents\` and put each ALTERNATE into the
-  \`variants\` array with its label as written on the menu, e.g.
-  \`variants: [{ label: "Meia dose", priceCents: 800 }]\`. DO NOT create
-  separate categories for alternate price columns. DO NOT duplicate the
-  item just to capture a second price. Each dish appears exactly once.
+- VARIANT PRICES — read carefully. Many Portuguese menus put column headers
+  like "PREÇO / DOSE" and "PREÇO 1/2 DOSE" (or "DOSE / MEIA DOSE",
+  "S / L", "33cl / 50cl") above an aligned grid of prices. EVERY row in
+  that grid is a single dish with MULTIPLE prices, one per column header.
+  When you see a column-header layout:
+    * Read the leftmost column as the dish's primary price (\`priceCents\`).
+    * For each remaining column whose row has a price, add a \`variants\`
+      entry with \`label\` = the column header (e.g. "Meia dose", "1/2 Dose",
+      "Large"), and \`priceCents\` = that column's value for the row.
+    * The column header is NOT a category. DO NOT emit "PREÇO / DOSE" or
+      "1/2 Dose" as a category name. The category is the section title
+      ABOVE the grid (e.g. "PRATOS PRINCIPAIS").
+    * Each dish appears exactly once. DO NOT duplicate "Bacalhau à brás"
+      to capture its half-dose price.
+  Worked example for a dual-column mains section:
+    PRATOS PRINCIPAIS    PREÇO / DOSE    PREÇO 1/2 DOSE
+    Bacalhau à Brás       € 14,50         € 8,00
+    Polvo à Lagareiro     € 19,00         € 7,50
+  → category "PRATOS PRINCIPAIS" with two items, each carrying one variant:
+    Bacalhau à Brás: priceCents 1450, variants [{ label: "Meia dose", priceCents: 800 }]
+    Polvo à Lagareiro: priceCents 1900, variants [{ label: "Meia dose", priceCents: 750 }]
+  Inline variants (one row says "Imperial €1,60 / Caneca €2,80") follow the
+  same rule: leftmost is primary, every other goes into \`variants\` with
+  its label.
 - Omit \`variants\` entirely when the dish has only one price.
 - Set confidence per item: 1.0 when you're certain, lower when OCR was
   ambiguous or you had to guess. Drop below 0.7 for hard-to-read rows so the

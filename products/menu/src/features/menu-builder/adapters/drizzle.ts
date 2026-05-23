@@ -254,6 +254,22 @@ export function makeDrizzleMenuWrite(db: AdapterDb): MenuWritePort {
   },
 
   async updateItem(itemId, fields) {
+    // Variants follow leave-alone semantics: `undefined` (the field
+    // wasn't sent) means "don't touch the column". `null` or `[]` are
+    // real operator actions — clear all variants on this item.
+    const variantsPatch =
+      fields.variants === undefined
+        ? {}
+        : {
+            variants:
+              fields.variants === null || fields.variants.length === 0
+                ? null
+                : fields.variants.map((v) => ({
+                    label: v.label,
+                    priceCents: v.priceCents,
+                  })),
+          }
+
     await db
       .update(item)
       .set({
@@ -263,6 +279,7 @@ export function makeDrizzleMenuWrite(db: AdapterDb): MenuWritePort {
         available: fields.available,
         nameI18n: fields.nameI18n,
         descriptionI18n: fields.descriptionI18n,
+        ...variantsPatch,
       })
       .where(eq(item.id, itemId))
   },
@@ -498,6 +515,7 @@ export function makeDrizzleMenuRead(db: AdapterDb): MenuReadPort {
               available: item.available,
               position: item.position,
               imageUrl: item.imageUrl,
+              variants: item.variants,
             })
             .from(item)
             .where(
@@ -534,6 +552,11 @@ export function makeDrizzleMenuRead(db: AdapterDb): MenuReadPort {
           available: it.available,
           position: it.position ?? 0,
           imageUrl: it.imageUrl,
+          // Normalise jsonb `null` → `[]` so the builder UI iterates
+          // without a branch.
+          variants:
+            (it.variants as Array<{ label: string; priceCents: number }> | null) ??
+            [],
         })),
       })),
     }

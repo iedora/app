@@ -111,6 +111,12 @@ export interface MenuWritePort {
       available: boolean
       nameI18n: LocalizedText | null
       descriptionI18n: LocalizedText | null
+      /**
+       * Ad-hoc variants. `null` (or omitted) is "leave alone" semantics —
+       * the adapter only writes the column when the field is present.
+       * Pass `[]` to explicitly clear.
+       */
+      variants?: ReadonlyArray<{ label: string; priceCents: number }> | null
     },
   ): Promise<void>
 

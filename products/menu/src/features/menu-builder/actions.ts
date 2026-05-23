@@ -152,6 +152,8 @@ export async function updateItem(
     available?: boolean
     nameI18n?: LocalizedText
     descriptionI18n?: LocalizedText
+    /** Pass `undefined` to leave variants alone; `[]` to clear them. */
+    variants?: ReadonlyArray<{ label: string; priceCents: number }>
   },
 ) {
   const { restaurant: r } = await requireRestaurantBySlug(slug)

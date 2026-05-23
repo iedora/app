@@ -43,6 +43,13 @@
       "when": 1779473614104,
       "tag": "0005_bouncy_cassandra_nova",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779497730460,
+      "tag": "0006_fancy_puppet_master",
+      "breakpoints": true
     }
   ]
 }

@@ -160,6 +160,13 @@ export const category = menuSchema.table(
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
+    /**
+     * When the i18n overrides on this row were last machine-translated.
+     * NULL = never synced. Compared against `updated_at` to find stale
+     * rows during a "Refresh translations" pass: stale iff
+     * `updated_at > translations_synced_at` (or the timestamp is NULL).
+     */
+    translationsSyncedAt: timestamp('translations_synced_at'),
   },
   (t) => [
     index('category_menu_idx').on(t.menuId),
@@ -202,6 +209,8 @@ export const item = menuSchema.table(
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
+    // See `category.translationsSyncedAt` — same staleness semantics.
+    translationsSyncedAt: timestamp('translations_synced_at'),
   },
   (t) => [
     index('item_category_idx').on(t.categoryId),

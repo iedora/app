@@ -246,11 +246,6 @@ export function MenuImportWizard({
   const [menuName, setMenuName] = useState('')
   const [quota, setQuota] = useState<QuotaSnapshot | null>(initialQuota ?? null)
   const [detected, setDetected] = useState<Detected | null>(null)
-  // Operator's opt-in for "use detected language as restaurant default".
-  // Initialised to the consumer's offer state (onboarding ships with the
-  // box pre-checked); the operator can clear it before clicking Import
-  // and the restaurant row stays untouched.
-  const [applyLanguage, setApplyLanguage] = useState(offerSetDefaultLanguage)
 
   function reset() {
     setStep({ kind: 'upload' })
@@ -449,7 +444,7 @@ export function MenuImportWizard({
         slug,
         menuName || 'Imported menu',
         final,
-        applyLanguage && detected
+        offerSetDefaultLanguage && detected
           ? { setDefaultLanguage: detected.language }
           : undefined,
       )
@@ -609,29 +604,19 @@ export function MenuImportWizard({
       </div>
 
       {offerSetDefaultLanguage && detected && (
-        <div
-          className="rounded-lg border border-[var(--ink-14)] bg-[var(--paper-2)] p-3 space-y-1"
-          data-test-id="menu-import-apply-language"
+        // Info hint, not a control. When the wizard runs from the
+        // onboarding flow (the restaurant has no menus yet), the AI's
+        // detected language becomes the restaurant's default on
+        // Import — no confirmation needed, no checkbox to miss. The
+        // operator can still flip it later in Settings.
+        <p
+          className="text-xs text-[var(--ink-55)]"
+          data-test-id="menu-import-apply-language-note"
         >
-          <label className="flex items-start gap-2 text-sm cursor-pointer">
-            <Checkbox
-              checked={applyLanguage}
-              onChange={() => setApplyLanguage((v) => !v)}
-              aria-describedby="menu-import-apply-language-hint"
-            >{' '}</Checkbox>
-            <span>
-              {t('importMenuApplyLanguage', {
-                language: detected.language.toUpperCase(),
-              })}
-            </span>
-          </label>
-          <p
-            id="menu-import-apply-language-hint"
-            className="pl-7 text-xs text-[var(--ink-55)]"
-          >
-            {t('importMenuApplyLanguageHint')}
-          </p>
-        </div>
+          {t('importMenuApplyLanguageNote', {
+            language: detected.language.toUpperCase(),
+          })}
+        </p>
       )}
 
       <Field>

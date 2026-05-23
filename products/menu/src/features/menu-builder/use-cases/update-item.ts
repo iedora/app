@@ -4,6 +4,11 @@ import { localizedSchema, pruneLocalized } from '@/features/i18n/server'
 import type { MenuWritePort } from '../ports'
 
 // Money is integer cents (AGENTS.md hard rule #6).
+const VariantInput = z.object({
+  label: z.string().trim().min(1).max(120),
+  priceCents: z.number().int().min(0).max(100_000_00),
+})
+
 const Input = z.object({
   itemId: z.string(),
   restaurantId: z.string(),
@@ -13,6 +18,8 @@ const Input = z.object({
   available: z.boolean().optional(),
   nameI18n: localizedSchema,
   descriptionI18n: localizedSchema,
+  // `undefined` = leave alone; `[]` = explicitly clear all variants.
+  variants: z.array(VariantInput).optional(),
 })
 
 export type UpdateItemResult =
@@ -39,6 +46,7 @@ export async function updateItem(
     available: parsed.data.available ?? true,
     nameI18n: pruneLocalized(parsed.data.nameI18n),
     descriptionI18n: pruneLocalized(parsed.data.descriptionI18n),
+    variants: parsed.data.variants,
   })
   return { ok: true, categoryId: existing.categoryId }
 }
