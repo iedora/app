@@ -304,10 +304,16 @@ func (c *client) doJSON(ctx context.Context, method, path string, in, out any, o
 		return err
 	}
 	if status == http.StatusNotFound {
-		return ErrNotFound
+		// Wrap so the caller's error message includes the URL — invaluable
+		// for diagnosing which specific REST path is misconfigured.
+		return fmt.Errorf("%w: %s %s", ErrNotFound, method, path)
 	}
 	if isAlreadyExists(status, body) {
 		return ErrAlreadyExists
+	}
+	if isNoChanges(status, body) {
+		// Idempotent no-op update — treat as success.
+		return nil
 	}
 	if status < 200 || status >= 300 {
 		return fmt.Errorf("HTTP %d %s %s: %s", status, method, path, strings.TrimSpace(string(body)))
@@ -342,6 +348,21 @@ func isAlreadyExists(status int, body []byte) bool {
 		return false
 	}
 	return ze.Code == 6
+}
+
+// isNoChanges matches Zitadel's idempotent "no-op update" signal — code 9
+// (FAILED_PRECONDITION) with "No changes" in the message, returned as
+// HTTP 400. Common on warm reconciles where every field matches the
+// existing resource. Treated as success because that's the semantic.
+func isNoChanges(status int, body []byte) bool {
+	if status != http.StatusBadRequest {
+		return false
+	}
+	var ze zitadelError
+	if err := json.Unmarshal(body, &ze); err != nil {
+		return false
+	}
+	return ze.Code == 9 && strings.Contains(ze.Message, "No changes")
 }
 
 // stderr indirection so tests can capture output. Mirrors the main

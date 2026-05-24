@@ -139,8 +139,8 @@ type searchOrgsResp struct {
 }
 
 func findOrgByName(ctx context.Context, c *client, name string) (string, error) {
-	body, status, err := c.do(ctx, http.MethodPost, "/v2/orgs/_search",
-		searchOrgsReq{Queries: []orgQuery{{NameQuery: &nameQuery{Name: name, Method: "ORG_NAME_QUERY_METHOD_EQUALS"}}}},
+	body, status, err := c.do(ctx, http.MethodPost, "/v2/organizations/_search",
+		searchOrgsReq{Queries: []orgQuery{{NameQuery: &nameQuery{Name: name, Method: "TEXT_QUERY_METHOD_EQUALS"}}}},
 		requestOpts{})
 	if err != nil {
 		return "", err
@@ -506,7 +506,9 @@ func reconcileOneTarget(ctx context.Context, c *client, s *State, cfg Config,
 	case existing == "" && !hasBWS:
 		return createTargetAndStore(ctx, c, cfg, name, endpoint, idOut, signingKeyOut, bwsKey)
 	case existing != "" && hasBWS:
-		_ = c.doJSON(ctx, http.MethodPatch, "/resources/v3alpha/targets/"+existing,
+		// v2 actions API uses POST for update (not PATCH) — see proto's
+		// `option (google.api.http) = { post: "/v2/actions/targets/{id}" }`.
+		_ = c.doJSON(ctx, http.MethodPost, "/v2/actions/targets/"+existing,
 			targetBody(name, endpoint), nil, requestOpts{})
 		*idOut = existing
 		*signingKeyOut = bwsVal
@@ -514,7 +516,7 @@ func reconcileOneTarget(ctx context.Context, c *client, s *State, cfg Config,
 	case existing != "" && !hasBWS:
 		// One-shot reveal lost — delete + recreate. Dependent executions
 		// (bound by target ID) get rebound by reconcileExecutions next.
-		if err := c.doJSON(ctx, http.MethodDelete, "/resources/v3alpha/targets/"+existing,
+		if err := c.doJSON(ctx, http.MethodDelete, "/v2/actions/targets/"+existing,
 			nil, nil, requestOpts{}); err != nil {
 			return fmt.Errorf("delete stale target %s: %w", existing, err)
 		}
@@ -547,7 +549,7 @@ func createTargetAndStore(ctx context.Context, c *client, cfg Config,
 		ID         string `json:"id"`
 		SigningKey string `json:"signingKey"`
 	}
-	if err := c.doJSON(ctx, http.MethodPost, "/resources/v3alpha/targets",
+	if err := c.doJSON(ctx, http.MethodPost, "/v2/actions/targets",
 		targetBody(name, endpoint), &resp, requestOpts{}); err != nil {
 		return fmt.Errorf("create target %s: %w", name, err)
 	}
@@ -563,28 +565,38 @@ func createTargetAndStore(ctx context.Context, c *client, cfg Config,
 }
 
 func findTargetByName(ctx context.Context, c *client, name string) (string, error) {
-	body, status, err := c.do(ctx, http.MethodPost, "/resources/v3alpha/targets/_search",
-		map[string]any{}, requestOpts{})
+	// Filter by name. Could send `{}` to list all, but per-name filter
+	// keeps the response small even when more targets land in future.
+	body, status, err := c.do(ctx, http.MethodPost, "/v2/actions/targets/search",
+		map[string]any{
+			"filters": []any{
+				map[string]any{
+					"targetNameFilter": map[string]any{
+						"targetName": name,
+						"method":     "TEXT_FILTER_METHOD_EQUALS",
+					},
+				},
+			},
+		}, requestOpts{})
 	if err != nil {
 		return "", err
 	}
 	if status >= 400 {
 		return "", fmt.Errorf("search targets HTTP %d: %s", status, string(body))
 	}
+	// Response shape: `{ pagination, targets: [{id, name, ...}] }`.
+	// The `result` field is reserved in the proto and not used.
 	var out struct {
-		Result []struct {
-			ID     string `json:"id"`
-			Config struct {
-				Name string `json:"name"`
-			} `json:"config"`
-			Name string `json:"name"` // some schema variants put name at top level
-		} `json:"result"`
+		Targets []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"targets"`
 	}
 	if err := json.Unmarshal(body, &out); err != nil {
 		return "", fmt.Errorf("decode search targets: %w", err)
 	}
-	for _, t := range out.Result {
-		if t.Config.Name == name || t.Name == name {
+	for _, t := range out.Targets {
+		if t.Name == name {
 			return t.ID, nil
 		}
 	}
@@ -609,25 +621,29 @@ func reconcileExecutions(ctx context.Context, c *client, s *State) error {
 	return nil
 }
 
+// Note on shape: Condition is a `oneof condition_type` with `function`
+// as a top-level case (NOT nested under `response`). Targets is a
+// `repeated string` of target IDs — NOT a list of {target: id} objects
+// despite what the proto's openapiv2_schema example claims. The 400
+// `invalid value for string field targets: {` we got on first cold
+// deploy is what tipped this off.
 func setFunctionExecution(ctx context.Context, c *client, fn, targetID string) error {
-	return c.doJSON(ctx, http.MethodPut, "/resources/v3alpha/executions",
+	return c.doJSON(ctx, http.MethodPut, "/v2/actions/executions",
 		map[string]any{
 			"condition": map[string]any{
-				"response": map[string]any{
-					"function": map[string]any{"name": fn},
-				},
+				"function": map[string]any{"name": fn},
 			},
-			"targets": []any{map[string]any{"target": targetID}},
+			"targets": []string{targetID},
 		}, nil, requestOpts{})
 }
 
 func setEventExecution(ctx context.Context, c *client, event, targetID string) error {
-	return c.doJSON(ctx, http.MethodPut, "/resources/v3alpha/executions",
+	return c.doJSON(ctx, http.MethodPut, "/v2/actions/executions",
 		map[string]any{
 			"condition": map[string]any{
 				"event": map[string]any{"event": event},
 			},
-			"targets": []any{map[string]any{"target": targetID}},
+			"targets": []string{targetID},
 		}, nil, requestOpts{})
 }
 
@@ -734,8 +750,10 @@ func createOIDCApp(ctx context.Context, c *client, s *State, cfg Config) (appID,
 
 func updateOIDCApp(ctx context.Context, c *client, s *State, cfg Config) error {
 	zitadelHost := hostnameOf(cfg.BaseURL)
+	// Update path: `/projects/{project_id}/apps/{app_id}/oidc_config`
+	// (NOT `/apps/oidc/{app_id}` — that's the create-only path).
 	return c.doJSON(ctx, http.MethodPut,
-		"/management/v1/projects/"+s.ProjectID+"/apps/oidc/"+s.OIDCAppID,
+		"/management/v1/projects/"+s.ProjectID+"/apps/"+s.OIDCAppID+"/oidc_config",
 		oidcAppBody(cfg.MenuHostname, zitadelHost),
 		nil, requestOpts{orgID: s.OrgID})
 }
@@ -744,8 +762,9 @@ func regenerateOIDCSecret(ctx context.Context, c *client, s *State) (string, err
 	var resp struct {
 		ClientSecret string `json:"clientSecret"`
 	}
+	// RegenerateOIDCClientSecret RPC path.
 	if err := c.doJSON(ctx, http.MethodPost,
-		"/management/v1/projects/"+s.ProjectID+"/apps/"+s.OIDCAppID+"/secret",
+		"/management/v1/projects/"+s.ProjectID+"/apps/"+s.OIDCAppID+"/oidc_config/_generate_client_secret",
 		map[string]any{}, &resp, requestOpts{orgID: s.OrgID}); err != nil {
 		return "", err
 	}

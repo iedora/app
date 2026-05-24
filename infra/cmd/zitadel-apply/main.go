@@ -72,6 +72,18 @@ func run(ctx context.Context, argv []string) error {
 		return err
 	}
 
+	// Self-bootstrap: if the SA key isn't already in env, TLS-probe
+	// Zitadel + fetch the FirstInstance key off the box. Keeps Stage 3's
+	// orchestrator (cmd/iedora/app.go) dumb — it doesn't need to know
+	// anything Zitadel-specific.
+	if cfg.SAKeyJSON == "" {
+		key, err := ensureSAKey(ctx, cfg, *noBWS)
+		if err != nil {
+			return err
+		}
+		cfg.SAKeyJSON = key
+	}
+
 	c, err := newClient(cfg.BaseURL, cfg.SAKeyJSON)
 	if err != nil {
 		return fmt.Errorf("new client: %w", err)
@@ -105,11 +117,10 @@ func loadConfig(grantsOnly, noBWS bool, outputFile string) (Config, error) {
 		GrantsOnly:    grantsOnly,
 		MenuDNSBudget: parseDurationOr(os.Getenv("ZA_MENU_DNS_BUDGET"), 90*time.Second),
 	}
-	saKey := os.Getenv("INFRA_ZITADEL_SA_KEY_JSON")
-	if saKey == "" {
-		return cfg, fmt.Errorf("INFRA_ZITADEL_SA_KEY_JSON missing in env")
-	}
-	cfg.SAKeyJSON = saKey
+	// Don't require the SA key here — `ensureSAKey` handles the cold
+	// path (missing in env + BWS → fetch from box via SSH). loadConfig
+	// just records whatever happens to be in env.
+	cfg.SAKeyJSON = os.Getenv("INFRA_ZITADEL_SA_KEY_JSON")
 
 	emails, err := parseEmails(os.Getenv("ZA_ADMIN_EMAILS"))
 	if err != nil {

@@ -120,6 +120,23 @@ func (d *dockerOnHetzner) Deploy(ctx context.Context) error {
 		return err
 	}
 
+	// `docker login` first — same rationale as menu-db-migrations:
+	// kreuzwerker/docker's registry_auth only applies to Tofu-driven
+	// `docker_image` resources, not ad-hoc SSH+docker pulls.
+	if ghcrToken := os.Getenv("INFRA_GHCR_TOKEN"); ghcrToken != "" {
+		// GHCR owner is the org/user part of the image repo (ghcr.io/<owner>/<repo>).
+		// Extract for the docker login `-u <owner>`.
+		owner := ghcrOwnerFromImageRepo(d.imageRepo)
+		fmt.Fprintln(stderr, "→ docker login ghcr.io")
+		loginCmd := fmt.Sprintf(
+			"echo %s | docker login ghcr.io -u %s --password-stdin",
+			shellSingleQuote(ghcrToken), shellSingleQuote(owner),
+		)
+		if err := sshExec(ctx, host, loginCmd); err != nil {
+			fmt.Fprintf(stderr, "  ! docker login failed (continuing — image may be cached): %v\n", err)
+		}
+	}
+
 	fmt.Fprintf(stderr, "→ docker pull %s\n", image)
 	if err := sshExec(ctx, host, "docker pull "+image); err != nil {
 		return fmt.Errorf("pull %s: %w", image, err)
@@ -288,7 +305,26 @@ func envArgs(env map[string]string) []string {
 func shellJoin(args []string) string {
 	parts := make([]string, len(args))
 	for i, a := range args {
-		parts[i] = "'" + strings.ReplaceAll(a, "'", `'\''`) + "'"
+		parts[i] = shellSingleQuote(a)
 	}
 	return strings.Join(parts, " ")
+}
+
+func shellSingleQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+// ghcrOwnerFromImageRepo extracts the namespace from a full GHCR image
+// repo path. `ghcr.io/eduvhc/menu` → `eduvhc`. Empty string on unexpected
+// shapes — the docker login below errors out clearly in that case.
+func ghcrOwnerFromImageRepo(repo string) string {
+	prefix := "ghcr.io/"
+	if !strings.HasPrefix(repo, prefix) {
+		return ""
+	}
+	tail := repo[len(prefix):]
+	if i := strings.IndexByte(tail, '/'); i > 0 {
+		return tail[:i]
+	}
+	return ""
 }

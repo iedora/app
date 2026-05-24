@@ -85,6 +85,24 @@ func run(ctx context.Context) error {
 
 	image := fmt.Sprintf("ghcr.io/%s/menu:%s", owner, sha)
 
+	// `docker login` once before pulling. The kreuzwerker/docker provider's
+	// `registry_auth` only applies to Tofu-managed `docker_image` resources;
+	// ad-hoc `ssh + docker pull` doesn't inherit those creds. Cheap to
+	// re-login every run (Docker dedupes on the saved token in
+	// /root/.docker/config.json).
+	if ghcrToken := os.Getenv("INFRA_GHCR_TOKEN"); ghcrToken != "" {
+		fmt.Fprintln(os.Stderr, "→ menu-db-migrations: docker login ghcr.io")
+		// Stream the token via stdin (`--password-stdin`) so it never
+		// shows up in `docker history` / process listings on the box.
+		loginCmd := fmt.Sprintf(
+			"echo %s | docker login ghcr.io -u %s --password-stdin",
+			shellQuote(ghcrToken), shellQuote(owner),
+		)
+		if err := sshExec(ctx, host, loginCmd); err != nil {
+			fmt.Fprintf(os.Stderr, "  ! docker login failed (continuing — image may be cached): %v\n", err)
+		}
+	}
+
 	fmt.Fprintf(os.Stderr, "→ menu-db-migrations: pull %s (skipped if already cached)\n", image)
 	if err := sshExec(ctx, host, "docker pull "+image); err != nil {
 		// Pull failure is non-fatal IF the image is already on the box

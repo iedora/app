@@ -62,7 +62,9 @@ var secretAllow = map[string]map[stage]bool{
 	"INFRA_GITHUB_API_TOKEN":            {stageIaC: true},
 	"INFRA_CLAUDE_CODE_OAUTH_TOKEN":     {stageIaC: true},
 	"INFRA_HCLOUD_TOKEN":                {stageIaC: true},
-	"INFRA_GHCR_TOKEN":                  {stageIaC: true},
+	// Needed by Stage 3 (menu-db-migrations runs `docker login + pull`)
+	// and Stage 4 (dockerOnHetzner pulls the product image).
+	"INFRA_GHCR_TOKEN":                  {stageIaC: true, stageApp: true, stageDeploy: true},
 	// OpenObserve email is needed by the `openobserve-dashboards`
 	// configurator in Stage 3 for HTTP Basic auth against the API.
 	"INFRA_OPENOBSERVE_ROOT_USER_EMAIL": {stageIaC: true, stageApp: true},
