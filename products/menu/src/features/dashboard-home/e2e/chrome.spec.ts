@@ -81,12 +81,11 @@ test.describe('@smoke dashboard chrome', () => {
 
     await trigger.click()
     await expect(sidebar).toHaveAttribute('data-open', 'true')
-    await expect(trigger).toHaveAttribute('aria-expanded', 'true')
 
-    // Trigger hides while the drawer is open (CSS rule on
-    // `[aria-expanded="true"]`). Close goes through the in-drawer X —
-    // matches the shadcn Sheet convention. Scrim/ESC also close, covered
-    // by the design-system unit suite.
+    // <SidebarTrigger> unmounts while the drawer is open — closing belongs
+    // to <SidebarClose> / scrim / ESC (shadcn Sheet convention). The
+    // remaining close affordances are covered by the design-system unit
+    // suite (sidebar.dom.test.tsx).
     await expect(trigger).toBeHidden()
     await close.click()
     await expect(sidebar).toHaveAttribute('data-open', 'false')
