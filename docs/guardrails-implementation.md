@@ -28,7 +28,7 @@ binaries:
 - `cmd/iedora` — pinned to `Live`, with `Require(Live)` at the top of
   every destructive entry point (`runIacApply`, `runIacDestroy`,
   `runAppApply`, `runDeployProduct`, `runDestroyProduct`).
-- `cmd/dev` — pinned to `Local`.
+- `cmd/local` — pinned to `Local`.
 - `cmd/zitadel-apply` — the only dual-mode binary; takes `--mode
   live|local` (default `live`). Mode plumbs through `loadConfig`,
   `buildStore` (live → `bwsStore`, local → `memoryStore`), `ensureSAKey`,
