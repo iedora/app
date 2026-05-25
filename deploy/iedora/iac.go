@@ -12,6 +12,7 @@ import (
 
 	"github.com/eduvhc/iedora/internal/bws"
 	"github.com/eduvhc/iedora/internal/cloudflare"
+	"github.com/eduvhc/iedora/internal/mode"
 	"github.com/eduvhc/iedora/internal/r2"
 )
 
@@ -28,6 +29,8 @@ import (
 //
 //	--skip-init   skip the leading `tofu init` (CI runs it as a separate step)
 func runIacApply(ctx context.Context, argv []string) error {
+	currentMode.Require(mode.Live)
+
 	fs := flag.NewFlagSet("iac apply", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	skipInit := fs.Bool("skip-init", false, "skip leading tofu init")
@@ -109,6 +112,8 @@ func runIacApply(ctx context.Context, argv []string) error {
 // to Stage 3). Does NOT state-rm menu_web docker_* — also extracted
 // (Stage 4).
 func runIacDestroy(ctx context.Context, argv []string) error {
+	currentMode.Require(mode.Live)
+
 	fs := flag.NewFlagSet("iac destroy", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	if err := fs.Parse(argv); err != nil {
