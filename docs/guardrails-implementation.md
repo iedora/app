@@ -56,7 +56,7 @@ stays — R2 sees encrypted bytes, never plaintext.
 
 ### Bootstrap
 
-`infra/deploy/cmd/state-bucket-bootstrap/` is the one-shot Go binary that
+`infra/iac/cmd/state-bucket-bootstrap/` is the one-shot Go binary that
 solves the chicken/egg: it creates the R2 bucket + scoped API token
 via the Cloudflare API and writes the credentials to BWS. Idempotent
 — warm runs rotate the token value in place so BWS converges. Run
@@ -97,7 +97,7 @@ Smoke-tested green: `menu.iedora.com/up` → 200 `{"ok":true,"db":"ok"}`,
 
 ### Files
 
-- [`infra/deploy/cmd/state-bucket-bootstrap/`](../infra/deploy/cmd/state-bucket-bootstrap/) — Go binary (main.go, r2_bucket.go, r2_token.go, main_test.go).
+- [`infra/iac/cmd/state-bucket-bootstrap/`](../infra/iac/cmd/state-bucket-bootstrap/) — Go binary (main.go, r2_bucket.go, r2_token.go, main_test.go).
 - [`internal/cloudflare/r2_bucket.go`](../internal/cloudflare/r2_bucket.go) + [`api_token.go`](../internal/cloudflare/api_token.go) — helpers added during the work.
 - [`infra/bin/state-bucket-bootstrap`](../infra/bin/state-bucket-bootstrap) — wrapper shim.
 - [`infra/iac/tofu/versions.tf`](../infra/iac/tofu/versions.tf) + [`products/house/infra/iac/tofu/versions.tf`](../products/house/infra/iac/tofu/versions.tf) — `backend "s3"` blocks.

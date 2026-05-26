@@ -20,6 +20,9 @@ infra/
       bws-upsert/            Tofu local-exec helper (idempotent BWS upsert).
       iedora-backup/         Backup container: daily encrypted pg_dumpall → R2.
                              Go binary + Dockerfile co-located.
+      state-bucket-bootstrap/ Stage -1 — provisions the R2 bucket + scoped CF
+                             token the Tofu s3 backend needs (chicken/egg).
+                             Lives under iac/ because it's IaC plumbing.
 
   app-state/               Stage 3 — configurators (reconcile running services)
     cmd/
@@ -28,7 +31,7 @@ infra/
       menu-db-migrations/    drizzle-kit migrate against menu's postgres DB.
       openobserve-dashboards/ Push embedded JSON dashboards via SSH `-L` tunnel.
 
-  deploy/                  Stage -1 + Stage 4 + cross-stage orchestrator
+  deploy/                  Stage 4 + cross-stage orchestrator
     cmd/
       iedora/                Pipeline router. Subcommands: iac, app, deploy,
                              destroy, pipeline, doctor. Owns the configurator
@@ -37,8 +40,6 @@ infra/
       with-secrets/          BWS env wrapper. Stage-filtered (iac / app / deploy +
                              per-product). Defense-in-depth — each stage sees
                              only its classified keys.
-      state-bucket-bootstrap/ Stage -1 — provisions the R2 bucket + scoped CF
-                             token the Tofu s3 backend needs (chicken/egg).
 
   dev/                     Local stack — mirror of all 4 stages, against local Docker
     docker-compose.yml       Postgres + Zitadel + OpenObserve + LocalStack.
@@ -64,7 +65,7 @@ Operators always invoke via shims at the repo root (`bin/<name>`); those shims `
 2. **Tofu-managed credentials write through to BWS** as `IAC_*` (`iac/tofu/secrets.tf::terraform_data.bws_sync_autogen` → `bin/bws-upsert`). Editing BWS directly is wasted work; the next apply restores Tofu's value.
 3. **Bootstrap order is BWS → Tofu → write-through.** Operator pastes the `IAC_BOOTSTRAP_*` keys first; everything else is Tofu-minted.
 4. **Follow [`docs/terraform-style.md`](../docs/terraform-style.md)** when editing any `.tf` — pessimistic `~>` pins, `for_each` over `count`, `validation` blocks.
-5. **State lives in Cloudflare R2** via the OpenTofu `s3` backend (Rule 2 of the environment guardrails). Bootstrap helper at [`deploy/cmd/state-bucket-bootstrap/`](deploy/cmd/state-bucket-bootstrap/).
+5. **State lives in Cloudflare R2** via the OpenTofu `s3` backend (Rule 2 of the environment guardrails). Bootstrap helper at [`iac/cmd/state-bucket-bootstrap/`](iac/cmd/state-bucket-bootstrap/).
 6. **Run the pre-merge runbook on every deploy-shape change** — see [`docs/deploy.md`](../docs/deploy.md) § Pre-merge runbook.
 
 ## Adding things

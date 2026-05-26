@@ -804,7 +804,7 @@ target.
 bin/                                     `go run` shims the Taskfile shells through
   iedora                                   → infra/deploy/cmd/iedora
   with-secrets                             → deploy/with-secrets
-  state-bucket-bootstrap                   → deploy/state-bucket-bootstrap (Stage -1)
+  state-bucket-bootstrap                   → iac/cmd/state-bucket-bootstrap (Stage -1)
   zitadel-apply                            → infra/app-state/cmd/zitadel-apply
   menu-db-migrations                       → app-state/menu-db-migrations
   openobserve-dashboards                   → app-state/openobserve-dashboards
