@@ -12,6 +12,7 @@ How code is organised across the products and shared packages, plus the menu-sid
 iedora/
   packages/
     design-system/                @iedora/design-system    (editorial CSS + React primitives)
+    eslint-config/                @iedora/eslint-config    (flat-config factories)
     iedora-observability/         @iedora/observability    (OTel wiring — traces + metrics)
   products/
     menu/                         menu.iedora.com          (SaaS menu builder)
@@ -35,12 +36,17 @@ Path: `products/menu/src/features/`.
 - **`i18n/`** — per-language registry (en, pt, es, fr) + format helpers + `LocalizedFields` editor UI.
 - **`identity/`** — federated organization ownership through Zitadel (`auth.iedora.com`). Calls Zitadel's REST management API using the menu service-account PAT (IAM_OWNER) for memberships and org provisioning.
 - **`menu-builder/`** — dnd-kit admin builder. Menu / category / item CRUD + reorder (position recompute in a single transaction).
+- **`menu-import/`** — AI-assisted import of an existing menu (image / PDF → categories + items + variants), driven from the dashboard.
+- **`menu-onboarding/`** — first-org-creation + add-another-restaurant flows (the empty-state journey).
 - **`menu-publishing/`** — public-side render path. `loadRestaurantSnapshot` / `loadRestaurantAdminMenus` cache wrappers (per-slug tag), template registry, renderer, sample-data seed.
+- **`menu-translation/`** — AI translation pass over a menu's localised fields (`name` / `description` → `*I18n`).
 - **`metrics/`** — daily-view counters + analytics range helpers. Writes are driven by the beacon endpoint, not this slice.
 - **`plans/`** — plan registry (free, casa). Same shape as i18n + templates.
-- **`rate-limit/`** — token-bucket rate limiter backed by Redis (testcontainers in dev/CI). Guards `/api/auth/*` and other unauth'd endpoints.
+- **`qr-codes/`** — physical-sticker registry (cross-tenant, iedora-admin only — owns the printed QR → restaurant binding).
+- **`rate-limit/`** — sliding-window rate limiter backed by Postgres (advisory locks + `READ COMMITTED`; tests run against PGLite). Guards `/api/auth/*` and other unauth'd endpoints. (Previously Redis; see slice README for why we dropped it.)
 - **`restaurant-identity/`** — restaurant CRUD + theme/identity settings.
 - **`restaurant-slug/`** — owner of the `restaurant.slug` column. `slugify(name)` + `isValidSlugShape(s)` (pure), `nextAvailableSlug(base)` (onboarding auto-pick), `rename(restaurantId, newSlug)` (operator rename, race-safe via DB unique index). One shape rule, two surfaces.
+- **`sessions/`** — authoritative server-side `menu.session` store (roles, permissions, `permissionsVersion`, revocation). The cookie is just a pointer; this slice is the source of truth — Zitadel Actions v2 webhooks rewrite rows live on grant change.
 - **`upload/`** — S3-compatible uploads. Presign + commit + clear, with the `r/{restaurantId}/...` key-prefix invariant verified twice. LocalStack in dev, `adobe/s3mock` in CI (LocalStack `:latest` requires a paid licence as of 2026); real R2 in production.
 
 ## Shared packages
@@ -55,9 +61,6 @@ Editorial primitives every product renders out of. Paper, ink, cinnabar; Fraunce
 Consumed by menu and house. Tests in `packages/design-system/src/test/` (jsdom + Testing Library).
 
 Menu also keeps shadcn primitives under `products/menu/src/shared/ui/` — pieces without an editorial equivalent (e.g. `dropdown-menu`, `label`) stay menu-local until the design system grows to subsume them.
-
-
-Tests are DB-less — pure crypto + parsing.
 
 ### `@iedora/observability` — `packages/iedora-observability/`
 

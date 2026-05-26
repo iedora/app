@@ -179,13 +179,10 @@ they degrade to the no-op tracer from `@opentelemetry/api`.
 ## Cross-product trace context
 
 `@vercel/otel`'s built-in W3C Trace Context propagator handles the
-`traceparent` header on every outbound `fetch` automatically (so menu →
-genkan identity-API calls stitch into one trace with no extra code).
-Inbound propagation in Next 16 is automatic too.
-
-For the webhook envelope (`@iedora/identity` sender → receiver), the
-package's own `traceparent` header propagation lives in `sender.ts` and
-`receiver.ts`. See `packages/iedora-identity/README.md`.
+`traceparent` header on every outbound `fetch` automatically (so
+menu → Zitadel management-API calls and menu → R2/S3 puts stitch into
+one trace with no extra code). Inbound propagation in Next 16 is
+automatic too. There are no inter-product fetches today.
 
 ## Where to look when unsure
 

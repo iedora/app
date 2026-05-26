@@ -31,39 +31,59 @@ The menu app (`infra-menu-web`) is **not** here — it's owned by Stage 4 (`task
 
 ## Stage 2 file layout
 
+This directory holds only the Tofu root + Tofu sub-modules + the two
+helpers that have a hard dependency on Tofu (`bws-upsert` is invoked by
+a `terraform_data` provisioner; `backup/` builds the image referenced
+by the backups container). Every other Go binary moved out to a
+top-level home during the 4-stage split — they're referenced here for
+context only.
+
 ```
 infra/
-  tofu/                  Single Tofu root: Hetzner + Cloudflare + GitHub
-                         config + shared service containers
+  tofu/                  Single encrypted Tofu root: Hetzner + Cloudflare
+                         + GitHub config + shared service containers
                          (postgres, openobserve, zitadel, zitadel-login,
                          caddy, backups). Per-product containers (menu)
                          are NOT here — they're owned by Stage 4.
-  cmd/iedora/            Stage 2/3/4 orchestrator (live).
+  modules/services/      Tofu sub-modules — one per shared container type
+                         (postgres, openobserve, zitadel, zitadel-login).
+  bws-upsert/            Go helper for `terraform_data.bws_sync_autogen`.
+                         Idempotent list-then-edit-or-create against BWS.
+  backup/                Dockerfile + Go source for the `infra-backups`
+                         container (daily encrypted pg_dumpall → R2).
+                         Replaces the prior infra/backup/*.sh scripts.
+  postgres/              `init.sql` — CREATE DATABASE menu / zitadel on
+                         first boot of the postgres container.
+```
+
+Outside this directory but part of the 4-stage pipeline (see
+[`docs/deploy.md` § File map](../docs/deploy.md)):
+
+```
+deploy/iedora/           Stage 2/3/4 orchestrator (live).
                          Subcommands: iac, app, deploy, destroy,
                          pipeline, doctor.
-  cmd/local/             Local-stack orchestrator (`task local`).
-                         Thin shim over `docker compose` against
-                         dev/docker-compose.yml.
-  local/                 docker-compose.yml + localstack init script
-                         + (gitignored) .zitadel-bootstrap/.
-  cmd/zitadel-apply/     Stage 3 — reconciles Zitadel app state
+deploy/state-bucket-bootstrap/
+                         Stage -1 — provisions the R2 bucket + scoped
+                         token the Tofu s3 backend needs.
+deploy/with-secrets/     BWS env wrapper. Stage-filtered
+                         (iac / app / deploy + per-product).
+app-state/zitadel/       Stage 3 — reconciles Zitadel app state
                          (org, project, OIDC app, machine user + PAT,
                          action targets, admin grants).
-  cmd/menu-db-migrations/ Stage 3 — drizzle-kit migrate against menu's
+app-state/menu-db-migrations/
+                         Stage 3 — drizzle-kit migrate against menu's
                          postgres database.
-  cmd/openobserve-dashboards/ Stage 3 — pushes embedded JSON dashboards
+app-state/openobserve-dashboards/
+                         Stage 3 — pushes embedded JSON dashboards
                          via SSH `-L` tunnel.
-  cmd/with-secrets/      BWS env wrapper. Stage-filtered (iac / app /
-                         deploy + per-product).
-  cmd/bws-upsert/        Idempotent BWS list-then-edit-or-create helper.
-                         Used by Tofu's `terraform_data.bws_sync_*`.
-  modules/services/      Tofu modules — one per shared container type.
-  internal/              Go helpers: bws, cloudflare, r2, tlsprobe.
-  bin/                   `go run` wrappers the Taskfile shells through.
-  cmd/iedora-backup/     Daily encrypted pg_dumpall → R2 backup binary
-                         (replaces the prior infra/backup/*.sh scripts).
-                         Includes its own Dockerfile.
-  postgres/              `init.sql` — bootstrap databases on first boot.
+dev/                     Local stack (docker-compose.yml +
+                         orchestrator/). Mirror of Stages 2-4 against
+                         the local Docker daemon.
+internal/                Shared Go helpers: bws, cloudflare, mode, r2,
+                         tlsprobe, testfakes.
+bin/                     `go run` wrappers the Taskfile shells through —
+                         one shim per binary above.
 ```
 
 ## See also

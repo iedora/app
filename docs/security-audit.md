@@ -10,8 +10,8 @@ Ranked by severity for the iedora stack.
 
 | # | Threat | Severity | Status | Mitigation |
 |---|---|---|---|---|
-| 2 | Webhook SSRF — admin registers a URL pointing at internals | high | resolved | `packages/iedora-identity/src/ssrf.ts` — DNS + CIDR allowlist v4/v6, protocol guard, dev-only escape hatch (`IEDORA_WEBHOOKS_ALLOW_PRIVATE=1` + `NODE_ENV!=production`) |
-| 3 | Webhook replay | medium | resolved | Stripe-style `x-iedora-signature: t=<ms>,v1=<hex>` over `${ts}.${body}`; receiver enforces 5 min skew + idempotency dedup on envelope.id |
+| 2 | Webhook SSRF — admin registers a URL pointing at internals | n/a | retired | Mitigation lived in `packages/iedora-identity/src/ssrf.ts`; that package + the menu-side webhook receiver were removed when identity moved fully to Zitadel. No menu surface accepts admin-registered URLs today. Restore the SSRF guard before introducing one |
+| 3 | Webhook replay | n/a | retired | Removed alongside threat #2. If/when we accept inbound webhooks again, reinstate the Stripe-style `x-iedora-signature: t=<ms>,v1=<hex>` + 5-min skew + envelope.id dedup pattern |
 | 6 | [CVE-2026-45364](https://www.cvedetails.com/product/177298/Better-auth-Better-Auth.html) — Better Auth IPv6 rate-limit bypass | n/a | retired | Better Auth removed from menu under issue #20; replaced by Zitadel OIDC. Mitigation history kept for audit trail |
 | 7 | [GHSA-wxw3-q3m9-c3jr](https://github.com/advisories) — Better Auth OAuth state mismatch w/o PKCE | n/a | retired | Better Auth removed from menu. The current OIDC flow uses `openid-client` which mandates PKCE by default |
 | 19 | Multi-tenant IDOR (org-scoped data leakage) | medium | contained | menu's `requireRestaurantAccess` checks `member` rows. Audit any path reading org data outside this guard |

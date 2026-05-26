@@ -57,7 +57,7 @@ resource "random_password" "openobserve_password" {
 # minted here. It's an app secret — consumed only by the menu container,
 # never by an IaC-managed resource — so Stage 4 (`iedora deploy menu`)
 # mints + upserts it to BWS via the productRuntime's appSecrets mechanism
-# (`infra/cmd/iedora/runtime_docker.go`). Tofu's secrets.tf is reserved
+# (`deploy/iedora/runtime_docker.go`). Tofu's secrets.tf is reserved
 # for secrets that govern how IaC containers boot (postgres password,
 # backup passphrase, Zitadel masterkey, etc.).
 

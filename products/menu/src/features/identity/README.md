@@ -27,8 +27,8 @@ org provisioning (`POST /admin/v1/orgs` then add the user as `ORG_OWNER`).
 ## Why a PAT (not the user's OIDC token)
 
 The user's own access_token doesn't carry IAM_OWNER scope; the
-membership search and org-create endpoints reject it. The
-`zitadel_personal_access_token.menu_sa` resource (TF, see
-`infra/tofu/zitadel.tf`) mints a long-lived bearer for the menu_sa
-machine user with IAM_OWNER, which the container reads as
-`ZITADEL_MANAGEMENT_TOKEN`.
+membership search and org-create endpoints reject it. Stage 3's
+[`app-state/zitadel`](../../../../../app-state/zitadel/) reconciler
+mints a long-lived PAT for the `menu_sa` machine user with IAM_OWNER
+and writes it to BWS as `APP_ZITADEL_MENU_SA_TOKEN`; the menu container
+reads it as `ZITADEL_MANAGEMENT_TOKEN`.

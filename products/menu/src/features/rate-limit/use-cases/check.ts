@@ -6,7 +6,7 @@ import type { RateLimitDecision, RateLimiter } from '../ports'
  * own connection errors and surfaces them via the `failClosed` flag.
  *
  * Tests bind a mock port directly. Production callers go through the
- * slice barrel's `enforceRateLimit` which is bound to the Redis adapter.
+ * slice barrel's `enforceRateLimit` which is bound to the Postgres adapter.
  */
 export async function check(
   port: RateLimiter,

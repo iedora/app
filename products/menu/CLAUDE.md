@@ -103,8 +103,8 @@ products/menu/
   drizzle/                           generated SQL migrations
   drizzle.config.ts
   next.config.ts, tsconfig.json      paths: @/* → ./src/*
-  Dockerfile                         app build (Bun-install + Node-build + standalone). Same Dockerfile dev (built locally by `task dev`) and prod (built + pushed to GHCR by .github/workflows/menu.yml) consume.
-  .env                               TF-emitted (infra/modules/menu_env, localhost-DNS variant). Committed. Statics + Zod-valid placeholders for the dynamic keys.
+  Dockerfile                         app build (Bun-install + Node-build + standalone). Same Dockerfile dev (built locally by `task local`) and prod (built + pushed to GHCR by .github/workflows/menu.yml) consume.
+  .env                               Committed. Statics + Zod-valid placeholders for the dynamic keys. The local-dev orchestrator (`dev/orchestrator/`) overlays the real values into `.env.local` after Zitadel FirstInstance.
   .env.local                         user-owned, gitignored. Real Zitadel + session values for the host bun-run-dev path; user can also override any key to point at remote services.
   package.json                       workspace deps to @iedora/design-system, identity, observability
   scripts/check-migrations.ts        dev-time guardrail
@@ -119,9 +119,9 @@ products/menu/
                                      menu-build-and-publish, qr-to-public-view, plan-upgrade, …)
 ```
 
-Dev: `task dev` boots a docker_container.menu (build local from this Dockerfile) on the iedora network — same image shape as prod. For HMR, `just dev --except menu && cd products/menu && bun run dev` (reads `.env` + `.env.local`).
+Dev: `task local` brings up the local stack (docker compose at `dev/docker-compose.yml`) — same Dockerfile shape as prod. For HMR, `task local --except menu && cd products/menu && bun run dev` (reads `.env` + `.env.local`).
 
-Prod: `docker_container.menu_web` in `infra/tofu/containers.tf` pulls `ghcr.io/eduvhc/menu:<sha>` (CI-pushed) and runs on the Hetzner box.
+Prod: Stage 4 (`task deploy:menu` → `dockerOnHetzner` runtime in [`deploy/iedora/runtime_docker.go`](../../deploy/iedora/runtime_docker.go)) SSHes to the box, pulls `ghcr.io/eduvhc/menu:<sha>` (CI-pushed), runs migrations, and replaces the container. The container is NOT declared in `infra/tofu/containers.tf` — only the shared services are.
 
 ## Commands
 
@@ -134,7 +134,7 @@ Prod: `docker_container.menu_web` in `infra/tofu/containers.tf` pulls `ghcr.io/e
 - `bun run db:migrate` — apply pending migrations.
 - `bun run db:push` — push schema directly (dev only).
 - `bun run db:studio` — Drizzle Studio.
-- `docker compose up -d` — Postgres + LocalStack.
+- `task local` (from repo root) — boots Postgres + Zitadel + OpenObserve + LocalStack via `dev/docker-compose.yml`.
 - `bunx shadcn@latest add <name>` — add a shadcn component.
 
-Deploy commands live at the repo root — see `AGENTS.md` § Useful commands.
+Deploy commands live at the repo root — see [`AGENTS.md`](../../AGENTS.md) § Commands.

@@ -14,10 +14,9 @@ No "mock all the things and assert call shapes" tier in between. PGLite tests al
 
 | Location | Runner | Tier | Notes |
 |---|---|---|---|
-| `products/menu/src/**/*.test.ts` | Vitest | unit | PGLite via `src/shared/testing/pglite.ts`; some tests boot real Redis via testcontainers (rate-limit) |
+| `products/menu/src/**/*.test.ts` | Vitest | unit | PGLite via `src/shared/testing/pglite.ts`; rate-limit also runs against PGLite (advisory locks + `READ COMMITTED`) |
 | `products/menu/src/features/*/e2e/` | Playwright | slice e2e | Postgres 18 + adobe/s3mock as service containers in CI (LocalStack locally); one slice per folder |
 | `products/menu/tests/e2e/journeys/` | Playwright | cross-slice journeys | Same runtime — only files that span ≥2 slices live here |
-| `packages/iedora-identity/src/__tests__/*.test.ts` | Vitest | unit | No DB. Pure crypto + parsing |
 | `packages/iedora-observability/src/__tests__/*.test.ts` | Vitest | unit | No-op-in-tests contract, tenant attribute pins |
 | `packages/design-system/src/test/` | Vitest + jsdom | unit | Component primitives via Testing Library |
 
@@ -212,7 +211,6 @@ One workflow per workspace. Each `paths:`-filtered.
   workflows/
     menu.yml                     menu's full pipeline
     design-system.yml            @iedora/design-system
-    identity.yml                 @iedora/identity
     observability.yml            @iedora/observability
 ```
 

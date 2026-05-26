@@ -634,7 +634,7 @@ ssh -L 5080:localhost:5080 root@$HOST   # then open http://localhost:5080
 
 | Secret kind | How to rotate |
 |-------------|---------------|
-| `INFRA_*` bootstrap (HCLOUD, CF, GH, etc.) | Regenerate at the source provider, then `bws secret edit <id>` with the new value. |
+| `IAC_BOOTSTRAP_*` (HCLOUD, CF, GH, GHCR, etc.) | Regenerate at the source provider, then `bws secret edit <id>` with the new value. |
 | `IAC_*` (Tofu-minted) | `bin/with-secrets --stage iac -- tofu -chdir=infra/tofu apply -replace=random_password.<name>`. The `terraform_data.bws_sync_autogen` write-through pushes the new value to BWS automatically. |
 | `APP_ZITADEL_MENU_SA_TOKEN` | `bws secret delete <id>`, then `task app:apply` — zitadel-apply detects `(no BWS, yes Zitadel)`, deletes the live PAT, mints a new one, writes BWS. Menu container restarts on next `task deploy:menu`. |
 | `DEPLOY_MENU_SESSION_SECRET` | `bws secret delete <id>`, then `task deploy:menu`. `dockerOnHetzner.appSecrets` re-mints. All active sessions invalidate (users re-auth). |
@@ -671,8 +671,8 @@ task deploy:menu      # restart menu with the new OIDC client_secret + PAT
 mode on `SCHEDULE=@daily`: `pg_dumpall` every database on
 `infra-postgres` → R2 (`iedora-data` bucket, `pg/` prefix),
 GPG-encrypted with `IAC_BACKUP_PASSPHRASE`. The S3 client is
-the pure-Go SigV4 implementation at `infra/internal/r2`; no
-`aws` CLI in the image.
+the pure-Go SigV4 implementation at [`internal/r2`](../internal/r2);
+no `aws` CLI in the image.
 
 Restore: `ssh -t root@$HOST docker exec -it infra-backups /iedora-backup restore`.
 
@@ -752,7 +752,7 @@ the affected stage.
 
 Run before merging any change to the orchestrator (`deploy/iedora/`,
 `deploy/with-secrets/`, `app-state/zitadel/`, the other Stage 3
-binaries, `infra/tofu/*.tf`, `internal/*`, `infra/bin/*`,
+binaries, `infra/tofu/*.tf`, `internal/*`, `bin/*`,
 `Taskfile.yml`, or `products/*/infra/tofu/*.tf`). The sequence proves
 the moving parts compose correctly against live cloud APIs — unit
 tests cover individual helpers but only this catches cross-API
@@ -792,7 +792,7 @@ target.
 - **House Tofu state** (`products/house/infra/tofu/`): 3 resources (cloudflare_workers_script.house, cloudflare_workers_custom_domain.apex, data.cloudflare_zone.iedora).
 - **BWS**: 6 `APP_ZITADEL_*` outputs from Stage 3 + `DEPLOY_MENU_SESSION_SECRET` minted by Stage 4.
 - **Zitadel**: org `iedora`, project `iedora`, 6 roles, machine user `menu-sa` with 1 PAT + IAM_OWNER, OIDC app `menu`, 2 action targets with executions.
-- **Box** (`ssh root@$HOST docker ps`): `infra-postgres`, `infra-zitadel`, `infra-zitadel-login`, `infra-caddy`, `infra-openobserve`, `infra-backups`, `infra-menu-web`.
+- **Box** (`ssh root@$HOST docker ps`): `infra-postgres`, `infra-zitadel`, `infra-zitadel-login`, `infra-caddy`, `infra-openobserve`, `infra-backups` (Tofu-owned, Stage 2) + `infra-menu-web` (Stage-4-owned, NOT in Tofu state).
 - **Public endpoints**:
   - `https://menu.iedora.com/up` → 200 `{"ok":true,"db":"ok"}`
   - `https://auth.iedora.com/.well-known/openid-configuration` → 200
@@ -801,48 +801,54 @@ target.
 ## File map
 
 ```
-infra/
-  bin/                                   thin wrappers around the Go binaries
-    iedora                                 `go run cmd/iedora` — the orchestrator
-    with-secrets                           `go run cmd/with-secrets` — stage-filtered env
-    zitadel-apply                          `go run cmd/zitadel-apply` — Stage 3 configurator
-    menu-db-migrations                     `go run cmd/menu-db-migrations` — Stage 3 configurator
-    openobserve-dashboards                 `go run cmd/openobserve-dashboards` — Stage 3 configurator
-    bws-upsert                             Tofu local-exec helper (BWS write-through)
+bin/                                     `go run` shims the Taskfile shells through
+  iedora                                   → deploy/iedora
+  with-secrets                             → deploy/with-secrets
+  state-bucket-bootstrap                   → deploy/state-bucket-bootstrap (Stage -1)
+  zitadel-apply                            → app-state/zitadel
+  menu-db-migrations                       → app-state/menu-db-migrations
+  openobserve-dashboards                   → app-state/openobserve-dashboards
+  bws-upsert                               → infra/bws-upsert (Tofu local-exec helper)
 
-  cmd/
-    iedora/                                orchestrator: subcommands + runtime registry
-      main.go, iac.go, app.go, deploy.go, pipeline.go, doctor.go
-      runtime.go, runtime_docker.go, runtime_cf.go    productRuntime + 2 impls
-      configurators.go                                Stage 3 registry
-      products.go                                     Stage 4 registry
-      ssh.go, tofu.go, paths.go, log.go
-    with-secrets/                          BWS wrapper. main.go + env.go + env_test.go.
-    zitadel-apply/                         Stage 3 — Zitadel reconciler.
-      main.go, client.go, bootstrap.go, reconcile.go, store.go,
-      schema.go, wait_dns.go
-    menu-db-migrations/                    Stage 3 — drizzle-kit migrate via SSH + docker run.
-    openobserve-dashboards/                Stage 3 — SSH-L tunnel + embedded JSONs + REST.
-      main.go + dashboards/*.json
-    bws-upsert/                            BWS write-through helper for Tofu.
-    local/                                 local-stack orchestrator (docker-compose shim).
+deploy/                                  Stage 2/3/4 orchestrator + helpers
+  iedora/                                  orchestrator: subcommands + runtime registry
+    main.go, iac.go, app.go, deploy.go, pipeline.go, doctor.go, destroy.go
+    runtime.go, runtime_docker.go, runtime_cf.go     productRuntime + 2 impls
+    configurators.go                                 Stage 3 registry
+    products.go                                      Stage 4 registry
+    ssh.go, tofu.go, paths.go, log.go
+  with-secrets/                            BWS wrapper. main.go + env.go + env_test.go
+  state-bucket-bootstrap/                  Stage -1 — R2 bucket + scoped token for the
+                                           Tofu s3 backend (chicken/egg helper)
 
-  internal/
-    bws/                                   bws CLI wrapper (ProjectID, ListSecrets, Find, Upsert, Delete)
-    cloudflare/                            CF /accounts API + R2 S3 creds derivation
-    r2/                                    R2 S3 client (EmptyBucket for destroy)
-    tlsprobe/                              `Wait()` for /debug/ready + LE-cert-not-Caddy-internal
-    testfakes/                             test-only HTTP server fakes
+app-state/                               Stage 3 — each subdir is a self-contained configurator
+  zitadel/                                 Zitadel REST reconciler (org / project / OIDC /
+                                           machine user + PAT / action targets / grants)
+  menu-db-migrations/                      drizzle-kit migrate via SSH + docker run
+  openobserve-dashboards/                  SSH-L tunnel + go:embed JSONs + REST upsert
 
-  tofu/                                    Stage 2 — central Tofu root
+internal/                                Shared Go helpers (repo-root single Go module)
+  bws/                                     bws CLI wrapper (ProjectID, ListSecrets, Find, Upsert, Delete)
+  cloudflare/                              CF /accounts API + R2 S3 creds derivation
+  mode/                                    binary-mode enum (local vs live; Guardrail #1)
+  r2/                                      R2 S3 client (EmptyBucket for destroy)
+  tlsprobe/                                `Wait()` for /debug/ready + LE-cert-not-Caddy-internal
+  testfakes/                               test-only HTTP server fakes
+
+infra/                                   Stage 2 — IaC for the shared estate
+  tofu/                                    central Tofu root
     versions.tf, variables.tf, hetzner.tf, main.tf, containers.tf,
     secrets.tf, github.tf, outputs.tf
   modules/services/                        Tofu modules for each live shared service
     postgres/, zitadel/, zitadel-login/, openobserve/
+  bws-upsert/                              BWS write-through helper for Tofu (terraform_data)
+  backup/                                  self-built Postgres-backup image (Dockerfile + Go binary)
+  postgres/                                init.sql — CREATE DATABASE menu / zitadel on first boot
 
-  local/                                   local-stack docker-compose root
-    docker-compose.yml, localstack-init.sh
-  backup/                                  self-built Postgres-backup image (Dockerfile + sh scripts)
+dev/                                     Local stack (mirror of Stages 2-4)
+  docker-compose.yml, localstack-init.sh   the stack itself
+  orchestrator/                            Go binary driving compose + the Stage-3-equivalent
+                                           seed step (replaces the prior Tofu-for-dev root)
 ```
 
 ## Why this design

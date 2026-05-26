@@ -2,7 +2,7 @@
 // single Go binary. Lives inside the backup container alongside
 // pg_dump/pg_dumpall/pg_restore/psql/gpg (external binaries the Go
 // process still shells out to). aws-cli is gone — uses the pure-Go
-// SigV4 S3 client at infra/internal/r2.
+// SigV4 S3 client at internal/r2.
 //
 // Subcommands:
 //

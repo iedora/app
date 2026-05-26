@@ -2,10 +2,10 @@
  * Named rate-limit policies. One source of truth so a future tuning pass
  * doesn't need to grep every action.
  *
- * `failClosed: true` → if Redis is unreachable, REJECT the request. Used for
- * surfaces where abuse cost outweighs availability (auth, presign).
- * `failClosed: false` → on Redis outage, ALLOW the request. Used for
- * cosmetic / fire-and-forget surfaces where a flaky cache must not break UX.
+ * `failClosed: true` → if the limiter backend is unreachable, REJECT the request.
+ * Used for surfaces where abuse cost outweighs availability (auth, presign).
+ * `failClosed: false` → on backend outage, ALLOW the request. Used for
+ * cosmetic / fire-and-forget surfaces where a flaky limiter must not break UX.
  *
  * Limits are per (key, window). Keys are constructed by the caller and
  * already include the actor (org/ip) and the policy name, e.g.

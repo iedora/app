@@ -54,8 +54,9 @@ That gives us three guarantees the pre-#21 self-contained cookie didn't:
 
 ### Live grant-change refresh
 
-A second Zitadel Actions v2 target (`menu_grants`, see
-`infra/tofu/zitadel.tf` + parity in `infra/dev/tofu/main.tf`) fires on
+A second Zitadel Actions v2 target (`menu_grants`, reconciled by
+[`app-state/zitadel/`](../../../../../app-state/zitadel/) in both live
+and local — Stage 3 is mode-aware, not Tofu-backed) fires on
 the seven `user.grant.{added,changed,cascade.changed,removed,
 cascade.removed,deactivated,reactivated}` events. The
 `/api/zitadel/grants-changed` route validates the HMAC with

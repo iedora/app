@@ -78,7 +78,7 @@ terraform {
     }
     # Mints the menu session cookie's encryption key directly in TF state.
     # Rotate via `tofu apply -replace=random_password.menu_session_secret`.
-    # Zitadel app-state is no longer managed here — see infra/cmd/zitadel-apply.
+    # Zitadel app-state is no longer managed here — see app-state/zitadel.
     random = {
       source  = "hashicorp/random"
       version = "~> 3.6"

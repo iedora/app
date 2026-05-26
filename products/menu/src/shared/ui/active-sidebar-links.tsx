@@ -10,10 +10,10 @@ import {
 } from '@iedora/design-system'
 
 /**
- * Sister to `<ActiveNavLinks>`, but for the vertical sidebar. One
- * client island reads `usePathname()` and renders the whole nav so we
- * don't pay N readers — `<SidebarLink>` then receives the active flag
- * and the `<Link>` child for prefetch / client-side routing.
+ * Vertical sidebar navigation. One client island reads `usePathname()`
+ * and renders the whole nav so we don't pay N readers — `<SidebarLink>`
+ * then receives the active flag and the `<Link>` child for prefetch /
+ * client-side routing.
  *
  * Items are either links or section labels. Mix freely:
  *

@@ -92,7 +92,8 @@ iedora/                                  repo root
 
   dev/                                   Local development stack (mirror of the 4 stages).
     orchestrator/                          Go binary driving local Docker + LocalStack
-    tofu/                                  Tofu root that boots dev containers
+    docker-compose.yml                     Local stack: postgres + zitadel + openobserve + LocalStack
+    localstack-init.sh                     Seeds LocalStack's R2 buckets on first boot
     .zitadel-bootstrap/                    (gitignored) local Zitadel FirstInstance outputs
 
   packages/
@@ -105,7 +106,7 @@ iedora/                                  repo root
     house/                               Astro — iedora.com
 ```
 
-Menu's `infra/` owns a Dockerfile (built by CI into the GHCR image) plus a tiny Tofu root for the R2 assets bucket and `assets.iedora.com`. The menu container itself is declared in `infra/tofu/containers.tf` at the repo root, and its lifecycle (pull/run on every deploy) is owned by Stage 4 via [`deploy/iedora/runtime_docker.go`](deploy/iedora/runtime_docker.go).
+Menu's `infra/` owns a Dockerfile (built by CI into the GHCR image) plus a tiny Tofu root for the R2 assets bucket and `assets.iedora.com`. The menu container itself is NOT declared in `infra/tofu/containers.tf` — only the shared services (postgres, zitadel, caddy, openobserve, backups) live there. Menu's lifecycle (pull/run on every deploy) is owned by Stage 4 via [`deploy/iedora/runtime_docker.go`](deploy/iedora/runtime_docker.go); Caddy routes to it by network alias so the container can come and go between deploys without touching Tofu.
 
 ## Commands
 
@@ -113,7 +114,7 @@ Menu's `infra/` owns a Dockerfile (built by CI into the GHCR image) plus a tiny 
 
 - `bun install` — install/refresh every workspace.
 - `bun install --frozen-lockfile` — what CI uses.
-- `just` — list every module's recipes.
+- `task --list-all` — list every recipe in the root Taskfile.
 
 ### Per-product
 
@@ -136,7 +137,7 @@ Stage 4: Deploy            task deploy:<p>  — per-product runtime
 - `task infra:up` / `task infra:down` — Stage 2 only (`tofu apply` / `destroy` on `infra/tofu/`).
 - `task app:apply` — Stage 3 (`bin/zitadel-apply` reconciles Zitadel app state).
 - `task deploy:menu` / `task deploy:house` / `task deploy:all` — Stage 4 per-product (or fan-out).
-- `task dev` — boots the local dev stack. `task dev:down` wipes it; `task dev:reset-db -- <service>` (e.g. `menu` or `zitadel`) drops + recreates one database without touching the rest.
+- `task local` — boots the local dev stack. `task local:down` wipes it; `task local:reset-db -- <service>` (e.g. `menu` or `zitadel`) drops + recreates one database without touching the rest.
 - `task doctor` — preflight on the operator's machine (PATH, BWS auth, bootstrap secrets).
 - Day-2 ops (logs / psql / backup / restore / rotate / wipe / zitadel-rebootstrap) are raw SSH against the Hetzner box.
 

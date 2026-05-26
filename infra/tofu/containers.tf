@@ -127,7 +127,7 @@ module "openobserve" {
 # ── Backups (self-built image) ───────────────────────────────────────────────
 # Pulls from GHCR which requires auth; the provider's registry_auth block
 # below ties to `var.infra_ghcr_token`. The image runs `iedora-backup`
-# (Go binary at infra/cmd/iedora-backup) in daemon mode every @daily:
+# (Go binary at infra/backup) in daemon mode every @daily:
 # pg_dumpalls every database on infra-postgres (menu + zitadel) → R2.
 
 resource "docker_container" "backups" {
@@ -256,7 +256,7 @@ module "zitadel_login" {
 # alias (`infra-menu-web`); when menu_web isn't running, Caddy returns
 # 502 — correct behavior between deploys.
 #
-# See `infra/cmd/iedora/products.go` for the menu's deploy spec
+# See `deploy/iedora/products.go` for the menu's deploy spec
 # (image repo, env mapping, migrate command). The split is intentional:
 # IaC owns shared infra; per-product Deploy owns the app container.
 

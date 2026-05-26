@@ -1,6 +1,6 @@
 # `features/rate-limit`
 
-Sliding-window rate limiting backed by Postgres. One slice for every per-actor cap in the app. Better Auth's own throttle lives in the same database via `rateLimit.storage: 'database'`.
+Sliding-window rate limiting backed by Postgres. One slice for every per-actor cap in the app.
 
 ## Public API
 

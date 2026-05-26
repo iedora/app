@@ -34,7 +34,7 @@ output "zitadel_hostname" {
 
 # ── Menu env (Stage 4 consumes via `tofu output -raw <name>`) ───────────────
 # Each output corresponds to one entry in the menu product's
-# `envFromTofu` map in `infra/cmd/iedora/products.go`. Adding a new menu
+# `envFromTofu` map in `deploy/iedora/products.go`. Adding a new menu
 # env key:
 #   1. Add it here (output "menu_<key>" { value = ... }).
 #   2. Add a line to products.go's envFromTofu mapping.
