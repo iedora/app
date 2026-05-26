@@ -10,4 +10,8 @@
 -- adds against an existing cluster, run `CREATE DATABASE` manually).
 
 CREATE DATABASE menu;
-CREATE DATABASE zitadel;
+CREATE DATABASE core;
+-- The `core` database holds the iedora auth surface (better-auth tables)
+-- under the `core` Postgres schema; the schema itself is created by the
+-- packages/auth Drizzle migration (`drizzle/0000_*.sql`). It'll grow to
+-- host audit + admin tables when the core product lands.
