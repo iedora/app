@@ -10,8 +10,12 @@ node_modules
 # covered by the `infra/` rule below.
 .env*
 
-# Infra & docs não vão para a imagem da app
+# Infra & docs não vão para a imagem da app — EXCEPT the iedora-backup
+# Go source under infra/backup/ which IS the build context for that
+# image (built from the repo root). The menu Dockerfile doesn't
+# COPY infra/ so the exception is harmless there.
 infra/
+!infra/backup/
 docs/
 tests/
 playwright-report/

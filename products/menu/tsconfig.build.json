@@ -2,6 +2,8 @@
   "extends": "./tsconfig.json",
   "exclude": [
     "node_modules",
-    "tests"
+    "tests",
+    "vitest.config.ts",
+    "vitest.config.live.ts"
   ]
 }
