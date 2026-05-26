@@ -43,7 +43,15 @@ func runIacApply(ctx context.Context, argv []string) error {
 		return fmt.Errorf("tofu init: %w", err)
 	}
 
-	parallel := "-parallelism=20"
+	// Pass 2 creates ~12 docker_container resources whose provider talks
+	// to the Hetzner box over SSH. sshd's default MaxStartups is 10:30:100
+	// (allows 10 unauthenticated connections, then random-drops above 30,
+	// rejects above 100), so the prior `-parallelism=20` regularly tripped
+	// "Connection reset by peer" on cold deploys when many container creates
+	// hit the auth phase concurrently. Five keeps us well under MaxStartups
+	// and barely costs latency — docker_container creates are I/O-bound,
+	// not CPU-bound, on the orchestrator side.
+	parallel := "-parallelism=5"
 
 	// ── Pass 1: Hetzner box (UNCONDITIONAL) ─────────────────────────────
 	// Targeted apply so the docker provider (which reaches the box via
