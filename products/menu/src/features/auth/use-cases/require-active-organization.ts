@@ -1,28 +1,19 @@
 import 'server-only'
 import { redirect } from 'next/navigation'
-import type { IdentityGateway } from '@/features/identity'
 import type { AuthGateway } from '../ports'
 import { verifySession } from './verify-session'
-import { getEffectiveOrganizationId } from './get-effective-organization-id'
 
 /**
  * Guarantees an authenticated session AND a resolved organizationId.
- * Redirects to /onboarding when the user has no Zitadel orgs yet.
- * Returns both so downstream guards don't need to re-query.
+ * Redirects to /onboarding when the user has no active organization yet
+ * (first sign-in before they've created or accepted one).
  *
- * The identity gateway is injected so tests can wire a fake against the
- * same use-case shape; production binds `zitadelHttpIdentity` from the
- * slice's `index.ts`.
+ * better-auth's organization plugin stores the active org on the session
+ * row; the lookup is a single read.
  */
-export async function requireActiveOrganization(
-  auth: AuthGateway,
-  identity: IdentityGateway,
-) {
+export async function requireActiveOrganization(auth: AuthGateway) {
   const session = await verifySession(auth)
-  const organizationId = await getEffectiveOrganizationId(
-    identity,
-    session.user.id,
-  )
+  const organizationId = session.session.activeOrganizationId
   if (!organizationId) redirect('/onboarding')
   return { session, organizationId }
 }

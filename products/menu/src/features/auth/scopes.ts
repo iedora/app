@@ -1,11 +1,10 @@
 /**
- * Canonical permission scopes asserted on the iedora-staff surface. Used
- * by `requireScope` (in `@/features/auth`) and by the Zitadel Action
- * webhook that expands bundles into the `permissions` claim.
+ * Canonical permission scopes asserted on the iedora-staff surface.
  *
- * Atomic permissions follow the OAuth scope convention `resource:verb`.
- * Bundles (e.g. `iedora-admin`) live in `bundles.ts` and resolve to a
- * subset of these scopes.
+ * Each scope is a `resource:verb` string — same convention as before the
+ * better-auth cutover. Internally `scopeToPermission` translates the
+ * kebab-case resource into the camelCase key expected by `@iedora/auth`'s
+ * access-control taxonomy (`statement` in `@iedora/auth/permissions`).
  *
  * Framework-free — imported from RSC, route handlers, tests. MUST NOT
  * depend on `next` or `server-only`.
@@ -20,8 +19,18 @@ export const SCOPES = {
 
 export type Scope = (typeof SCOPES)[keyof typeof SCOPES]
 
-/**
- * Every scope value, used by the webhook to validate that a role with a
- * colon is a known atomic permission before passing it through.
- */
 export const ALL_SCOPES: ReadonlyArray<Scope> = Object.values(SCOPES)
+
+/**
+ * Convert a `resource:verb` scope string into the better-auth permission
+ * shape (`{ resource: ['verb'] }`). Kebab-case resources collapse to
+ * camelCase to match the @iedora/auth statement key names.
+ */
+export function scopeToPermission(scope: Scope): Record<string, string[]> {
+  const [resource, action] = scope.split(':')
+  if (!resource || !action) {
+    throw new Error(`[auth/scopes] malformed scope ${scope}`)
+  }
+  const camel = resource.replace(/-(\w)/g, (_, c: string) => c.toUpperCase())
+  return { [camel]: [action] }
+}

@@ -1,61 +1,52 @@
 import 'server-only'
-import { cookies } from 'next/headers'
+import { headers } from 'next/headers'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/shared/db/client'
 import { restaurant } from '@/shared/db/schema'
-import { env } from '@/shared/env'
-import { sessionStore } from '@/features/sessions'
-import type { AuthGateway } from '../ports'
-import {
-  makeSessionCookie,
-  SESSION_COOKIE,
-  type Session,
-} from './session'
+import { auth } from '@/shared/auth'
+import type { AuthGateway, Session } from '../ports'
 
 /**
- * Production AuthGateway. Wraps the menu session cookie (jose JWE → opaque
- * pointer) + the server-side session store + Drizzle (restaurant lookup
- * scoped to a tenant id). Tenant-membership checks run against Zitadel
- * via `@/features/identity` — see the use-cases.
+ * Production AuthGateway. Delegates session reads to better-auth (which
+ * owns the cookie + the server-side row in the `core` schema) and
+ * resolves restaurant lookups against the menu DB.
  *
- * Server-only: `cookies()` and the Drizzle client never belong on the client.
+ * Server-only: the `headers()` call and the Drizzle client never belong
+ * on the client.
  */
-const sessions = makeSessionCookie(env.MENU_SESSION_SECRET)
+async function readSession(): Promise<Session | null> {
+  const s = await auth.api.getSession({ headers: await headers() })
+  if (!s?.user) return null
 
-async function readSessionCookie(): Promise<Session | null> {
-  const jar = await cookies()
-  const raw = jar.get(SESSION_COOKIE)?.value
-  if (!raw) return null
-
-  const pointer = await sessions.open(raw)
-  if (!pointer) return null
-
-  // Authoritative lookup. The store rejects revoked + expired rows, so a
-  // grant-change webhook or admin revoke takes effect on the very next
-  // request — no waiting on the 7d cookie TTL.
-  const record = await sessionStore.get(pointer.sid)
-  if (!record) return null
-
-  // Cheap tamper check: cookie's `sub` must match the row's `userId`. The
-  // JWE already authenticates the payload (A256GCM), but a mismatch here
-  // would catch a server-side row swap and is a free invariant to assert.
-  if (record.userId !== pointer.sub) return null
-
+  const role = s.user.role ?? null
   return {
     user: {
-      id: record.userId,
-      email: record.email,
-      name: record.name,
-      roles: record.roles,
-      permissions: record.permissions,
+      id: s.user.id,
+      email: s.user.email,
+      name: s.user.name,
+      role,
+      // Back-compat shim — the previous Zitadel implementation surfaced
+      // `roles` as an array. With better-auth, the cross-tenant role is
+      // a scalar (`user.role`); we project it into a single-element
+      // array so consumers calling `.roles.includes('iedora-admin')`
+      // keep working without changes.
+      roles: role ? [role] : [],
+      // Always empty — granular per-resource checks go through
+      // `requireScope()` (which calls `auth.api.hasPermission`), not
+      // through a flat list on the session.
+      permissions: [],
     },
-    expiresAt: Math.floor(record.expiresAt.getTime() / 1000),
-    sid: record.id,
+    session: {
+      id: s.session.id,
+      activeOrganizationId: s.session.activeOrganizationId ?? null,
+    },
+    sid: s.session.id,
+    expiresAt: Math.floor(new Date(s.session.expiresAt).getTime() / 1000),
   }
 }
 
 export const drizzleAuthGateway: AuthGateway = {
-  getSession: readSessionCookie,
+  getSession: readSession,
 
   async findRestaurantByIdInOrg({ restaurantId, organizationId }) {
     const rows = await db

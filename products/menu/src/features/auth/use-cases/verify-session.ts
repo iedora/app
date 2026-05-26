@@ -4,12 +4,12 @@ import { signInUrl } from '@/shared/brand'
 import type { AuthGateway } from '../ports'
 
 /**
- * Resolves the current session. Redirects to menu's local /api/auth/login
- * (which mints PKCE+state cookies and bounces to Zitadel) when the caller
- * is unauthenticated; returns the (non-null) session otherwise.
+ * Resolves the current session. Redirects to /sign-in when the caller is
+ * unauthenticated; returns the (non-null) session otherwise.
  *
- * The redirect target is on menu's OWN host so the session cookie set on
- * the OIDC callback is same-origin with the page that asked for it.
+ * Backed by better-auth — the cookie is set by the @iedora/auth instance,
+ * which scopes cookies on the parent domain (`.iedora.com`) so SSO works
+ * across iedora products.
  */
 export async function verifySession(auth: AuthGateway) {
   const session = await auth.getSession()

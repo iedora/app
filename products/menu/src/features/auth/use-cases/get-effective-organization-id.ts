@@ -1,21 +1,19 @@
 import 'server-only'
-import type { IdentityGateway } from '@/features/identity'
+import type { AuthGateway } from '../ports'
 
 /**
- * Resolves the user's effective organizationId by asking Genkan (via the
- * identity slice). Genkan is the source of truth for org membership — we
- * pick the first organization it returns. Returns null only when the user
- * truly has no organizations yet (onboarding case).
+ * Resolves the org the caller is currently acting on. better-auth's
+ * organization plugin stores this on `session.activeOrganizationId`,
+ * so the lookup collapses to a single session read.
  *
- * Why this lives in the auth slice (and not identity): callers reach for
- * it as part of "tell me who I am and what tenant context to render in".
- * The identity slice owns the I/O; the auth slice owns the policy
- * decision (which org to default to when there's more than one).
+ * The legacy signature accepted `(identity, userId)` and fell back to
+ * the user's first membership when no active org was set; the better-auth
+ * model puts that fallback on `setActiveOrganization` instead — once an
+ * org is chosen, it sticks on the session row.
  */
 export async function getEffectiveOrganizationId(
-  identity: IdentityGateway,
-  userId: string,
+  auth: AuthGateway,
 ): Promise<string | null> {
-  const orgs = await identity.listOrganizations(userId)
-  return orgs[0]?.id ?? null
+  const session = await auth.getSession()
+  return session?.session.activeOrganizationId ?? null
 }

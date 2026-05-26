@@ -11,7 +11,7 @@ import type { AuthGateway, Session } from '../ports'
  * scoping, so the role is the only gate.
  *
  * Failure modes:
- *   - no session     → bounce to /api/auth/login (same as `verifySession`)
+ *   - no session     → bounce to /sign-in (same as `verifySession`)
  *   - missing role   → 404. We hide the existence of the surface from
  *                      tenant users; a 403 would advertise it.
  */

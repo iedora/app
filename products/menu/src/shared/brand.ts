@@ -17,17 +17,17 @@ export const CONTACT_EMAIL = `hello@${BRAND_DOMAIN}`
 export const APP_HOSTNAME = `menu.${BRAND_DOMAIN}`
 export const APP_URL = `https://${APP_HOSTNAME}`
 
-// Sign-in / sign-out routes on the menu domain. The login route is a
-// server-side handler that mints the OIDC state+PKCE cookies and 302s the
-// browser to Zitadel's /authorize endpoint — see
-// `src/app/api/auth/login/route.ts`.
-export const SIGN_IN_PATH = '/api/auth/login'
-export const SIGN_OUT_PATH = '/api/auth/logout'
+// Sign-in / sign-out routes on the menu domain. Both are page routes —
+// `/sign-in` and `/sign-out` — backed by better-auth: the page calls
+// `authClient.signIn.email(...)` / `authClient.signOut()` which hits
+// `/api/auth/*` under the hood (see `src/app/api/auth/[...all]`).
+export const SIGN_IN_PATH = '/sign-in'
+export const SIGN_OUT_PATH = '/sign-out'
 
 /**
- * Helper for client + server callers: build a `/api/auth/login?next=…` URL
- * that the proxy + DAL redirect into when no session cookie is present.
- * `next` MUST be a same-origin path (the login handler re-validates).
+ * Helper for client + server callers: build a `/sign-in?next=…` URL the
+ * proxy + DAL redirect into when no session is present. `next` MUST be a
+ * same-origin path (the sign-in page re-validates).
  */
 export function signInUrl(next?: string): string {
   if (!next) return SIGN_IN_PATH
