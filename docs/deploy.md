@@ -5,11 +5,15 @@
 
 **Operational lifecycle — three Days, jump to whichever fits:**
 
-| | What | Section |
+| | What | Runbook |
 |---|---|---|
-| **Day 0** | Wipe everything. Cloud + Tofu state + BWS managed-keys → zero. | [§ Day 0](#day-0--wipe-everything-clean-slate) |
-| **Day 1** | Cold-start deploy. Empty cloud → working `menu.iedora.com` + `core.iedora.com` + `iedora.com`. | [§ Day 1](#day-1--cold-start-deploy) |
-| **Day 2** | Ongoing operations. Logs, psql, backup/restore, secret rotation, troubleshooting. | [§ Day 2](#day-2--ongoing-operations) |
+| **Day 0** | Wipe everything. Cloud + Tofu state + BWS managed-keys → zero. | [`ops/day-0.md`](ops/day-0.md) |
+| **Day 1** | Cold-start deploy. Empty cloud → working `menu.iedora.com` + `core.iedora.com` + `iedora.com`. | [`ops/day-1.md`](ops/day-1.md) |
+| **Day 2** | Ongoing operations. Logs, psql, backup/restore, secret rotation, auth re-bootstrap. | [`ops/day-2.md`](ops/day-2.md) |
+| Troubleshooting | Failure modes + recovery, indexed by symptom. | [`ops/troubleshooting.md`](ops/troubleshooting.md) |
+
+This document is the **architecture + pipeline reference**. The
+day-by-day runbooks live in [`ops/`](ops/README.md).
 
 ## The pipeline
 
@@ -88,7 +92,7 @@ old container while Stage 4 is mid-pull.
 
 Implementation: `gateMigrations` at
 [`infra/app-state/menu-db-migrations/lint.go`](../infra/app-state/menu-db-migrations/lint.go)
-scans `apps/web/drizzle/*.sql` for `DROP COLUMN` / `DROP TABLE`
+scans `products/menu/drizzle/*.sql` for `DROP COLUMN` / `DROP TABLE`
 / `ALTER COLUMN ... TYPE` / `RENAME COLUMN` / `RENAME TABLE`. In
 live mode, each destructive statement must carry an inline
 `-- iedora:expand-contract phase=contract references=<expand-tag>`
@@ -566,297 +570,25 @@ openobserve) too via the dep closure in the orchestrator.
 
 ## Day 2 — Ongoing operations
 
-Most day-2 work is SSH against the box. Resolve the host once and re-use:
-
-```bash
-HOST=$(bin/iedora-env --stage iac -- tofu -chdir=infra/iac/tofu\1output -raw hetzner_ipv4)
-
-# Logs
-ssh root@$HOST docker logs -f --tail=200 infra-web        # or infra-postgres / infra-cloudflared / …
-
-# psql
-ssh -t root@$HOST docker exec -it infra-postgres psql -U postgres
-
-# Force a pg_dump now
-ssh root@$HOST docker exec infra-pg-backup /infra-pg-backup backup
-
-# Restore latest dump
-ssh -t root@$HOST docker exec -it infra-pg-backup /infra-pg-backup restore
-
-# Open the OpenObserve UI via SSH tunnel (OO is internal-only)
-ssh -L 5080:localhost:5080 root@$HOST   # then open http://localhost:5080
-```
-
-### Secret rotation
-
-| Secret kind | How to rotate |
-|-------------|---------------|
-| `IAC_BOOTSTRAP_*` (HCLOUD, CF, GH, GHCR, etc.) | Regenerate at the source provider, then `bws secret edit <id>` with the new value. |
-| `IAC_*` (Tofu-minted) | `bin/iedora-env --stage iac -- tofu -chdir=infra/iac/tofu\1apply -replace=random_password.<name>`. The `terraform_data.bws_sync_autogen` write-through pushes the new value to BWS automatically. |
-| `DEPLOY_MENU_IEDORA_CORE_SECRET` | `bws secret delete <id>`, then `bin/iedora-env bin/iedora deploy menu`. `dockerOnHetzner.appSecrets` re-mints. All active better-auth sessions invalidate (users re-authenticate). |
-
-### Auth re-bootstrap (drop + rebuild the `core` schema)
-
-If `core` data is unrecoverable (e.g. dev mistake, post-incident
-sanitise) and a clean better-auth schema is wanted without touching
-`menu`:
-
-```bash
-HOST=$(bin/iedora-env tofu -chdir=infra/iac/tofu output -raw hetzner_ipv4)
-ssh -t root@$HOST docker exec -it infra-postgres psql -U postgres -c 'DROP DATABASE core;'
-bin/iedora-env bin/iedora app apply   # core-db-migrations re-creates from drizzle/
-bin/iedora-env bin/iedora deploy menu  # re-mints DEPLOY_MENU_IEDORA_CORE_SECRET on next sign-in
-```
-
-`menu` rows referencing the wiped `core` org-ids become orphan FKs (text
-columns, not enforced) — re-onboard from `/sign-up` to re-seed.
-
-### Backups
-
-`infra-pg-backup` runs the Go binary
-[`infra/iac/cmd/infra-pg-backup/`](../infra/iac/cmd/infra-pg-backup/) in daemon
-mode on `SCHEDULE=@daily`: `pg_dumpall` every database on
-`infra-postgres` → R2 (`iedora-data` bucket, `pg/` prefix),
-GPG-encrypted with `IAC_BACKUP_PASSPHRASE`. The S3 client is
-the pure-Go SigV4 implementation at [`internal/r2`](../internal/r2);
-no `aws` CLI in the image.
-
-Restore: `ssh -t root@$HOST docker exec -it infra-pg-backup /infra-pg-backup restore`.
-
-Retention: 14 days (`BACKUP_KEEP_DAYS=14`).
-
-**Don't rotate `IAC_BACKUP_PASSPHRASE` casually** —
-previously-encrypted dumps become unreadable. Pre-launch this is
-acceptable; post-launch use a dual-passphrase window.
+Moved to [`ops/day-2.md`](ops/day-2.md) — logs, psql, backup/restore,
+secret rotation, auth re-bootstrap.
 
 ## Day 0 — Wipe everything (clean slate)
 
-When the goal is a TRUE zero state — no cloud resources, no Tofu state,
-nothing for the next deploy to inherit. Use this before a Day 1 from
-scratch.
-
-The operator needs `BWS_ACCESS_TOKEN` in their shell and `bws / tofu /
-rclone / curl / jq` on PATH.
-
-```bash
-# 1. Tear down everything Tofu manages (VPS, DNS, Tunnel, R2 buckets,
-#    R2 tokens, BWS IAC_* keys). Destroy-hooks purge each R2 bucket
-#    via rclone before the API DELETE.
-bin/iedora-env tofu -chdir=infra/iac/tofu init
-bin/iedora-env tofu -chdir=infra/iac/tofu destroy -auto-approve
-
-# If the Cloudflare tunnel DELETE 400s with "active connections", wait
-# 2–3 min for the CF edge to drop the cloudflared connector and retry:
-until bin/iedora-env tofu -chdir=infra/iac/tofu destroy -auto-approve; do sleep 30; done
-
-# 2. Verify zero orphans (anything created outside Tofu's awareness).
-bin/iedora-env bash -c '
-  curl -fsS -H "Authorization: Bearer $IAC_BOOTSTRAP_HCLOUD_TOKEN" \
-    https://api.hetzner.cloud/v1/servers | jq -r ".servers[] | .name"
-  ZONE=$(curl -fsS -H "Authorization: Bearer $IAC_BOOTSTRAP_CLOUDFLARE_API_TOKEN" \
-    "https://api.cloudflare.com/client/v4/zones?name=iedora.com" | jq -r ".result[0].id")
-  curl -fsS -H "Authorization: Bearer $IAC_BOOTSTRAP_CLOUDFLARE_API_TOKEN" \
-    "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records" \
-    | jq -r ".result[] | \"\(.type) \(.name)\""
-  curl -fsS -H "Authorization: Bearer $IAC_BOOTSTRAP_CLOUDFLARE_API_TOKEN" \
-    "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/cfd_tunnel?is_deleted=false" \
-    | jq -r ".result[] | .name"
-'
-# Expect: nothing iedora-shaped. The `iedora-tofu-state` R2 bucket and
-# `iedora-tofu-state-r2` CF token survive — they're Stage -1 (next step).
-```
-
-**Optional — Day 0 deep**: nuke the Stage -1 state bucket + scoped
-token too. After this, the next deploy MUST re-run
-`bin/state-bucket-bootstrap` (which is otherwise idempotent and a fast
-no-op on warm runs).
-
-```bash
-bin/iedora-env bash -c '
-  TOKEN="$IAC_BOOTSTRAP_CLOUDFLARE_API_TOKEN"
-  # Revoke the R2-scoped state token.
-  TID=$(curl -fsS -H "Authorization: Bearer $TOKEN" "https://api.cloudflare.com/client/v4/user/tokens?per_page=50" \
-        | jq -r ".result[] | select(.name==\"iedora-tofu-state-r2\") | .id")
-  [ -n "$TID" ] && curl -fsS -X DELETE -H "Authorization: Bearer $TOKEN" \
-    "https://api.cloudflare.com/client/v4/user/tokens/$TID" >/dev/null
-  # Delete the state bucket.
-  curl -fsS -X DELETE -H "Authorization: Bearer $TOKEN" \
-    "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets/iedora-tofu-state" >/dev/null
-  # Drop the BWS keys that pointed at them.
-  for K in IAC_BOOTSTRAP_TOFU_STATE_ACCESS_KEY IAC_BOOTSTRAP_TOFU_STATE_SECRET_KEY IAC_BOOTSTRAP_TOFU_STATE_BUCKET; do
-    ID=$(bws secret list "$BWS_PROJECT_ID" -o json | jq -r ".[] | select(.key==\"$K\") | .id")
-    [ -n "$ID" ] && bws secret delete "$ID"
-  done
-'
-```
-
-**What survives Day 0** (operator-managed `IAC_BOOTSTRAP_*` in BWS):
-`CLOUDFLARE_API_TOKEN`, `STATE_PASSPHRASE`, `HCLOUD_TOKEN`,
-`GHCR_TOKEN`, `SSH_PRIVATE_KEY`, `OPENOBSERVE_ROOT_USER_EMAIL`. Plus
-the GH Actions secret `BWS_ACCESS_TOKEN`. These are the seven things
-you NEVER want Tofu to manage; everything else is Tofu-minted on
-Day 1.
+Moved to [`ops/day-0.md`](ops/day-0.md) — the full destroy procedure
+(tofu destroy with the active-tunnel retry loop, orphan-inventory via
+API, optional Stage -1 deep-wipe).
 
 ## Day 1 — Cold-start deploy
 
-From an empty cloud → working production. Two flavours:
-
-- **First time on a fresh laptop** — needs the prerequisites in
-  [§ Day 1 prerequisites](#day-1-prerequisites) one-off.
-- **After a Day 0 wipe** — prerequisites already in BWS; skip straight
-  to [§ Day 1 deploy](#day-1-deploy).
-
-### Day 1 prerequisites
-
-One-off setup. After this, the same `BWS_ACCESS_TOKEN` + the seven
-operator-managed bootstrap keys are reused across every Day 0/1 cycle.
-
-1. **Local tools**: `brew install opentofu gh bitwarden/tap/bws rclone`,
-   Docker Desktop or OrbStack, `gh auth login` with `write:packages`.
-
-2. **Cloudflare API token** at dash.cloudflare.com → API Tokens:
-   - Account · Account Settings · Read
-   - Account · Workers R2 Storage · Edit
-   - Zone · DNS · Edit (scoped to your zone)
-   - User · API Tokens · Edit (Tofu mints sub-tokens)
-
-3. **SSH key**: `ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519`
-   (skip if you already have one). Tofu registers
-   `~/.ssh/id_ed25519.pub` as `hcloud_ssh_key.operator`.
-
-4. **Populate BWS** — only `BWS_ACCESS_TOKEN` needs to be in your
-   shell (`export BWS_ACCESS_TOKEN=0.…` in `~/.secrets` is the usual
-   pattern). Then:
-
-   ```bash
-   PROJECT_ID=$(bws project list -o json | jq -r '.[] | select(.name=="iedora-deploy") | .id')
-   for KEY in IAC_BOOTSTRAP_CLOUDFLARE_API_TOKEN IAC_BOOTSTRAP_STATE_PASSPHRASE \
-              IAC_BOOTSTRAP_HCLOUD_TOKEN IAC_BOOTSTRAP_GHCR_TOKEN \
-              IAC_BOOTSTRAP_SSH_PRIVATE_KEY IAC_BOOTSTRAP_OPENOBSERVE_ROOT_USER_EMAIL; do
-     read -s -p "$KEY: " V && echo
-     bws secret create "$KEY" "$V" "$PROJECT_ID" -o none
-   done
-   ```
-
-   Source-of-truth notes:
-   - `IAC_BOOTSTRAP_STATE_PASSPHRASE`: `openssl rand -hex 32` — encrypts Tofu state.
-   - `IAC_BOOTSTRAP_HCLOUD_TOKEN`: Hetzner console → Security → API tokens (R/W).
-   - `IAC_BOOTSTRAP_GHCR_TOKEN`: classic PAT with `write:packages` (fine-
-     grained + personal account + GHCR is GitHub's worst-supported
-     combo — keep classic until iedora moves to an org).
-   - `IAC_BOOTSTRAP_SSH_PRIVATE_KEY`: `cat ~/.ssh/id_ed25519`.
-
-   The `IAC_BOOTSTRAP_TOFU_STATE_*` keys are minted by
-   `state-bucket-bootstrap` (next step) — DO NOT populate them.
-
-5. **Set the bootstrap GH Actions secret** the CI workflow needs
-   BEFORE it can hydrate the BWS env. Just ONE — `BWS_ACCESS_TOKEN`.
-   It can NOT be Tofu-managed (chicken-egg: `infra-deploy.yml` reads
-   it to run Tofu in the first place). One-time, survives every
-   `tofu destroy`:
-
-   ```bash
-   gh secret set BWS_ACCESS_TOKEN --repo eduvhc/iedora
-   ```
-
-   That's the only thing CI needs out-of-band. Every other credential
-   is either in BWS or auto-derived by `bin/iedora-env`:
-
-   - `BWS_PROJECT_ID`         → first project from `bws project list`.
-   - `CLOUDFLARE_ACCOUNT_ID`  → CF `/accounts` API.
-   - `MENU_PUBLIC_HOSTNAME`   → `variables.tf` default
-                                 (`menu.iedora.com`).
-
-### Day 1 deploy
-
-The canonical sequence, top to bottom. ~6–8 min cold; idempotent
-(safe to re-run any step).
-
-```bash
-# 0. Preflight — fails fast if PATH, BWS, or bootstrap secrets are off.
-bin/iedora-env bin/iedora doctor
-
-# 1. Stage -1 — R2 bucket + scoped API token for Tofu state.
-#    Idempotent: writes IAC_BOOTSTRAP_TOFU_STATE_{ACCESS_KEY,SECRET_KEY,
-#    BUCKET} to BWS. Day-2 fast path on warm runs.
-bin/iedora-env bin/state-bucket-bootstrap
-
-# 2. Stage 2 — the shared estate. Provisions Hetzner CAX11 + cloud-init
-#    drops the compose stack (postgres, openobserve, cloudflared,
-#    infra-pg-backup), renders the CF Tunnel + DNS records, mints
-#    every IAC_* secret and writes them to BWS.
-bin/iedora-env tofu -chdir=infra/iac/tofu init -upgrade
-bin/iedora-env tofu -chdir=infra/iac/tofu apply -auto-approve
-
-# 3. Stage 3 — app-state reconcilers. Runs in order:
-#    - core-db-migrations    drizzle-kit migrate against the `core` DB
-#                            (better-auth schema). FIRST so step 4's
-#                            menu container reads a migrated core.session.
-#    - menu-db-migrations    drizzle-kit migrate against the `menu` DB.
-#    - openobserve-dashboards push embedded JSONs via SSH-L tunnel.
-bin/iedora-env bin/iedora app apply
-
-# 4. Stage 4 — deploy the menu container. Mints DEPLOY_IEDORA_CORE_SECRET
-#    on first run (better-auth session signing key, persisted to BWS).
-bin/iedora-env bin/iedora deploy menu
-
-# 6. Smoke test.
-curl -fsS https://menu.iedora.com/up                                    # {"ok":true,"db":"ok"}
-curl -fsS -o /dev/null -w "%{http_code}\n" https://core.iedora.com/sign-in   # 200
-curl -fsS -o /dev/null -w "%{http_code}\n" https://iedora.com/                # 200 (apex → /house)
-```
-
-If anything in 2–4 fails, the failing stage is the recovery point —
-each stage is independently re-runnable. Common failures live in
-[§ Failure modes / troubleshooting](#failure-modes--troubleshooting).
+Moved to [`ops/day-1.md`](ops/day-1.md) — prerequisites + the canonical
+deploy sequence (state-bucket-bootstrap → tofu apply → core schema →
+app apply → deploy menu → smoke test).
 
 ## Failure modes / troubleshooting
 
-The ones operators are likely to hit. Most are recoverable by re-running
-the affected stage; the rest have explicit recovery steps below.
-
-### Tofu apply / destroy
-
-| Symptom | Cause | Recovery |
-|---------|-------|----------|
-| `Error: error during placement (resource_unavailable, ...)` on `hcloud_server.iedora` | Hetzner datacenter (default `fsn1`) is temporarily out of capacity for the chosen SKU (e.g. CAX11). | Wait 5–10 min, OR pass `TF_VAR_hetzner_location=nbg1` (Nuremberg) or `hel1` (Helsinki) — same EU backbone, similar latency from PT. Validated tier list in `variables.tf::hetzner_location`. |
-| `Error acquiring the state lock` (HTTP 412 `PreconditionFailed`) | Previous `tofu apply` was Ctrl-C'd before releasing the R2-backend lock. Lock ID + path are in the error body. | `bin/iedora-env tofu -chdir=infra/iac/tofu force-unlock -force <LOCK_ID>`. Safe when you know the prior operation is dead (the error shows `Who:` so you can confirm). |
-| `tofu destroy` reports `0 destroyed` but the Hetzner box / CF DNS / R2 buckets still exist | A previous `tofu apply` was cancelled mid-run; resources were created on the provider side but never persisted to the state file. State is empty so destroy has nothing to do. | Cleanup via API directly. Inventory: `curl ... https://api.hetzner.cloud/v1/servers`, `curl ... /accounts/$AID/r2/buckets`, `curl ... /zones/$ZID/dns_records`. Delete by ID. |
-| Destroy fails: bucket DELETE returns 409 / hangs | `rclone purge` skipped (binary missing or no creds) and the R2 bucket has objects. | `brew install rclone` if missing. Re-run destroy. If buckets stay, manually `rclone purge :s3:<bucket>` with `RCLONE_S3_*` env (see `destroy-hooks.tf`). |
-| `bin/iedora-env` aborts with `RSA: command not found` on tempfile line N | Older versions of iedora-env sourced `bws secret list -o env` directly; multi-line values (SSH private key) break bash quoting. | Pull latest; the helper now reads JSON + base64-decodes per key. If still hitting: `git pull && rm -rf node_modules` + re-test. |
-
-### Stage 2 — infra (Hetzner / Cloudflare)
-
-| Symptom | Cause | Recovery |
-|---------|-------|----------|
-| `iedora.service failed because the control process exited with error code` after first apply, log says `service "X" refers to undefined volume "Y": invalid compose project` | HCL volume map key doesn't match the name referenced in the service's `volumes` list. yamlencode emits keys verbatim. | Quote hyphenated keys in `compose.tf::local.compose.volumes` — `"my-data" = { name = "my-data" }` — so the key matches the service reference. |
-| All containers restart on a small env change | Older `iedora.service` ran `systemctl restart` which fires `ExecStop = docker compose down` → `ExecStart` (full down/up). | Pull latest. The unit now has `ExecReload = docker compose up -d --remove-orphans` and `sync.tf` calls `systemctl reload` instead of restart — only containers whose config actually changed are recreated. |
-| BWS destroy hooks report `429 Too Many Requests` and leave 1–2 IAC_* keys behind | BWS mutating-call rate limit is ~1/s server-side. Older code fired N parallel `terraform_data.bws_sync_*` provisioners and saturated it. | Pull latest. `bws-sync` (single resource, sequential batch) replaces the per-key resources. Lingering keys: drop directly via `bws secret delete <id>`. |
-
-### Stage 3 — app state
-
-| Symptom | Cause | Recovery |
-|---------|-------|----------|
-| `Host key verification failed` from a configurator's SSH call | Operator's `~/.ssh/known_hosts` pins a stale key for the Hetzner IP (recycled across destroy/apply). | `internal/ssh.Client` uses `UserKnownHostsFile=/dev/null + StrictHostKeyChecking=no` — pull latest. For ad-hoc `ssh root@$HOST` from the laptop: `ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@$HOST`. |
-| `menu-db-migrations: connection refused` | `infra-postgres` isn't up. | `ssh root@$HOST docker ps`. If missing, `bin/iedora-env tofu -chdir=infra/iac/tofu apply`. |
-
-### Stage 4 — deploy
-
-| Symptom | Cause | Recovery |
-|---------|-------|----------|
-| `tofu output X empty` | Stage 2 wasn't run, OR an `outputs.tf` entry was added but not applied. | `bin/iedora-env tofu -chdir=infra/iac/tofu apply`. |
-| `unauthorized` from `docker pull ghcr.io/...` | `IAC_BOOTSTRAP_GHCR_TOKEN` expired OR not in scope. | Regenerate the GHCR PAT, `bws secret edit`. The configurator's `docker login` step uses `--password-stdin` so the token never appears in `docker history`. |
-| `Type 'string \| undefined' is not assignable to parameter of type 'string'` in `proxy.ts` during `next build` | `noUncheckedIndexedAccess` is on; `(host ?? '').split(':')[0]` is `string \| undefined`. | `… .split(':')[0] ?? ''`. Or any guard before `houseHosts.has(host)`. |
-| `iedora.com` / `menu.iedora.com` → 502 from the tunnel | `infra-web` upstream isn't running (Stage 4 didn't deploy, or container crashed). | `ssh root@$HOST docker ps` — confirm `infra-web` listed. If missing: `bin/iedora-env bin/iedora deploy menu`. |
-| Hot-swap window (~150ms) where `menu.iedora.com` 502s mid-deploy | The brief alias-unbind during `docker network disconnect/connect`. | Retry the request; the alias rebinds within the second. If persistent: both `infra-web` and `infra-web-next` running means the rename never landed — rename manually. |
-
-### CI
-
-| Symptom | Cause | Recovery |
-|---------|-------|----------|
-| Any CI workflow fails with `BWS_ACCESS_TOKEN must be set in your shell` | `BWS_ACCESS_TOKEN` GH Actions secret was removed (most often by `tofu destroy` if it was Tofu-managed historically, or never set on a fresh repo). | Set it manually — one-time, survives destroy: `gh secret set BWS_ACCESS_TOKEN --repo eduvhc/iedora`. Then re-run the workflow. CI uses this token to hydrate every other secret from BWS via `bin/iedora-env`. |
-| Stage 3 / 4 workflow fails with `Error loading key "/home/runner/.ssh/id_ed25519": error in libcrypto` | The SSH-key-write step couldn't read `$IAC_BOOTSTRAP_SSH_PRIVATE_KEY` from the BWS-hydrated env — usually means the BWS secret itself was deleted or never set. | `bws secret list "$BWS_PROJECT_ID"` to confirm presence; recreate with `bws secret create IAC_BOOTSTRAP_SSH_PRIVATE_KEY "$(cat ~/.ssh/id_ed25519)" "$BWS_PROJECT_ID"` if missing. |
-| `menu.yml` E2E run hangs / fails after long re-arrangement | Stale CI cache (e.g. node_modules, Playwright browsers) confused by a workspaces refactor. | Re-run the workflow with `gh run rerun <run-id> --failed`. If still red: bump the cache key or delete the cache via the Actions UI. |
+Moved to [`ops/troubleshooting.md`](ops/troubleshooting.md) — symptom →
+cause → recovery table.
 
 ## IaC test layers
 
