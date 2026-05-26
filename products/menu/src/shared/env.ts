@@ -21,7 +21,23 @@ const serverSchema = z.object({
   // Database ------------------------------------------------------------
   DATABASE_URL: z.url(),
 
-  // Auth (Zitadel native OIDC) ------------------------------------------
+  // Auth (@iedora/auth — better-auth) -----------------------------------
+  // Postgres URL pointing at the `core` database (better-auth tables).
+  // Same Postgres instance as DATABASE_URL — different DB.
+  CORE_DATABASE_URL: z.url(),
+  // ≥ 32-char secret used by better-auth to sign session tokens.
+  IEDORA_AUTH_SECRET: z.string().min(32),
+  // Canonical URL of the auth API. Today: menu's own origin
+  // (`MENU_PUBLIC_URL`); when the `core` product lands this becomes
+  // `https://core.iedora.com` and menu just consumes the cookie.
+  IEDORA_AUTH_BASE_URL: z.url(),
+  // Comma-separated allow-list for CSRF (browser-origin checks).
+  IEDORA_AUTH_TRUSTED_ORIGINS: z.string().default(''),
+  // Parent-domain cookie scope. Production: `.iedora.com` (default).
+  // Dev: `localhost`. Empty string falls back to better-auth's default.
+  IEDORA_AUTH_COOKIE_DOMAIN: z.string().default('.iedora.com'),
+
+  // Auth (Zitadel native OIDC — being removed) --------------------------
   // Menu's public base URL — used to build the OIDC redirect_uri and
   // post-logout URI. Must match the values declared in TF for
   // zitadel_application_oidc.menu (infra/iac/tofu/zitadel.tf).
