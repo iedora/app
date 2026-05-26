@@ -10,13 +10,10 @@
  * against a separate PGLite instance via the factory.
  */
 process.env.DATABASE_URL ||= 'postgres://test:test@localhost/test'
+process.env.CORE_DATABASE_URL ||= 'postgres://test:test@localhost/core_test'
+process.env.IEDORA_AUTH_SECRET ||= 'a'.repeat(48)
+process.env.IEDORA_AUTH_BASE_URL ||= 'http://localhost:3000'
 process.env.MENU_PUBLIC_URL ||= 'http://localhost:3000'
-process.env.MENU_SESSION_SECRET ||= 'a'.repeat(48)
-process.env.ZITADEL_ISSUER_URL ||= 'http://localhost:3001'
-process.env.ZITADEL_OAUTH_CLIENT_ID ||= 'menu-test'
-process.env.ZITADEL_OAUTH_CLIENT_SECRET ||= 'test-secret'
-process.env.ZITADEL_MANAGEMENT_TOKEN ||= 'test-pat'
-process.env.ZITADEL_ACTION_SIGNING_KEY ||= 'test-signing-key'
 process.env.S3_ENDPOINT ||= 'http://localhost:4566'
 process.env.S3_REGION ||= 'us-east-1'
 process.env.S3_ACCESS_KEY ||= 'test'

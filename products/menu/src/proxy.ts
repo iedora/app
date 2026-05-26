@@ -1,15 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { SESSION_COOKIE } from '@/features/auth/adapters/session'
 import { publicUrl } from '@/shared/url'
+import { signInUrl } from '@/shared/brand'
 
 const protectedPrefixes = ['/dashboard', '/onboarding']
 
 /**
  * Hosts served by the iedora.com brand page (instead of menu's app).
- * Caddy forwards both `iedora.com` and `www.iedora.com` to the same
- * upstream; the proxy decides what to render based on Host.
+ * The CF Tunnel routes both `iedora.com` and `www.iedora.com` to the
+ * same upstream; the proxy decides what to render based on Host.
  */
 const houseHosts = new Set(['iedora.com', 'www.iedora.com'])
+
+/**
+ * better-auth's session cookie name. Used here only as an OPTIMISTIC
+ * hint (cookie present ⇒ likely signed in) — the real session lookup
+ * happens in the DAL via `auth.api.getSession()`. AGENTS.md hard rule #5.
+ *
+ * Default name in better-auth is `better-auth.session_token` (with the
+ * cross-subdomain config we set, it stays this shape — only the cookie
+ * `Domain` attribute changes).
+ */
+const SESSION_COOKIE = 'better-auth.session_token'
 
 /**
  * Two jobs in order of precedence:
@@ -20,14 +31,11 @@ const houseHosts = new Set(['iedora.com', 'www.iedora.com'])
  *      everything iedora.com serves. Direct visits to
  *      `menu.iedora.com/house*` 404 (see the guard below).
  *
- *   2. **Optimistic auth gate** for menu's protected prefixes —
- *      AGENTS.md hard rule #5. Real auth runs in the DAL; this only
- *      avoids a wasted RSC render when the caller obviously isn't
- *      signed in. Redirect target is `/api/auth/login?next=…` and the
- *      URL goes through `publicUrl()` (not `req.nextUrl.clone()`)
- *      because Caddy fronts Next in prod — `req.nextUrl` carries the
- *      internal bind `http://0.0.0.0:3000` which the browser refuses
- *      to follow.
+ *   2. **Optimistic auth gate** for menu's protected prefixes. Real
+ *      auth runs in the DAL via `verifySession()`. The redirect goes
+ *      through `publicUrl()` because Cloudflare Tunnel fronts Next in
+ *      prod — `req.nextUrl` carries the internal bind `http://0.0.0.0:3000`
+ *      which the browser can't follow.
  */
 export default function proxy(req: NextRequest) {
   const host = (req.headers.get('host') ?? '').toLowerCase().split(':')[0] ?? ''
@@ -35,7 +43,6 @@ export default function proxy(req: NextRequest) {
 
   // 1. House host → rewrite under /house.
   if (houseHosts.has(host)) {
-    // /house is the internal target; anything else gets prefixed.
     const target = path === '/' ? '/house' : `/house${path}`
     const url = req.nextUrl.clone()
     url.pathname = target
@@ -55,7 +62,7 @@ export default function proxy(req: NextRequest) {
 
   const hasSession = req.cookies.has(SESSION_COOKIE)
   if (!hasSession) {
-    return NextResponse.redirect(publicUrl('/api/auth/login', { next: path }))
+    return NextResponse.redirect(publicUrl(signInUrl(path)))
   }
 
   return NextResponse.next()

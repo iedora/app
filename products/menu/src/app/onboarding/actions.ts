@@ -2,12 +2,10 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { headers } from 'next/headers'
 import { z } from 'zod'
 import { getEffectiveOrganizationId, getSession } from '@/features/auth'
-import {
-  createOrganization,
-  setActiveOrganization,
-} from '@/features/identity'
+import { auth } from '@/shared/auth'
 import { nextAvailableSlug, slugify } from '@/features/restaurant-slug'
 import { signInUrl } from '@/shared/brand'
 import { db } from '@/shared/db/client'
@@ -23,8 +21,6 @@ export type OnboardingFormState =
   | { error?: string; fieldErrors?: Partial<Record<keyof z.infer<typeof onboardingSchema>, string>> }
   | undefined
 
-/** The tx handle Drizzle yields to its callback. Inferred so we don't drag in
- *  the upstream generics every time we want a typed transactional helper. */
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
 async function insertRestaurantWithDefaultMenu(
@@ -68,26 +64,18 @@ export async function completeOnboarding(
   const session = await getSession()
   if (!session?.user) redirect(signInUrl('/onboarding'))
 
-  // Throttle per-user — org doesn't exist yet on first call. Fail-open by
-  // policy (cosmetic UX gate, not a brute-force surface).
   const decision = await enforceRateLimit('onboarding', `user:${session.user.id}`)
   if (!decision.ok) {
     return { error: `Too many attempts. Try again in ${decision.retryAfterSec}s.` }
   }
 
-  // Allocate the public slug HERE so the same value is consistent
-  // across the menu DB insert AND the Zitadel org create call below.
-  // Generating in the form would push the collision-handling onto the
-  // client, which both adds complexity to onboarding UX and races
-  // against concurrent operators.
+  // Allocate the public slug HERE so the same value is consistent across
+  // the menu DB insert AND the better-auth org create call below.
   const slug = await nextAvailableSlug(slugify(restaurantName))
 
-  // Existing org? Add the restaurant under it (gated by plan limit). Brand-new
-  // user? Create org on Genkan + first restaurant locally. Plans are scoped
-  // to the org so the `+ new restaurant` flow on the dashboard makes the
-  // gate meaningful — every restaurant lives under a single tenant rather
-  // than spawning a fresh one.
-  const existingOrgId = await getEffectiveOrganizationId(session.user.id)
+  // Existing org on session? Add restaurant under it (gated by plan).
+  // First-time user? Create org via better-auth + first restaurant.
+  const existingOrgId = await getEffectiveOrganizationId()
 
   if (existingOrgId) {
     const gate = await canAddRestaurant(existingOrgId)
@@ -99,7 +87,7 @@ export async function completeOnboarding(
     return addRestaurantToOrg(existingOrgId, restaurantName, slug)
   }
 
-  return createOrgAndFirstRestaurant(session.user.id, restaurantName, slug)
+  return createOrgAndFirstRestaurant(restaurantName, slug)
 }
 
 async function addRestaurantToOrg(
@@ -121,35 +109,44 @@ async function addRestaurantToOrg(
 }
 
 async function createOrgAndFirstRestaurant(
-  userId: string,
   restaurantName: string,
   slug: string,
 ): Promise<OnboardingFormState> {
-  // Create the org on Genkan first — it owns the canonical record, mints
-  // the owner membership, and returns the UUID we'll stash on the
-  // restaurant row. If this fails we surface a generic error; we don't
-  // need to roll anything back since nothing local was written yet.
-  const orgResult = await createOrganization(userId, restaurantName, slug)
-  if (!orgResult.ok) {
+  // Create the org via better-auth — it owns the org row in the `core`
+  // schema, mints an owner-role membership for the caller, and returns
+  // the id we stash on the restaurant row. The headers carry the
+  // session cookie so the API knows who the owner is.
+  let organizationId: string
+  try {
+    const org = await auth.api.createOrganization({
+      body: {
+        name: restaurantName,
+        slug,
+      },
+      headers: await headers(),
+    })
+    if (!org?.id) {
+      return { error: 'Could not create organization. Please try again.' }
+    }
+    organizationId = org.id
+  } catch (err) {
+    console.error('[onboarding] org creation failed', err)
     return { error: 'Could not create organization. Please try again.' }
   }
-  const organization = orgResult.organization
 
-  // Set this as the user's active organization on Genkan so subsequent
-  // calls to `listOrganizations` resolve it first. Best-effort — a failure
-  // here is recoverable on next sign-in.
-  await setActiveOrganization(userId, organization.id).catch(() => false)
+  // Make it the active org on the caller's session so subsequent
+  // page loads find the right tenant context. Best-effort — a failure
+  // here is recoverable on next sign-in (the user picks the org from
+  // the switcher and we set it then).
+  await auth.api.setActiveOrganization({
+    body: { organizationId },
+    headers: await headers(),
+  }).catch(() => undefined)
 
-  // Restaurant + default menu must commit together; if the transaction
-  // fails (migration, FK, etc.) we surface a generic error. Genkan-side
-  // cleanup of the org would be a follow-up call — for now we accept the
-  // tiny eventual-consistency risk (orphan empty org on the IdaaS that
-  // the user can use again next time onboarding is re-run with a
-  // different slug). The previous local-transaction-rollback-of-the-auth-
-  // org no longer makes sense across two databases.
+  // Restaurant + default menu must commit together.
   try {
     await db.transaction((tx) =>
-      insertRestaurantWithDefaultMenu(tx, organization.id, restaurantName, slug),
+      insertRestaurantWithDefaultMenu(tx, organizationId, restaurantName, slug),
     )
   } catch (err) {
     console.error('[onboarding] restaurant creation failed', err)
@@ -157,7 +154,5 @@ async function createOrgAndFirstRestaurant(
   }
 
   revalidatePath('/dashboard')
-  // Hand off to the AI menu-setup step. The user can skip from there
-  // and land on /dashboard with an empty-shelled restaurant.
   redirect(`/onboarding/menu/${slug}`)
 }

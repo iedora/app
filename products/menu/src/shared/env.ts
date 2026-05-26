@@ -37,62 +37,10 @@ const serverSchema = z.object({
   // Dev: `localhost`. Empty string falls back to better-auth's default.
   IEDORA_AUTH_COOKIE_DOMAIN: z.string().default('.iedora.com'),
 
-  // Auth (Zitadel native OIDC — being removed) --------------------------
-  // Menu's public base URL — used to build the OIDC redirect_uri and
-  // post-logout URI. Must match the values declared in TF for
-  // zitadel_application_oidc.menu (infra/iac/tofu/zitadel.tf).
+  // Menu's public base URL — used for absolute URL construction via
+  // `publicUrl()`. Must match the canonical hostname the menu serves
+  // (`https://menu.iedora.com` in prod, `http://localhost:3000` in dev).
   MENU_PUBLIC_URL: z.url(),
-
-  // 32-byte (or more) secret used to derive the JWE encryption key for
-  // the menu session cookie (jose, alg=dir, enc=A256GCM). Minted in TF
-  // by random_password.menu_session_secret. Rotating it invalidates
-  // every session — see infra/iac/tofu/zitadel.tf.
-  MENU_SESSION_SECRET: z.string().min(32),
-
-  // Zitadel issuer base URL. Discovery doc lives at
-  // `${ZITADEL_ISSUER_URL}/.well-known/openid-configuration`. Production:
-  // https://auth.iedora.com — dev points at a local stand-in.
-  ZITADEL_ISSUER_URL: z.url(),
-  ZITADEL_OAUTH_CLIENT_ID: z.string().min(1),
-  ZITADEL_OAUTH_CLIENT_SECRET: z.string().min(1),
-
-  // PAT for menu's IAM_OWNER service account. Identity slice uses this
-  // bearer for org provisioning + membership lookups. Minted in TF by
-  // zitadel_personal_access_token.menu_sa.
-  ZITADEL_MANAGEMENT_TOKEN: z.string().min(1),
-
-  // HMAC signing key for the Zitadel Actions v2 webhook that injects the
-  // flat `permissions` claim into id_token / access_token. Minted in TF
-  // by zitadel_action_target.menu_permissions (computed `signing_key`).
-  // The /api/zitadel/permissions route uses it to validate the
-  // `ZITADEL-Signature` header on every inbound call.
-  ZITADEL_ACTION_SIGNING_KEY: z.string().min(1),
-
-  // HMAC signing key for the second Zitadel Actions v2 target — fires on
-  // `user.grant.{added,changed,cascade.changed,removed,cascade.removed,
-  // deactivated,reactivated}` events. The /api/zitadel/grants-changed
-  // route validates this key and re-resolves the user's permissions in
-  // place, so a grant change reflects on the user's NEXT request even
-  // if they never re-auth. Minted by zitadel_action_target.menu_grants
-  // (computed signing_key). Optional during the rollout window — empty
-  // value disables the route (returns 503).
-  ZITADEL_GRANTS_SIGNING_KEY: z.string().default(''),
-
-  // ID of the iedora Zitadel project. The webhook uses it as `projectId`
-  // when self-healing an admin's missing iedora-admin grant on their
-  // first sign-in (the TF-time grant helper can't reach a user that
-  // doesn't exist yet — Zitadel only auto-provisions on first OIDC
-  // login). Empty in tests / build stub.
-  IEDORA_PROJECT_ID: z.string().default(''),
-
-  // Comma-separated emails that should auto-receive `iedora-admin` on
-  // first sign-in. Matches `var.iedora_admin_emails` on the TF side.
-  // Webhook reads this list, grants the role inline when the user has
-  // none, includes the expanded scopes in the same response — so the
-  // FIRST token already carries the right permissions claim. Empty
-  // disables self-heal (production behaviour falls back to the TF-side
-  // null_resource grant for users that pre-existed at apply time).
-  IEDORA_ADMIN_EMAILS: z.string().default(''),
 
   // Rate-limit kill-switch. Set 'true' in e2e tests so the slice short-circuits
   // to "always ok" and load-bearing flows (org creation, asset upload) can
