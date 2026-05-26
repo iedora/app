@@ -92,6 +92,18 @@ jobs:
           tofu_version: '1.12.0'
           tofu_wrapper: false
 
+      - name: tofu init (R2 backend)
+        # `task app:apply` shells out to `tofu output -raw hetzner_ipv4`
+        # via `bin/with-secrets --stage iac`. With Rule 2's R2 backend
+        # (`backend "s3"`), `tofu output` errors with "Backend
+        # initialization required" unless an init has run on this
+        # runner. Local state used to make this implicit; the R2
+        # backend doesn't. Idempotent + cached via `-input=false`.
+        run: |
+          set -euo pipefail
+          bin/with-secrets --stage iac -- \
+            tofu -chdir=infra/tofu init -input=false
+
       - name: Configure SSH (SA-key fetch needs SSH on cold runs)
         env:
           SSH_KEY: ${{ secrets.IAC_BOOTSTRAP_SSH_PRIVATE_KEY }}
