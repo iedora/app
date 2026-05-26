@@ -1,38 +1,36 @@
-# @iedora/observability CI.
+# @iedora/auth CI.
 #
-# OpenTelemetry wiring shared across the estate. Tests cover the no-op
-# behaviour in NODE_ENV=test + the tenant-attribute contract. No DB, no
-# network. Fast suite (~30s).
+# Shared auth surface — better-auth instance, Drizzle schema, AC
+# taxonomy. Tests are pure-function checks over the role/scope
+# bindings; no DB, no network.
 
-name: '[package:observability] CI'
+name: '[package:auth] CI'
 
 on:
   push:
     branches: [main]
     paths:
-      - 'packages/iedora-observability/**'
+      - 'packages/auth/**'
       - 'packages/eslint-config/**'
       - 'bun.lock'
       - 'package.json'
-      - '.github/workflows/observability.yml'
+      - '.github/workflows/auth.yml'
       - '.github/actions/setup/**'
   pull_request:
     branches: [main]
     paths:
-      - 'packages/iedora-observability/**'
+      - 'packages/auth/**'
       - 'packages/eslint-config/**'
       - 'bun.lock'
       - 'package.json'
-      - '.github/workflows/observability.yml'
+      - '.github/workflows/auth.yml'
       - '.github/actions/setup/**'
-  # `gh workflow run observability.yml --ref <branch>` — manual re-trigger.
   workflow_dispatch:
 
 concurrency:
-  group: observability-${{ github.workflow }}-${{ github.ref }}
+  group: auth-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Workflow-level permissions — least privilege. CI does checkout + test only.
 permissions:
   contents: read
 
@@ -43,7 +41,7 @@ jobs:
     timeout-minutes: 5
     defaults:
       run:
-        working-directory: packages/iedora-observability
+        working-directory: packages/auth
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup
@@ -55,7 +53,7 @@ jobs:
     timeout-minutes: 5
     defaults:
       run:
-        working-directory: packages/iedora-observability
+        working-directory: packages/auth
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup
@@ -67,7 +65,7 @@ jobs:
     timeout-minutes: 5
     defaults:
       run:
-        working-directory: packages/iedora-observability
+        working-directory: packages/auth
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup

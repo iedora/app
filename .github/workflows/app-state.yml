@@ -10,7 +10,7 @@
 #   workflow_run                     re-reconcile after every successful infra
 #                                    apply
 
-name: '[Deploy] App state'
+name: '[infra] App state'
 
 on:
   workflow_dispatch: {}
@@ -24,7 +24,7 @@ on:
       - 'go.sum'
       - '.github/workflows/app-state.yml'
   workflow_run:
-    workflows: ['[Deploy] Infra']
+    workflows: ['[infra] Deploy']
     types: [completed]
     branches: [main]
 
@@ -37,7 +37,7 @@ permissions:
 
 jobs:
   apply:
-    name: '[Deploy] App state apply'
+    name: Apply
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     # When fired by workflow_run, only proceed if the upstream Infra deploy

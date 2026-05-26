@@ -22,7 +22,7 @@
 #
 # Self-contained on purpose: one file is the entire menu CI surface.
 
-name: '[Build] Menu'
+name: '[product:menu] CI'
 
 on:
   push:
@@ -67,7 +67,7 @@ permissions:
 
 jobs:
   typecheck:
-    name: '[Lint] Typecheck'
+    name: Typecheck
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     defaults:
@@ -79,7 +79,7 @@ jobs:
       - run: bun run typecheck
 
   lint:
-    name: '[Lint] ESLint'
+    name: Lint
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     defaults:
@@ -91,7 +91,7 @@ jobs:
       - run: bun run lint
 
   unit:
-    name: '[Test] Unit (Vitest)'
+    name: Unit (Vitest)
     runs-on: ubuntu-24.04
     # ubuntu-24.04 ships Docker Engine. Most slices run against PGLite
     # in-process; any future testcontainers-based suite picks the daemon
@@ -110,7 +110,7 @@ jobs:
         run: bun run test
 
   security:
-    name: '[Security] Trivy + SBOM'
+    name: Security (Trivy + SBOM)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     # Scans the workspace lockfile (Bun workspaces dedupe deps at the root,
@@ -144,7 +144,7 @@ jobs:
           retention-days: 90
 
   e2e:
-    name: '[Test] E2E (Playwright)'
+    name: E2E (Playwright)
     needs: [typecheck, lint, unit]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -241,7 +241,7 @@ jobs:
   # artifact so the merge job can stitch the manifest list. Pattern from
   # docs.docker.com/build/ci/github-actions/multi-platform.
   build:
-    name: '[Build] Image (${{ matrix.platform }})'
+    name: 'Build image (${{ matrix.platform }})'
     needs: [typecheck, lint, unit, security, e2e]
     # Only on push to main — PRs run the gates only. workflow_dispatch on main
     # still triggers a build for the "re-roll latest" flow.
@@ -353,7 +353,7 @@ jobs:
   # x86_64 — the merge is just registry plumbing, no image content
   # crosses the runner.
   merge:
-    name: '[Build] Merge multi-arch manifest'
+    name: Merge multi-arch manifest
     needs: [build]
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
@@ -452,7 +452,7 @@ jobs:
   # Day-2 (menu-only push): the latest app-state run is already success
   # from a prior CI run, this step returns ~immediately.
   wait_app_state:
-    name: '[Deploy] Wait for app-state'
+    name: Wait for app-state
     needs: merge
     runs-on: ubuntu-24.04
     timeout-minutes: 30
