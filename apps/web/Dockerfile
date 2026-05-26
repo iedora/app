@@ -1,12 +1,15 @@
 # syntax=docker/dockerfile:1.24
-# Multi-stage build for the menu app inside the Bun workspaces monorepo.
+# Multi-stage build for the `apps/web` Next.js shell inside the Bun
+# workspaces monorepo. The shell hosts every logical product (menu,
+# core, house) via host-based rewrites in src/proxy.ts.
 #
 # Build context is the REPO ROOT. The image is built + pushed to GHCR by
-# `.github/workflows/menu.yml`; the running container is provisioned by
-# the repo-root `infra/tofu/` (`docker_container.menu_web` on the Hetzner
-# VPS). Bun installs the workspace deps; Node executes the build (Bun +
-# next build is unstable per AGENTS.md); final image runs server.js on
-# Node over Next's standalone output.
+# `.github/workflows/web.yml`; the running container (`infra-web`) is
+# managed by Stage 4 of the deploy pipeline
+# (`infra/deploy/cmd/iedora/runtime_docker.go`). Bun installs the
+# workspace deps; Node executes the build (Bun + next build is unstable
+# per AGENTS.md); final image runs server.js on Node over Next's
+# standalone output.
 #
 # All three stages are glibc (Debian) — no musl→glibc handoff between
 # install/build/runtime keeps native-module prebuilts (postgres-js, sharp,
@@ -22,9 +25,14 @@ WORKDIR /workspace
 # introduced by PR #6 (TypeScript 6 + shared eslint refactor) — every deploy
 # after #6 failed with `extends: "../../tsconfig.base.json" doesn't resolve`.
 COPY package.json bun.lock tsconfig.base.json ./
-# Every workspace package referenced from menu's package.json must be
-# present so `bun install` can resolve `"@iedora/design-system": "workspace:*"`.
+# Every workspace referenced from apps/web's package.json must be
+# present so `bun install` can resolve workspace:* specifiers:
+#   - packages/* → @iedora/{auth,design-system,observability,brand,eslint-config}
+#   - products/* → @iedora/product-{menu,core,house}
+# Without products/, bun fails fast with:
+#   "Workspace dependency @iedora/product-menu not found, Searched in ./*"
 COPY packages packages
+COPY products products
 COPY apps/web/package.json apps/web/package.json
 
 # BuildKit cache mount keeps the Bun global cache warm across rebuilds on
@@ -43,7 +51,10 @@ WORKDIR /workspace
 # bug that worked locally (homelab build context had the host's installed
 # node_modules) but failed in CI's clean Docker run.
 COPY --from=deps /workspace ./
-# Overlay menu source (deps only had apps/web/package.json).
+# Overlay apps/web source (deps only had apps/web/package.json). The
+# products/ tree was already brought in by the deps stage above (it has
+# real source, not just package.json — workspace:* exports point at
+# .ts/.tsx files).
 COPY apps/web apps/web
 
 WORKDIR /workspace/apps/web

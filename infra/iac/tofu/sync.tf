@@ -59,7 +59,12 @@ resource "terraform_data" "iedora_sync" {
   provisioner "remote-exec" {
     inline = [
       "systemctl daemon-reload",
-      "systemctl reload iedora.service || systemctl start iedora.service",
+      # On failure, dump the unit's journal to the provisioner output
+      # so the GHA log shows what `docker compose up -d` rejected
+      # (image pull, port collision, missing env, …) without an extra
+      # SSH round-trip. The trailing `exit 1` preserves the original
+      # failure semantics so Tofu still treats the apply as failed.
+      "systemctl reload iedora.service || systemctl start iedora.service || { echo '--- iedora.service failed; dumping journal ---'; journalctl -xeu iedora.service --no-pager -n 200 || true; exit 1; }",
     ]
   }
 }
