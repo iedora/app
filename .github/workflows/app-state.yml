@@ -52,6 +52,39 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      - name: Wait for ghcr.io/eduvhc/menu:latest
+        # Both Stage-3 configurators (`core-db-migrations`,
+        # `menu-db-migrations`) `docker run --rm <menu-image>` on the
+        # box. On a fresh Day 1, the menu image is being built in
+        # parallel by `menu.yml`; if `Infra deploy` finishes first this
+        # workflow would crash on `docker pull`. Block here until GHCR
+        # exposes a `latest` tag (the manifest list `imagetools create`
+        # pushes alongside `:<sha>`).
+        #
+        # Day-2 paths (push to infra/app-state/** or manual dispatch on
+        # a warm cluster) skip the wait immediately — `:latest` already
+        # exists from a prior CI run.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 1800 ))   # 30 min budget
+          while true; do
+            if gh api -H "Accept: application/vnd.github+json" \
+                 /users/eduvhc/packages/container/menu/versions \
+                 --jq '.[].metadata.container.tags[]' 2>/dev/null \
+                 | grep -qx 'latest'; then
+              echo "✓ ghcr.io/eduvhc/menu:latest is available"
+              break
+            fi
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "✗ menu:latest still missing after 30 min — abort"
+              exit 1
+            fi
+            echo "menu:latest not yet pushed — waiting 30s"
+            sleep 30
+          done
+
       - name: Install bws CLI
         env:
           BWS_VERSION: '2.0.0'

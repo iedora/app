@@ -443,6 +443,63 @@ jobs:
           subject-digest: ${{ steps.inspect.outputs.digest }}
           push-to-registry: true
 
+  # ── Gate: wait for Stage 3 (DB migrations) to be green ──────────────────
+  # Stage 4's `dockerOnHetzner.Deploy` starts the menu container, which
+  # immediately reads `core.session` on every request. If Stage 3 hasn't
+  # applied the `@iedora/auth` migrations yet, the boot 500s. On a fresh
+  # Day 1 the chain is: infra-deploy.yml provisions the box → app-state
+  # (workflow_run) waits for THIS image to land → applies core +
+  # menu schemas → then this gate flips green and `deploy` proceeds.
+  #
+  # Day-2 (menu-only push): the latest app-state run is already success
+  # from a prior CI run, this step returns ~immediately.
+  wait_app_state:
+    name: Wait for Stage 3
+    needs: merge
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    permissions:
+      actions: read
+    steps:
+      - name: Poll app-state.yml status
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 1700 ))   # ~28 min, below job timeout
+          while true; do
+            run=$(gh run list \
+                    --repo "${{ github.repository }}" \
+                    --workflow=app-state.yml \
+                    --branch=main \
+                    --limit 1 \
+                    --json status,conclusion,databaseId,createdAt -q '.[0]' || echo '{}')
+            status=$(echo "$run" | jq -r '.status // "absent"')
+            conclusion=$(echo "$run" | jq -r '.conclusion // ""')
+            case "$status" in
+              completed)
+                if [ "$conclusion" = "success" ]; then
+                  echo "✓ app-state.yml green (run #$(echo "$run" | jq -r .databaseId))"
+                  exit 0
+                fi
+                echo "✗ app-state.yml ${conclusion} — refusing to deploy"
+                exit 1
+                ;;
+              absent)
+                echo "no app-state.yml run yet — waiting 30s"
+                ;;
+              *)
+                echo "app-state.yml status=${status} — waiting 30s"
+                ;;
+            esac
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "✗ app-state.yml didn't finish within budget — abort"
+              exit 1
+            fi
+            sleep 30
+          done
+
   # ── Stage 4: deploy the freshly-built image ─────────────────────────────
   # Invokes the reusable deploy.yml workflow with product=menu + this
   # commit's SHA. The dockerOnHetzner runtime (products.go) reads
@@ -450,7 +507,7 @@ jobs:
   # apply round-trip. Rollback path: `gh workflow run deploy.yml
   # --field product=menu --field image_sha=<older-sha>`.
   deploy:
-    needs: merge
+    needs: wait_app_state
     uses: ./.github/workflows/deploy.yml
     with:
       product: menu
