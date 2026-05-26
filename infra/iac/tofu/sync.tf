@@ -10,9 +10,10 @@
 
 resource "terraform_data" "iedora_sync" {
   triggers_replace = {
-    server_id = hcloud_server.iedora.id
-    compose   = sha256(local.compose_yaml)
-    caddyfile = sha256(local.caddyfile)
+    server_id    = hcloud_server.iedora.id
+    compose      = sha256(local.compose_yaml)
+    caddyfile    = sha256(local.caddyfile)
+    systemd_unit = sha256(local.systemd_unit)
   }
 
   connection {
@@ -42,12 +43,25 @@ resource "terraform_data" "iedora_sync" {
     destination = "/etc/iedora/Caddyfile"
   }
 
-  # Reconcile. `systemctl restart` of a Type=oneshot RemainAfterExit
-  # unit re-runs ExecStart, which is `docker compose up -d
-  # --remove-orphans`. Compose handles container drift idempotently.
+  provisioner "file" {
+    content     = local.systemd_unit
+    destination = "/etc/systemd/system/iedora.service"
+  }
+
+  # Reconcile.
+  #   - `daemon-reload` picks up any change to the unit file.
+  #   - `reload` runs ExecReload = `docker compose up -d --remove-
+  #     orphans` — only containers whose config changed get recreated.
+  #     `restart` would Stop+Start the whole stack via ExecStop=
+  #     docker compose down, taking postgres + zitadel down for no
+  #     reason.
+  #   - `|| start` covers the case where the service isn't yet active
+  #     (a fresh-box first apply where cloud-init beat us to it leaves
+  #     it active, but a crashed/disabled box may not).
   provisioner "remote-exec" {
     inline = [
-      "systemctl restart iedora.service",
+      "systemctl daemon-reload",
+      "systemctl reload iedora.service || systemctl start iedora.service",
     ]
   }
 }

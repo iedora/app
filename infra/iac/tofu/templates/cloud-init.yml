@@ -39,20 +39,7 @@ write_files:
 
   - path: /etc/systemd/system/iedora.service
     content: |
-      [Unit]
-      Description=iedora compose stack
-      Requires=docker.service
-      After=docker.service network-online.target
-
-      [Service]
-      Type=oneshot
-      RemainAfterExit=yes
-      WorkingDirectory=/etc/iedora
-      ExecStart=/usr/bin/docker compose -f /etc/iedora/docker-compose.yml up -d --remove-orphans
-      ExecStop=/usr/bin/docker compose -f /etc/iedora/docker-compose.yml down
-
-      [Install]
-      WantedBy=multi-user.target
+      ${indent(6, systemd_unit)}
 
 runcmd:
   - install -d -o root -g root -m 0755 /root/infra-postgres/data

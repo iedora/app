@@ -85,6 +85,7 @@ resource "hcloud_server" "iedora" {
     compose_yaml      = local.compose_yaml
     caddyfile         = local.caddyfile
     postgres_init_sql = local.postgres_init_sql
+    systemd_unit      = local.systemd_unit
     ghcr_auth_b64     = base64encode("${var.github_owner}:${var.infra_ghcr_token}")
   })
 

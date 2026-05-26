@@ -32,6 +32,11 @@ locals {
   # into the postgres container at /docker-entrypoint-initdb.d/init.sql.
   postgres_init_sql = file("${path.module}/../postgres/init.sql")
 
+  # systemd unit that runs the compose stack. Source-of-truth lives
+  # in templates/iedora.service so both first-boot (cloud-init) and
+  # day-2 (sync.tf) read the same bytes.
+  systemd_unit = file("${path.module}/templates/iedora.service")
+
   # Compose document. yamlencode round-trips through HCL types, so the
   # diff in `tofu plan` shows the structured change rather than a raw
   # YAML blob.
