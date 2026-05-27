@@ -253,21 +253,24 @@ jobs:
       - name: Dispatch app-state.yml + follow the dispatched run
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
           # Snapshot the most recent app-state run ID BEFORE dispatch,
           # so we can identify the new one we just kicked off
           # (gh workflow run doesn't return the run-id directly).
+          # --repo on every gh call — this job has no actions/checkout,
+          # so gh can't detect the repo from git remotes.
           before=$(gh run list \
-                     --repo "${{ github.repository }}" \
+                     --repo "$REPO" \
                      --workflow=app-state.yml \
                      --branch=main \
                      --limit 1 \
                      --json databaseId -q '.[0].databaseId // "0"')
 
           echo "→ dispatching app-state.yml on main"
-          gh workflow run app-state.yml --ref main
+          gh workflow run app-state.yml --repo "$REPO" --ref main
 
           # Poll for a new run created AFTER our snapshot. GHA can take
           # a few seconds to register a workflow_dispatch run.
@@ -275,7 +278,7 @@ jobs:
           for i in $(seq 1 20); do
             sleep 3
             latest=$(gh run list \
-                       --repo "${{ github.repository }}" \
+                       --repo "$REPO" \
                        --workflow=app-state.yml \
                        --branch=main \
                        --limit 1 \
@@ -299,7 +302,7 @@ jobs:
           # ambiguity about which run we're tracking.
           deadline=$(( $(date +%s) + 1700 ))   # ~28 min, below job timeout
           while true; do
-            view=$(gh run view "$run_id" --json status,conclusion 2>/dev/null || echo '{}')
+            view=$(gh run view "$run_id" --repo "$REPO" --json status,conclusion 2>/dev/null || echo '{}')
             status=$(echo "$view" | jq -r '.status // "absent"')
             conclusion=$(echo "$view" | jq -r '.conclusion // ""')
 
