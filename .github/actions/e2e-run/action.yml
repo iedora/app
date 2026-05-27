@@ -3,17 +3,35 @@
 # Shared Playwright harness for products that serve through `apps/web`
 # (the Next.js shell). Each product declares its own `services` (Postgres
 # ± S3Mock) and `matrix.shard` in the workflow job; this action runs the
-# common pipeline — wait-for-services, DB migrations, Playwright install,
-# production Next.js build, spec execution, and report upload.
+# common pipeline.
+#
+# Pipeline steps:
+#   1. Wait for S3Mock + create bucket (only if needs_s3mock: true)
+#   2. Apply core DB migrations (always — runs migrate.mjs against core_test)
+#   3. Apply product DB migrations (bun run db:migrate:test; skipped if
+#      needs_product_migrations: false — core piggybacks on @iedora/auth's
+#      schema)
+#   4. Install Playwright browsers
+#   5. Build apps/web (production, using product's .env.test)
+#   6. Run Playwright specs
+#   7. Upload HTML report artifact
+#
+# The core DB step (2) uses `packages/auth/scripts/migrate.mjs` — a
+# self-healing script that creates the `core_test` database if it doesn't
+# exist, then applies the better-auth schema. Every product needs this
+# because the Next.js server initializes better-auth in-process at startup.
 #
 # Every product that runs E2E needs:
 #   1. A `playwright.config.ts` at the product root (webServer →
 #      `../../apps/web`).
-#   2. A `.env.test` with DATABASE_URL, CORE_DATABASE_URL, and (if S3)
-#      S3_* env vars.
-#   3. Scripts in package.json: `test:e2e`, `db:migrate:test`.
+#   2. A `.env.test` with CORE_DATABASE_URL, IEDORA_CORE_SECRET, and (if
+#      needed) DATABASE_URL + S3_*.
+#   3. Scripts in package.json: `test:e2e` (and `db:migrate:test` if
+#      the product owns Drizzle migrations).
 #   4. An `e2e` job in its CI workflow that calls this action after
 #      typecheck + lint + unit.
+#
+# See docs/testing/e2e-architecture.md for the full contract.
 
 name: 'E2E run'
 description: 'Shared Playwright harness — services, migrations, build, specs, report.'
@@ -31,6 +49,9 @@ inputs:
   needs_s3mock:
     description: 'Whether the product uses S3 uploads and needs the s3mock service.'
     default: 'false'
+  needs_product_migrations:
+    description: "Whether to run the product's db:migrate:test script. Set false for products that piggyback on @iedora/auth's schema (core)."
+    default: 'true'
   shard:
     description: 'Current shard index (e.g. 1/2). Forwarded to Playwright --shard.'
     default: '1/1'

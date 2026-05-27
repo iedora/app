@@ -136,7 +136,7 @@ export const fooProfile: PermissionProfile = {
 // seeds.ts — idempotent, return the generated IDs
 export async function seedFoo(input: FooInput): Promise<SeededFoo> { ... }
 // routes.ts — single source of truth for this slice's URLs
-export const fooRoutes = { home: '/dashboard/foo' } as const
+export const fooRoutes = { home: '/menu/dashboard/foo' } as const
 // index.ts
 import 'server-only'
 export * from './profile'; export * from './seeds'; export * from './routes'

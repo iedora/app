@@ -45,5 +45,12 @@ Auth SDK contract: [`../../packages/auth/README.md`](../../packages/auth/README.
 - `bun run typecheck`
 - `bun run lint`
 - `bun run test` — vitest with `--passWithNoTests` (no test files yet).
+- `bun run test:e2e` / `:ui` / `:debug` — Playwright suite (planned — harness not yet built). See [`docs/testing/e2e-architecture.md`](../../docs/testing/e2e-architecture.md).
 
 CI: `[product:core] CI` at `.github/workflows/product-core.yml`.
+
+## Testing
+
+Core has no Drizzle schema of its own — the `core` database is owned by `@iedora/auth` (better-auth tables + audit log). Unit tests use `fake-gateway.ts` adapters; E2E tests will use the shared `e2e-run` composite action with `needs_product_migrations: false`.
+
+See [`docs/testing/e2e-architecture.md`](../../docs/testing/e2e-architecture.md) for the E2E contract and [`docs/testing/todos/e2e-implementation.md`](../../docs/testing/todos/e2e-implementation.md) for the implementation checklist.
