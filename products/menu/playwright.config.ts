@@ -70,10 +70,12 @@ export default defineConfig({
     {
       // CI runs the build in a dedicated step (so Playwright's webServer
       // only has to start it). Local does build + start in one shot.
+      // cwd points at apps/web/ — where next build + next start live.
       command: process.env.CI
         ? 'bun run start'
         : 'bun run build && bun run start',
       url: BASE_URL,
+      cwd: '../../apps/web',
       reuseExistingServer: !process.env.CI,
       timeout: 240_000,
       env: {
