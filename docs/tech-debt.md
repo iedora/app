@@ -154,6 +154,70 @@ branch" race during rapid commits).
 
 ---
 
+## Docker / runtime
+
+### DOCKER-1: migrate scripts piggyback the Next standalone image
+**size:** M · **risk:** low
+
+Stage-3 configurators (`infra/app-state/{core,menu}-db-migrations/`)
+`docker run --rm ghcr.io/eduvhc/web:latest node /app/packages/auth/scripts/migrate.mjs`.
+They reuse the Next.js app image just to access:
+- `drizzle-orm` (resolution by Node ESM)
+- the schema files (`packages/auth/drizzle/*.sql`, `products/menu/drizzle/*.sql`)
+- the migrate.mjs script itself
+
+Next's standalone trace was never designed for this. Its
+`outputFileTracingIncludes` places `drizzle-orm` at
+`/app/apps/web/node_modules/` because the include globs are
+apps/web-relative. The migrate.mjs scripts at
+`/app/packages/auth/scripts/` and `/app/products/menu/scripts/`
+can't find drizzle-orm via Node's parent-walk because nothing in
+`/app/packages/auth/node_modules/` (or `products/menu/node_modules/`)
+exists in the standalone image.
+
+**Current workaround (the hack)**: `apps/web/Dockerfile` runtime
+stage manually creates symlinks:
+```
+packages/auth/node_modules/drizzle-orm  → /app/apps/web/node_modules/drizzle-orm
+packages/auth/node_modules/postgres     → /app/apps/web/node_modules/postgres
+products/menu/node_modules/drizzle-orm  → /app/apps/web/node_modules/drizzle-orm
+products/menu/node_modules/postgres     → /app/apps/web/node_modules/postgres
+```
+
+This works but is fragile: every new top-level dep that migrate.mjs
+imports requires another symlink. And the migrate scripts are
+coupled to the Next.js app's runtime layout — they break the moment
+Next reorganizes standalone's filesystem.
+
+**Proper fix options** (pick one):
+
+(a) **Dedicated `migrate` image.** Build a separate small image
+    (`ghcr.io/eduvhc/migrate:<sha>`) that contains just
+    drizzle-kit + the schema + migrate.mjs + their direct deps.
+    Stage-3 `docker run`s THAT image instead of the Next.js one.
+    Clean separation; migrate image is ~50MB vs the 250MB Next
+    image. Two builds + two pushes per deploy.
+
+(b) **Bundle migrate.mjs with `bun build --target node`.** Produces
+    a single self-contained .mjs with drizzle-orm + postgres-js
+    inlined. Stage-3 still uses the web image but invokes the
+    pre-bundled file. No node_modules walk needed. One extra build
+    step per migrate script.
+
+(c) **Run migrations from the CI runner directly.** app-state.yml
+    already has `bun install` + tofu + SSH; could open an SSH tunnel
+    to postgres and run `bun --cwd packages/auth db:migrate` from
+    the runner. No image needed at all for migrations. Trade-off:
+    CI runner needs Postgres network reach (currently the box does
+    the docker-run pattern, runner doesn't open a tunnel).
+
+(b) is the smallest change and matches what zod, hono etc. publish
+shape-wise. (a) is the most architecturally honest. (c) is
+strongest if the CI runner already has SSH to the box (it does).
+
+**Decision pending.** Until then: keep the Dockerfile symlinks +
+this entry as the documented "this is the hack" pointer.
+
 ## TypeScript / monorepo
 
 ### TS-1: Composite TS project references only on `products/menu`
