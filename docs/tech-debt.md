@@ -39,6 +39,57 @@ inline. Extract to `.github/scripts/wait-app-state.sh` or composite
 actions. `app-state.yml`, `deploy.yml`, `infra-deploy.yml` have
 similar but smaller blocks (30-40 each).
 
+### CI-5: workflows over-trigger on irrelevant changes
+**size:** S · **risk:** low
+
+Two distinct over-triggering issues observed in practice:
+
+**(a) `[security] CodeQL`** runs on every push to main except for the
+narrow `paths-ignore` list (`*.md`, `docs/**`, `LICENSE*`,
+`.gitignore`, `.editorconfig`). That means it fires on:
+- Any workflow file edit (`.github/workflows/*.yml`) — no source code
+  scanned, but a full 20-min SAST runs anyway.
+- Tofu HCL changes (`infra/iac/tofu/**`) — no JS/TS to scan.
+- Go-only changes (`infra/**/*.go`, `internal/**`) — JS/TS analyzer
+  doesn't apply.
+- Config-only changes (`vitest.config.ts`, `drizzle.config.ts`, etc.)
+  — touches no business code.
+
+Fix: switch from `paths-ignore` (denylist) to `paths` (allowlist),
+listing only paths that contain JS/TS source:
+```yaml
+paths:
+  - '**/*.ts'
+  - '**/*.tsx'
+  - '**/*.mts'
+  - '**/*.js'
+  - '**/*.mjs'
+  - '**/*.cjs'
+  - 'bun.lock'
+  - 'package.json'
+```
+Weekly cron still catches anything missed.
+
+Previous reasoning (in codeql.yml header comment): "SAST signal lives
+in cross-cutting taint flow — a vuln in a shared package can surface
+only when reached from a product's entrypoint". Valid argument, but
+the same logic doesn't apply when ZERO JS/TS files change — there's
+nothing new to taint-flow into.
+
+**(b) Per-product / per-package CIs include `bun.lock` + `package.json`
+in their paths.** Any dep update (e.g. bumping a dev dep at the
+workspace root) triggers EVERY product + package CI to re-run, even
+when their own code is untouched. Bun workspaces hoist deps to the
+root, so a `bun.lock` diff often touches every workspace's effective
+deps — but the per-product CI is meant to gate the product's own
+typecheck + lint + test, not whether any of its transitive deps
+changed.
+
+Fix: drop `bun.lock` + `package.json` from the per-workspace paths
+filters. A workspace-root `[deps] CI` workflow (TBD — could just be
+`bun install --frozen-lockfile` + smoke-typecheck of every workspace)
+would handle the "dep change broke something" case once.
+
 ### CI-4: ~~cross-workflow gating via `gh run list` polling~~ → resolved
 **size:** ~~L~~ · **risk:** ~~med~~
 
