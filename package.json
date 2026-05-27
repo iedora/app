@@ -10,7 +10,9 @@
   "scripts": {
     "typecheck": "bun run --workspaces typecheck",
     "lint": "bun run --workspaces lint",
-    "test": "bun run --workspaces test"
+    "test": "bun run --workspaces test",
+    "ci:check": "actionlint -color .github/workflows/*.yml",
+    "postinstall": "[ -n \"${CI:-}\" ] && exit 0; cp -f scripts/git-hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit && echo 'git hooks installed' || true"
   },
   "catalog": {
     "drizzle-orm": "^0.45.2",

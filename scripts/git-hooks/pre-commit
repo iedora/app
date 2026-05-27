@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Pre-commit hook — runs actionlint on changed workflow files.
+# Installed by `bun install` (via root postinstall script).
+# Skips when actionlint is not found or when running in CI.
+set -euo pipefail
+
+[ -n "${CI:-}" ] && exit 0
+
+if ! command -v actionlint &>/dev/null; then
+  echo "pre-commit: actionlint not found — skipping (install: go install github.com/rhysd/actionlint/cmd/actionlint@latest)"
+  exit 0
+fi
+
+changed=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^\.github/(workflows|actions|scripts)/' || true)
+if [ -z "$changed" ]; then
+  exit 0
+fi
+
+echo "pre-commit: linting CI files..."
+echo "$changed" | while read -r f; do echo "  $f"; done
+
+# actionlint checks workflow YAML files directly.
+# .sh scripts under .github/scripts/ are checked with shellcheck via actionlint
+# only when embedded in workflow run: blocks. Standalone .sh files need separate
+# shellcheck — but actionlint >=1.7 can't lint standalone .sh files.
+echo "$changed" | grep '\.github/workflows/.*\.yml$' | xargs -r actionlint -color || {
+  echo ""
+  echo "pre-commit: actionlint failed. Fix the issues above and try again."
+  echo "  Run manually: actionlint -color .github/workflows/*.yml"
+  exit 1
+}
+
+# Shellcheck standalone .sh scripts (not embedded in YAML).
+script_changes=$(echo "$changed" | grep '\.github/scripts/.*\.sh$' || true)
+if [ -n "$script_changes" ] && command -v shellcheck &>/dev/null; then
+  echo "pre-commit: shellcheck scripts..."
+  echo "$script_changes" | xargs -r shellcheck --shell=bash || {
+    echo ""
+    echo "pre-commit: shellcheck failed. Fix the issues above and try again."
+    exit 1
+  }
+fi
+
+echo "pre-commit: OK"

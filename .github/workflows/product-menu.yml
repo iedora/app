@@ -110,7 +110,7 @@ jobs:
       - uses: ./.github/actions/setup
 
       - name: Wait for S3Mock + create bucket
-        run: bash ${GITHUB_WORKSPACE}/.github/scripts/wait-s3mock.sh
+        run: bash "${GITHUB_WORKSPACE}/.github/scripts/wait-s3mock.sh"
 
       - name: Apply DB migrations
         run: bun run db:migrate:test
