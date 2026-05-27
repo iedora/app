@@ -2,11 +2,10 @@ import type { Metadata } from 'next'
 import { Wordmark } from '@iedora/design-system'
 
 /**
- * iedora.com — the brand landing page. Lives in `@iedora/product-house`
- * and is mounted by `apps/web` at `/house/*` via a thin re-export in
- * `apps/web/src/app/house/page.tsx`. `proxy.ts` rewrites the apex
+ * iedora.com — the brand landing page. `proxy.ts` rewrites the apex
  * host (`iedora.com`) into `/house/*` so the user-visible URL stays
- * clean.
+ * clean. Small enough that the workspace overhead isn't worth a
+ * separate `@iedora/product-house` package; lives inline here.
  *
  * Deliberately minimal — a single statement + two CTAs. The richer
  * marketing copy can grow back here once the second product ships and
