@@ -1,12 +1,16 @@
 import { toNextJsHandler } from '@iedora/auth/next'
-import { auth } from '@iedora/auth'
 
-/**
- * Catch-all auth API route. better-auth handles every sub-path under
- * `/api/auth/*` (`/sign-in/email`, `/sign-up/email`, `/sign-out`,
- * `/get-session`, `/organization/*`, `/admin/*`, …).
- *
- * The single `[...all]` handler replaces the per-flow OIDC routes the
- * Zitadel integration needed (`login`, `callback`, `logout`).
- */
-export const { GET, POST } = toNextJsHandler(auth.handler)
+export const dynamic = 'force-dynamic'
+
+async function getHandler() {
+  const { auth } = await import('@iedora/auth')
+  return toNextJsHandler(auth.handler)
+}
+
+export async function GET(req: Request) {
+  return (await getHandler()).GET(req)
+}
+
+export async function POST(req: Request) {
+  return (await getHandler()).POST(req)
+}

@@ -164,7 +164,9 @@
       "dependencies": {
         "@iedora/auth": "workspace:*",
         "@iedora/brand": "workspace:*",
+        "@iedora/db": "workspace:*",
         "@iedora/design-system": "workspace:*",
+        "drizzle-orm": "catalog:",
         "server-only": "^0.0.1",
       },
       "devDependencies": {

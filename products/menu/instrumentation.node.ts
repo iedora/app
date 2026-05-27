@@ -10,6 +10,13 @@
 import { registerIedoraOtel } from '@iedora/observability'
 
 export async function registerNode() {
+  // Fail fast if critical runtime env vars are missing.
+  // Vercel pattern: validate at startup (register), not at build time.
+  // If this throws, the server never binds the port → health check fails
+  // → CI/deploy catches the misconfiguration.
+  const { getAuth } = await import('@iedora/auth')
+  getAuth()
+
   // Register OTel FIRST — the pino instrumentation registers a
   // require-hook around `pino`, and that hook must be in place BEFORE
   // any pino logger is constructed. Importing the shared logger after

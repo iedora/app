@@ -24,3 +24,4 @@ export {
 } from './permissions'
 
 export { schema } from './schema'
+export { getCoreDb } from './db'

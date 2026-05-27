@@ -79,13 +79,6 @@ ENV NODE_ENV=production
 # by the repo-root Tofu container resource (TF-minted OIDC + session secrets).
 ENV SKIP_ENV_VALIDATION=1
 
-# Consistent Server Actions encryption key across multi-instance deployments.
-# When unset, Next.js generates a random key per build — fine for single-instance
-# but breaks Server Actions when instances don't share the same key.
-# Pass from CI via --build-arg if running multiple replicas.
-ARG NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
-ENV NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
-
 # Version skew protection — embedded as deploymentId in next.config.ts.
 # When the running container's ID differs from the client's, Next.js forces
 # a hard navigation instead of client-side navigation, ensuring assets
@@ -104,11 +97,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-# Consistent encryption key + deployment version — same values as the
-# builder stage. Both are embedded in the standalone output at build
-# time; setting them at runtime ensures the running process matches.
-ARG NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
-ENV NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
+# Consistent deployment version — same value as the builder stage.
+# Embedded in the standalone output at build time; setting it at runtime
+# ensures the running process matches for version-skew detection.
 ARG DEPLOYMENT_VERSION
 ENV DEPLOYMENT_VERSION=${DEPLOYMENT_VERSION}
 
