@@ -41,6 +41,40 @@ COPY apps/web/package.json apps/web/package.json
 RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
     bun install --frozen-lockfile --ignore-scripts
 
+# ── Stage 1b: bundle migrate scripts ──────────────────────────────────────────
+# Industry-standard pattern for migrations in a monorepo Docker image
+# (refs: altan.fyi/drizzle-migration-monorepo, drizzle docs §migrations):
+# bundle the small migrate.mjs into a self-contained ESM with all
+# deps inlined, ship it next to a copy of its `drizzle/` folder. The
+# Next standalone output is for the request-serving path only — its
+# layout shouldn't be expected to host arbitrary node scripts.
+#
+# Output layout (consumed by Stage 3 configurators in
+# `infra/app-state/{core,menu}-db-migrations/`):
+#   /migrate/core/scripts/migrate.mjs   bundled @iedora/auth migrator
+#   /migrate/core/drizzle/              auth's *.sql + meta/_journal.json
+#   /migrate/menu/scripts/migrate.mjs   bundled menu migrator
+#   /migrate/menu/drizzle/              menu's *.sql + meta/_journal.json
+#
+# `migrate.mjs` resolves `../drizzle` relative to import.meta.url; the
+# scripts/ + drizzle/ sibling layout above preserves that semantic
+# without changing source.
+FROM oven/bun:1.3-debian@sha256:9dba1a1b43ce28c9d7931bfc4eb00feb63b0114720a0277a8f939ae4dfc9db6f AS migrate-bundler
+WORKDIR /workspace
+COPY --from=deps /workspace ./
+COPY packages packages
+COPY products products
+RUN mkdir -p /migrate/core/scripts /migrate/core/drizzle \
+             /migrate/menu/scripts /migrate/menu/drizzle && \
+    bun build packages/auth/scripts/migrate.mjs \
+        --target=node --format=esm \
+        --outfile=/migrate/core/scripts/migrate.mjs && \
+    bun build products/menu/scripts/migrate.mjs \
+        --target=node --format=esm \
+        --outfile=/migrate/menu/scripts/migrate.mjs && \
+    cp -r packages/auth/drizzle/. /migrate/core/drizzle/ && \
+    cp -r products/menu/drizzle/. /migrate/menu/drizzle/
+
 # ── Stage 2: build ────────────────────────────────────────────────────────────
 FROM node:24.0.2-bookworm-slim@sha256:083430e81f23ca4f309c6de17614d20706ddd544b2adc71fb9fdd86e2371360a AS builder
 WORKDIR /workspace
@@ -93,28 +127,11 @@ COPY --from=builder --chown=nextjs:nextjs /workspace/apps/web/public ./apps/web/
 # owned by the runtime user so the very first request doesn't EPERM.
 RUN mkdir -p ./apps/web/.next/cache && chown nextjs:nextjs ./apps/web/.next/cache
 
-# Stage-3 configurators (`bin/iedora app apply`) `docker run --rm` this
-# image and execute migrate.mjs scripts from packages/auth/scripts/ and
-# products/menu/scripts/. Node ESM resolution from those locations
-# walks up looking for `node_modules/drizzle-orm` etc. — but Next's
-# outputFileTracingIncludes laid down `drizzle-orm` + `postgres` at
-# `/app/apps/web/node_modules/`, which the migrate scripts never reach.
-#
-# Symlink the two packages into the migrate-script locations so
-# Node's resolution finds them via the realpath of `apps/web/`.
-# Drizzle's own internal `import 'postgres'` follows the realpath
-# (Node default is --preserve-symlinks=false) and finds it next to
-# drizzle in apps/web/node_modules.
-RUN mkdir -p ./packages/auth/node_modules ./products/menu/node_modules && \
-    ln -s /app/apps/web/node_modules/drizzle-orm ./packages/auth/node_modules/drizzle-orm && \
-    ln -s /app/apps/web/node_modules/postgres   ./packages/auth/node_modules/postgres && \
-    ln -s /app/apps/web/node_modules/drizzle-orm ./products/menu/node_modules/drizzle-orm && \
-    ln -s /app/apps/web/node_modules/postgres   ./products/menu/node_modules/postgres && \
-    chown -h nextjs:nextjs \
-        ./packages/auth/node_modules/drizzle-orm \
-        ./packages/auth/node_modules/postgres \
-        ./products/menu/node_modules/drizzle-orm \
-        ./products/menu/node_modules/postgres
+# Bundled migrate scripts + their drizzle/ folders (built in the
+# `migrate-bundler` stage). Stage-3 configurators invoke:
+#   node /app/migrate/core/scripts/migrate.mjs   (CORE_DATABASE_URL env)
+#   node /app/migrate/menu/scripts/migrate.mjs   (DATABASE_URL env)
+COPY --from=migrate-bundler --chown=nextjs:nextjs /migrate /app/migrate
 
 USER nextjs
 WORKDIR /app/apps/web

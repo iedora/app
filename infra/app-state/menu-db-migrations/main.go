@@ -143,9 +143,13 @@ func run(ctx context.Context) error {
 	// DNS resolves. Env passed via `-e` is operator-readable in `docker
 	// inspect` for ~seconds (until --rm cleans up); fine for a deploy
 	// step, not appropriate for a long-running container.
-	fmt.Fprintln(os.Stderr, "→ menu-db-migrations: docker run --rm node scripts/migrate.mjs")
+	// Bundled migrate script + drizzle/ folder live at
+	// `/app/migrate/menu/` — built in apps/web/Dockerfile's
+	// `migrate-bundler` stage. Self-contained ESM with deps inlined;
+	// no Node module-resolution dance into the standalone tree.
+	fmt.Fprintln(os.Stderr, "→ menu-db-migrations: docker run --rm node /app/migrate/menu/scripts/migrate.mjs")
 	dockerCmd := fmt.Sprintf(
-		"docker run --rm --network %s -e %s %s node scripts/migrate.mjs",
+		"docker run --rm --network %s -e %s %s node /app/migrate/menu/scripts/migrate.mjs",
 		shellQuote(network),
 		shellQuote("DATABASE_URL="+dbURL),
 		shellQuote(image),

@@ -18,21 +18,11 @@ const nextConfig: NextConfig = {
     '@iedora/product-core',
     '@iedora/product-menu',
   ],
-  outputFileTracingIncludes: {
-    // Force-include files the migrate scripts need at runtime —
-    // Turbopack's standalone trace misses them otherwise (vercel/next.js#88844).
-    // Two schemas ship with the image:
-    //   - menu's own `drizzle/` + `scripts/migrate.mjs` (DATABASE_URL)
-    //   - @iedora/auth's `drizzle/` + `scripts/migrate.mjs` (CORE_DATABASE_URL)
-    '/*': [
-      './node_modules/drizzle-orm/**/*',
-      './node_modules/postgres/**/*',
-      '../../products/menu/drizzle/**/*',
-      '../../products/menu/scripts/migrate.mjs',
-      '../../packages/auth/drizzle/**/*',
-      '../../packages/auth/scripts/migrate.mjs',
-    ],
-  },
+  // No `outputFileTracingIncludes` for migrate scripts — they're
+  // bundled in apps/web/Dockerfile's `migrate-bundler` stage (single
+  // ESM file each, all deps inlined). The Next standalone output is
+  // for the request-serving path only. Industry-standard pattern;
+  // refs are in DOCKER-1 in docs/tech-debt.md.
   allowedDevOrigins: ['menu.733113.xyz'],
 }
 

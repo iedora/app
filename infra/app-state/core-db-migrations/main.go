@@ -101,12 +101,14 @@ func run(ctx context.Context) error {
 		fmt.Fprintf(os.Stderr, "  ! pull failed (continuing — using cached if present): %v\n", err)
 	}
 
-	// One-shot migrator. The migrate script lives at the workspace path
-	// (preserved by Next's standalone tracing — see
-	// apps/web/next.config.ts::outputFileTracingIncludes).
-	fmt.Fprintln(os.Stderr, "→ core-db-migrations: docker run --rm node /app/packages/auth/scripts/migrate.mjs")
+	// One-shot migrator. The migrate script + its drizzle/ folder are
+	// bundled in apps/web/Dockerfile's `migrate-bundler` stage and
+	// land at `/app/migrate/core/`. Self-contained ESM with deps
+	// inlined — see DOCKER-1 in docs/tech-debt.md for the history of
+	// why this replaced the Next-standalone piggyback.
+	fmt.Fprintln(os.Stderr, "→ core-db-migrations: docker run --rm node /app/migrate/core/scripts/migrate.mjs")
 	dockerCmd := fmt.Sprintf(
-		"docker run --rm --network %s -e %s %s node /app/packages/auth/scripts/migrate.mjs",
+		"docker run --rm --network %s -e %s %s node /app/migrate/core/scripts/migrate.mjs",
 		shellQuote(network),
 		shellQuote("CORE_DATABASE_URL="+dbURL),
 		shellQuote(image),
