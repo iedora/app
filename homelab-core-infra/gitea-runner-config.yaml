@@ -31,11 +31,13 @@ cache:
 
 container:
   privileged: false
-  # 2 cpus + 2 GB por job × capacity 3 = 6 cpus + 6 GB cap total.
-  # Beelink N100 = 4 cores + 16 GB. Headroom para outros containers
-  # (gitea, oo, iedora-web, postgres) ~4 GB. Overcommit aceitável para
-  # CI bursts (raramente todos os 3 a 100%).
-  options: "--cpus=2 --memory=2g"
+  # 4 cpus + 3 GB por job × capacity 3 = 12 cpus + 9 GB cap total.
+  # Beelink N100 = 4 cores físicos + 16 GB → cada job consegue saturar
+  # os 4 cores quando corre sozinho; quando há concorrência o kernel
+  # time-slica. Run de parallel workspaces dentro do job é capped pelo
+  # próprio runner (scripts/run-parallel.mjs lê availableParallelism()
+  # que respeita o cgroup --cpus, evitando over-subscription).
+  options: "--cpus=4 --memory=3g"
   valid_volumes:
     - /var/cache/buildx
     - /var/cache/bun
