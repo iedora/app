@@ -1,12 +1,17 @@
-# CI orchestrator — referencia os 2 composite actions paralelos:
+# CI — 2 jobs paralelos num só workflow para UI mostrar tudo numa view:
 #
-#   ci     → .gitea/actions/ci      (correctness: typecheck/lint/test)
-#   audit  → .gitea/actions/audit   (security: gitleaks/hadolint/osv-scanner)
+#   ci     → correctness  (typecheck/lint/test)
+#   audit  → security     (gitleaks/hadolint/osv-scanner)
 #
-# Composite actions têm a sua própria pasta + bash em .sh (não inline)
-# para manter este workflow thin + cada concern auto-contida + testável
-# isoladamente. Quando o Gitea fixar #34986 (workflow_call broken para
-# self-hosted runners) podemos extrair cada job para o seu workflow file.
+# Steps inline (não composite actions) para o Gitea Actions mostrar
+# cada step individualmente — bug #31397 ofusca steps dentro de
+# composite. Bash não-trivial vive em .gitea/<concern>/*.sh (ex.:
+# .gitea/audit/install-tools.sh), invocado por path absoluto. Mantém
+# o workflow legível + bash testável isoladamente via shellcheck.
+#
+# Concurrency group cancela runs antigos no mesmo branch quando há
+# push novo. Cron weekly só corre o `audit` (skip ci via `if:`) —
+# CVE database refresca-se sem push.
 
 name: CI
 
@@ -16,43 +21,85 @@ on:
     branches: [main]
   workflow_dispatch:
   schedule:
-    # Segunda 06:00 UTC — pesca CVEs novas que apareceram na OSV durante
-    # a semana mesmo sem push. Só o job `audit` corre (ver `if:` no `ci`).
-    - cron: '0 6 * * 1'
+    - cron: '0 6 * * 1'  # Segunda 06:00 UTC — pesca CVEs novas
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # Correctness gate: typecheck + lint + test em paralelo workspace.
+  # bun-debian label → oven/bun:1.3-debian (homelab-core-infra/
+  # gitea-runner-config.yaml: GITEA_RUNNER_LABELS).
+  # Bind-mount /var/cache/bun: bun install cache persiste entre runs.
+  # ─────────────────────────────────────────────────────────────────
   ci:
     if: github.event_name != 'schedule'
-    # bun-debian label = oven/bun:1.3-debian (mapeado em
-    # homelab-core-infra/gitea-runner-config.yaml).
     runs-on: bun-debian
     timeout-minutes: 15
     container:
       image: oven/bun:1.3-debian
-      # Bind-mount directo do bun install cache do host. Filesystem access
-      # nativo → ~5s restore (vs ~2min com actions/cache + cache-server).
       volumes:
         - /var/cache/bun:/root/.bun/install/cache
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.gitea/actions/ci
 
+      - name: Install workspace deps
+        run: bun install --frozen-lockfile
+
+      - name: typecheck (all workspaces, paralelo, tsgo)
+        run: bun run typecheck
+
+      - name: lint (all workspaces, paralelo, eslint)
+        run: bun run lint
+
+      - name: test (all workspaces, sequencial, vitest internamente paraleliza)
+        run: bun run test
+
+  # ─────────────────────────────────────────────────────────────────
+  # Security gate: 3 tools sobre o filesystem + lockfile + history.
+  # Binários cached em /var/cache/audit-tools (bind-mount, idempotent
+  # install via .gitea/audit/install-tools.sh).
+  # ─────────────────────────────────────────────────────────────────
   audit:
     runs-on: bun-debian
     timeout-minutes: 10
     container:
       image: oven/bun:1.3-debian
-      # Bind-mount /opt/audit-bin cache → /var/cache/audit-tools no host.
-      # Binários (gitleaks/hadolint/osv-scanner) persistem entre runs.
       volumes:
         - /var/cache/audit-tools:/opt/audit-bin
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      HADOLINT_VERSION: 2.14.0
+      OSV_VERSION: 2.3.8
     steps:
       - uses: actions/checkout@v4
         with:
-          # gitleaks precisa do histórico completo para varrer commits.
+          # gitleaks varre commits — precisa do histórico completo.
           fetch-depth: 0
-      - uses: ./.gitea/actions/audit
+
+      - name: Restore or install audit binaries
+        # Script idempotent: cada tool só descarrega se diferente da
+        # versão pinned (env above). Cold start ~15s (apt + 3 binaries),
+        # steady-state ~1s. Bash extraído para shellcheck local.
+        shell: bash
+        run: .gitea/audit/install-tools.sh
+
+      - name: gitleaks (secret scan — full history, baseline-filtered)
+        # --baseline-path: ignora 23 findings históricos pre-adoção
+        # (test fixtures + .env + tfstate purged). Bloqueia só leaks
+        # NOVOS. Re-gerar: gitleaks detect --report-format json
+        # --report-path .gitleaks-baseline.json
+        run: /opt/audit-bin/gitleaks detect --baseline-path .gitleaks-baseline.json --redact --verbose --no-banner --exit-code 1
+
+      - name: hadolint (Dockerfile lint)
+        # failure-threshold=error → warnings logam mas não quebram CI.
+        # Próxima leva: corrigir DL4006 (real bug — exit do `npm install
+        # … | tail -3` é o do tail).
+        run: /opt/audit-bin/hadolint --failure-threshold error apps/web/Dockerfile
+
+      - name: osv-scanner (lockfile CVEs)
+        # Picks up osv-scanner.toml do cwd. Suppressões known + tracked
+        # vivem lá com rationale + review (RFC3339 datetime).
+        run: /opt/audit-bin/osv-scanner --lockfile=bun.lock
