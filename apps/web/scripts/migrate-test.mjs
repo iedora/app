@@ -1,17 +1,20 @@
-// Applies every product schema migration the unified E2E suite needs:
+// Applies every product schema migration the unified E2E suite needs.
 //
-//   1. core_test  — better-auth tables, applied by @iedora/auth's
-//      self-healing migrate.mjs (creates the DB if absent).
-//   2. menu_test  — menu's Drizzle schema, applied via drizzle-kit
-//      from products/menu/.
+// Goes through the SAME path as bin/dev-stack + Stage 3 prod: the
+// `iedora local migrate` Go subcommand builds the dedicated migrate
+// image (infra/migrate/Dockerfile) and `docker run --rm`s it once per
+// product. One source of truth (`infra/deploy/cmd/iedora/local_migrate.go::
+// localMigrators`) for the product list; one image; one entrypoint
+// layout. No host-bun shellout, no per-product loop here.
 //
-// Add a product = append it to PRODUCT_MIGRATIONS below. Products that
-// own no Drizzle schema (e.g. core, which lives on @iedora/auth) need
-// no entry here.
+// CI specifics: GitHub Actions exposes the postgres service container on
+// host port 5432; the migrate container joins `--network host` so
+// `localhost:5432` from inside it = the postgres service. Same
+// password as the dev compose stack (`Password1!`), so no flag override.
 //
-// Invoked by `bun run db:migrate:test` from apps/web/, which loads
-// `.env.test` via `bun --env-file=.env.test` before spawning this
-// script.
+// Add a product = the change goes in local_migrate.go::localMigrators
+// + infra/migrate/Dockerfile + products/<p>/scripts/migrate.mjs.
+// This script doesn't need to change.
 
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -20,28 +23,25 @@ import { dirname, resolve } from 'node:path'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(__dirname, '../../..')
 
-const PRODUCT_MIGRATIONS = [
-  { name: 'menu', cwd: resolve(repoRoot, 'products/menu') },
-]
+const iedora = resolve(repoRoot, 'bin/iedora')
 
-const coreMigrate = resolve(
-  repoRoot,
-  'packages/auth/scripts/migrate.mjs',
-)
-
-async function run(cmd, args, opts) {
-  await new Promise((res, rej) => {
-    const p = spawn(cmd, args, { stdio: 'inherit', ...opts })
-    p.on('close', (code) =>
-      code === 0 ? res() : rej(new Error(`${cmd} ${args.join(' ')} exited ${code}`)),
-    )
-  })
-}
-
-console.log('[migrate-test] applying core schema…')
-await run('node', [coreMigrate])
-
-for (const { name, cwd } of PRODUCT_MIGRATIONS) {
-  console.log(`[migrate-test] applying ${name} schema…`)
-  await run('bun', ['--bun', 'drizzle-kit', 'migrate'], { cwd })
-}
+await new Promise((res, rej) => {
+  const p = spawn(
+    iedora,
+    [
+      'migrate',
+      '--repo', repoRoot,
+      // GH Actions postgres service is exposed on host port 5432, not on
+      // any docker network reachable from the migrate container — use
+      // host networking so `localhost:5432` resolves to the service.
+      '--network', 'host',
+      '--pg-host', 'localhost',
+    ],
+    { stdio: 'inherit' },
+  )
+  p.on('close', (code) =>
+    code === 0
+      ? res()
+      : rej(new Error(`iedora local migrate exited ${code}`)),
+  )
+})
