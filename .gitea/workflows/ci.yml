@@ -1,8 +1,13 @@
-# Pipeline — 3 jobs no mesmo workflow para gating natural e UI única:
+# Pipeline — 4 jobs no mesmo workflow para gating natural e UI única:
 #
-#   ci      → correctness  (typecheck/lint/test)         [PR + push main + dispatch]
-#   audit   → security     (gitleaks/hadolint/osv)       [PR + push main + dispatch + cron]
-#   deploy  → kamal deploy (gated: needs [ci, audit])    [push main + dispatch]
+#   changes → path filter   (computa output `source`)     [PR + push main + dispatch]
+#   ci      → correctness   (typecheck/lint/test)         [needs source=true; skip cron]
+#   audit   → security      (gitleaks/hadolint/osv)       [PR + push main + dispatch + cron]
+#   deploy  → kamal deploy  (needs ci+audit, source=true) [push main + dispatch]
+#
+# `audit` corre sempre — gitleaks scan histórico, secrets podem aparecer
+# em docs também. `ci` e `deploy` skip-am quando só docs/non-source
+# mudam, poupando tempo de CI em PRs documentais.
 #
 # Steps inline (não composite actions) para o Gitea Actions mostrar
 # cada step individualmente — bug #31397 ofusca steps dentro de
@@ -28,13 +33,48 @@ on:
 
 jobs:
   # ─────────────────────────────────────────────────────────────────
+  # Path filter: ci + deploy só correm se source mudou (typescript,
+  # lockfile, Dockerfile, configs Kamal, workflows próprios). Docs-only
+  # PR/push skipa typecheck/lint/test/deploy. `audit` corre sempre
+  # (gitleaks scan history; secret pode aparecer em docs também).
+  # `workflow_dispatch` e `schedule` ignoram este filtro.
+  # ─────────────────────────────────────────────────────────────────
+  changes:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    outputs:
+      source: ${{ steps.filter.outputs.source }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            source:
+              - '**/*.ts'
+              - '**/*.tsx'
+              - '**/*.js'
+              - '**/*.mjs'
+              - '**/*.cjs'
+              - '**/*.json'
+              - 'bun.lock'
+              - '**/Dockerfile'
+              - 'config/**'
+              - '.kamal/**'
+              - '.gitea/workflows/**'
+              - '.gitea/audit/**'
+              - '.gitea/deploy/**'
+              - 'homelab-core-infra/**'
+
+  # ─────────────────────────────────────────────────────────────────
   # Correctness gate: typecheck + lint + test em paralelo workspace.
   # bun-debian label → oven/bun:1.3-debian (homelab-core-infra/
   # gitea-runner-config.yaml: GITEA_RUNNER_LABELS).
   # Bind-mount /var/cache/bun: bun install cache persiste entre runs.
   # ─────────────────────────────────────────────────────────────────
   ci:
-    if: github.event_name != 'schedule'
+    needs: changes
+    if: github.event_name != 'schedule' && (github.event_name == 'workflow_dispatch' || needs.changes.outputs.source == 'true')
     concurrency:
       group: ci-${{ github.ref }}
       cancel-in-progress: true
@@ -135,50 +175,34 @@ jobs:
   # kamal-remote-ssh--... preserva cache em volumes Docker entre runs.
   # ─────────────────────────────────────────────────────────────────
   deploy:
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
-    needs: [ci, audit]
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.source == 'true')
+    needs: [changes, ci, audit]
     concurrency:
       group: deploy-production
       cancel-in-progress: false   # mid-deploy abort would leave inconsistent state
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    container:
+      image: node:24-bookworm
+      # Bind-mount /var/cache/deploy-tools (binários + gem home)
+      # cacheia entre runs. Whitelistado em homelab-core-infra/
+      # gitea-runner-config.yaml valid_volumes.
+      volumes:
+        - /var/cache/deploy-tools:/opt/deploy-bin
     steps:
       - uses: actions/checkout@v4
 
-      - name: System deps (docker-cli, ruby+dev, build-essential, jq, python3, curl, unzip)
-        shell: bash
-        run: |
-          apt-get update -qq
-          apt-get install -y -qq --no-install-recommends \
-            ca-certificates curl unzip jq python3 \
-            ruby ruby-dev build-essential \
-            docker.io
-
-      - name: Install Docker buildx plugin
-        # Debian's `docker.io` apt package NÃO inclui buildx. Kamal
-        # precisa para o remote builder (`kamal deploy` falha logo no
-        # `docker buildx version`). Binary directo do release oficial.
+      - name: Restore or install deploy tools
+        # Idempotent: apt deps (ruby+dev/build-essential/docker.io)
+        # corre cold cada run; buildx + bws + kamal gem são reutilizados
+        # do volume. Cold ~60s, steady-state ~30s. Pattern espelha
+        # `.gitea/audit/install-tools.sh`.
         shell: bash
         env:
-          BUILDX_VER: "0.34.1"
-        run: |
-          mkdir -p ~/.docker/cli-plugins
-          curl -fsSL "https://github.com/docker/buildx/releases/download/v${BUILDX_VER}/buildx-v${BUILDX_VER}.linux-amd64" \
-            -o ~/.docker/cli-plugins/docker-buildx
-          chmod +x ~/.docker/cli-plugins/docker-buildx
-          docker buildx version
-
-      - name: Install Kamal 2.11
-        shell: bash
-        run: gem install --no-document kamal -v 2.11.0
-
-      - name: Install BWS CLI
-        shell: bash
-        run: |
-          BWS_VER="${BWS_VER:-0.5.0}"
-          curl -fsSL "https://github.com/bitwarden/sdk-sm/releases/download/bws-v${BWS_VER}/bws-x86_64-unknown-linux-gnu-${BWS_VER}.zip" -o /tmp/bws.zip
-          unzip -q /tmp/bws.zip -d /tmp/bws
-          install -m 0755 /tmp/bws/bws /usr/local/bin/bws
+          KAMAL_VERSION: "2.11.0"
+          BUILDX_VERSION: "0.34.1"
+          BWS_VERSION: "0.5.0"
+        run: .gitea/deploy/install-tools.sh
 
       - name: Bootstrap SSH from BWS
         # Exporta KAMAL_BWS_PROJECT_ID para steps seguintes (via
