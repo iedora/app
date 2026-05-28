@@ -37,11 +37,32 @@ export default function proxy(req: NextRequest) {
   const here = surfaceByHost(host)
 
   // 1. Host-based rewrite for surfaces with a rewritePath set.
+  //
+  // The rewrite is **idempotent**: if the path already starts with the
+  // surface's `rewritePath` (e.g. `menu.iedora.com/menu/onboarding`),
+  // we don't prepend again. Double-prefixing produced URLs that 404'd
+  // in prod even though the same internal route worked.
+  //
+  // Why it matters: server-side `redirect('/menu/onboarding')` calls
+  // (in app pages + menu's auth use-cases) emit the INTERNAL Next path
+  // as the browser-visible Location header. The browser then visits
+  // `menu.iedora.com/menu/onboarding`, and without idempotence the
+  // proxy turned it into `/menu/menu/onboarding` → 404. Now both
+  // `menu.iedora.com/onboarding` and `menu.iedora.com/menu/onboarding`
+  // resolve to the same internal `/menu/onboarding` route.
+  //
+  // Note: when the path is already prefixed we DON'T early-return —
+  // we just skip the rewrite. Rules 2 (cross-host guard) and 3 (auth
+  // gate) still need to evaluate for `/menu/dashboard` direct visits.
   if (here && here.rewritePath) {
-    const target = path === '/' ? here.rewritePath : `${here.rewritePath}${path}`
-    const url = req.nextUrl.clone()
-    url.pathname = target
-    return NextResponse.rewrite(url)
+    const alreadyPrefixed =
+      path === here.rewritePath || path.startsWith(`${here.rewritePath}/`)
+    if (!alreadyPrefixed) {
+      const target = path === '/' ? here.rewritePath : `${here.rewritePath}${path}`
+      const url = req.nextUrl.clone()
+      url.pathname = target
+      return NextResponse.rewrite(url)
+    }
   }
 
   // 2. Cross-host guard — visiting another surface's namespace from
