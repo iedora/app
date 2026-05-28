@@ -1,130 +1,171 @@
 # Git & Gitea — commit / push canonical
 
-Setup mínimo para empurrar para `git.iedora.com` (Gitea self-hosted no
-homelab) com:
+Setup para empurrar para `git.iedora.com` (Gitea self-hosted no homelab)
+**de qualquer rede** (casa, café, 4G) e em **qualquer um dos 3 laptops**
+sem copiar ficheiros entre máquinas.
 
-- **Auth SSH** sem `GIT_SSH_COMMAND` em cada push
-- **Commit signing SSH** ("Verified" badge no Gitea, sem GPG)
-- **Conventional Commits** enforced localmente via `commit-msg` hook
-- **Hooks** instalados automaticamente pelo `bun install`
+Stack:
+
+- **Bitwarden Desktop SSH Agent** — chave SSH vive no vault encriptado,
+  sincroniza entre laptops. Usada para **commit signing**.
+- **HTTPS para transporte git** via Cloudflare Tunnel (`git.iedora.com`).
+  PAT no keychain do OS (que tu mantéis em backup no vault).
+- **Hooks** (pre-commit + commit-msg) instalados pelo `bun install`.
+
+```
+┌─ Bitwarden vault (sync 3 laptops) ─┐
+│  SSH key (signing)  +  Gitea PAT   │
+└────────────────────────────────────┘
+       │                  │
+       ▼                  ▼
+   ssh-agent          OS keychain
+   (signing)          (git push HTTPS)
+       │                  │
+       ▼                  ▼
+   git commit -S     git push gitea
+```
 
 Workflow assumido: **trunk-based**. Pushes ao `main` disparam CI. PRs
 opcionais quando se quer revisão explícita.
 
----
-
-## 1. SSH config (uma vez por máquina)
-
-A chave registada no Gitea é a **`ci_ed25519`** (nome no Gitea:
-`operator-mac`). Gera nova se for outra máquina — vê § Onboarding nova
-máquina.
-
-### macOS / Linux
-
-Adiciona ao `~/.ssh/config`:
-
-```ssh-config
-Host gitea.iedora git.iedora.com 192.168.50.53
-  HostName 192.168.50.53
-  Port 3022
-  User git
-  IdentityFile ~/.ssh/ci_ed25519
-  IdentitiesOnly yes
-```
-
-Testa: `ssh -T git@192.168.50.53 -p 3022` deve devolver
-`Hi there, eduvhc!`.
-
-### Windows
-
-Duas opções:
-
-**A) Git Bash (recomendado — mesma UX que macOS/Linux)**
-
-Mesmo bloco acima em `C:\Users\<tu>\.ssh\config`. Garante permissões
-restritivas:
-
-```powershell
-icacls "$env:USERPROFILE\.ssh\config" /inheritance:r /grant:r "${env:USERNAME}:F"
-icacls "$env:USERPROFILE\.ssh\ci_ed25519" /inheritance:r /grant:r "${env:USERNAME}:F"
-```
-
-Sem isto, o OpenSSH do Windows recusa a chave com `Permissions for
-'config' are too open`.
-
-**B) PowerShell + OpenSSH nativo (Windows 10+)**
-
-Mesmo ficheiro `~\.ssh\config`. O `ssh-agent` do Windows liga-se
-diferente:
-
-```powershell
-Set-Service ssh-agent -StartupType Automatic
-Start-Service ssh-agent
-ssh-add $env:USERPROFILE\.ssh\ci_ed25519
-```
-
-Em ambos os casos, `git push gitea homelab-migration` funciona sem
-flags adicionais.
-
-> Nota WSL2: se clonares o repo dentro de WSL, repete a § macOS/Linux
-> dentro da distro. **Não** partilhes a chave entre Windows-host e WSL
-> via `/mnt/c` — copia para `~/.ssh/` dentro de WSL e ajusta `chmod 600`.
+> **macOS — atalho automatizado**: `bun run setup:mac` (corre
+> `scripts/setup-laptop-mac.sh`). Faz tudo nas secções 2-6 por ti;
+> só precisas dos 3 cliques na UI do Bitwarden Desktop (§ 1).
 
 ---
 
-## 2. Commit signing SSH (uma vez por máquina)
+## 1. Bitwarden Desktop — SSH Agent
 
-A chave de access do Gitea é a **mesma** que assina commits (limitação
-do Gitea — não há separação como no GitHub). Já a tens; só falta
-configurar o git:
+Em **cada laptop**:
 
-### macOS / Linux
+1. **Instala Bitwarden Desktop**
+   - macOS: `brew install --cask bitwarden` (ou App Store)
+   - Linux: `.deb` / `.AppImage` / `flatpak install com.bitwarden.desktop`
+   - Windows: instalador `.exe` ou Microsoft Store
+
+2. **Settings → Security → SSH Agent → Enable**
+
+3. **Adiciona a chave SSH ao vault** (uma vez, primeiro laptop):
+   - `+ Add Item → SSH Key → Generate`
+   - Nome: `iedora-gitea`
+   - Copia a public key
+
+4. **Regista a public key no Gitea** (uma vez):
+   - https://git.iedora.com/user/settings/keys
+   - **Add SSH Key**, nome: `bitwarden-vault`, cola a public key
+   - Marca como **Authentication** e **Signing** (Gitea usa a mesma key
+     para os dois)
+
+Nos restantes laptops, basta enable SSH Agent — o vault sincroniza.
+
+### Socket paths por OS
+
+| OS | Install | Path |
+|---|---|---|
+| macOS | App Store | `~/Library/Containers/com.bitwarden.desktop/Data/.bitwarden-ssh-agent.sock` |
+| macOS | .dmg / brew | `~/.bitwarden-ssh-agent.sock` |
+| Linux | standard | `~/.bitwarden-ssh-agent.sock` |
+| Linux | snap | `~/snap/bitwarden/current/.bitwarden-ssh-agent.sock` |
+| Linux | flatpak | `~/.var/app/com.bitwarden.desktop/data/.bitwarden-ssh-agent.sock` |
+| Windows | qualquer | `\\.\pipe\openssh-ssh-agent` (desliga o OpenSSH Authentication Agent service primeiro) |
+
+### Shell config
+
+**macOS / Linux** — appende ao `~/.zshrc` (zsh) ou `~/.bashrc` (bash):
+
+```bash
+# Bitwarden SSH Agent — vault sincroniza chaves entre laptops
+BW_SSH_SOCK="$HOME/Library/Containers/com.bitwarden.desktop/Data/.bitwarden-ssh-agent.sock"
+# ↑ ajusta path conforme tabela acima
+[ -S "$BW_SSH_SOCK" ] && export SSH_AUTH_SOCK="$BW_SSH_SOCK"
+unset BW_SSH_SOCK
+```
+
+Recarrega: `source ~/.zshrc`. Verifica: `ssh-add -l` deve listar a key.
+
+**Windows (PowerShell — Admin uma vez)**:
+
+```powershell
+Stop-Service ssh-agent
+Set-Service ssh-agent -StartupType Disabled
+# Bitwarden assume o pipe OpenSSH; nenhum env var necessário.
+```
+
+---
+
+## 2. Commit signing (Bitwarden assina)
+
+Em **cada laptop**, uma vez:
 
 ```bash
 git config --global commit.gpgsign true
 git config --global gpg.format ssh
-git config --global user.signingkey ~/.ssh/ci_ed25519.pub
+git config --global user.signingkey 'key::ssh-ed25519 AAAA…'   # cola a public key
 
-# allowed_signers — o git usa para verificar localmente (`git log --show-signature`)
+# allowed_signers — `git log --show-signature` verifica localmente
 EMAIL=$(git config --global user.email)
-echo "$EMAIL namespaces=\"git\" $(cat ~/.ssh/ci_ed25519.pub)" >> ~/.ssh/allowed_signers
+PUB='ssh-ed25519 AAAA…'   # mesma key
+echo "$EMAIL namespaces=\"git\" $PUB" >> ~/.ssh/allowed_signers
 git config --global gpg.ssh.allowedSignersFile ~/.ssh/allowed_signers
 ```
 
-O Gitea mostra "Verified" automaticamente porque a chave já está
-registada como access key — nada para fazer no UI.
-
-### Windows (Git Bash ou PowerShell)
-
-```powershell
-git config --global commit.gpgsign true
-git config --global gpg.format ssh
-git config --global user.signingkey "$env:USERPROFILE\.ssh\ci_ed25519.pub"
-
-$email = git config --global user.email
-$key = Get-Content "$env:USERPROFILE\.ssh\ci_ed25519.pub"
-Add-Content "$env:USERPROFILE\.ssh\allowed_signers" "$email namespaces=`"git`" $key"
-git config --global gpg.ssh.allowedSignersFile "$env:USERPROFILE\.ssh\allowed_signers"
-```
+Bitwarden Desktop tem de estar **aberto e unlocked** para assinar.
 
 Verifica: `git log --show-signature -1` deve dizer
 `Good "git" signature for eduardoferdcarvalho@gmail.com`.
 
 ---
 
-## 3. Hooks (auto-instalados)
+## 3. HTTPS transport + Gitea PAT
 
-O `bun install` na raiz do repo corre um `postinstall` que copia:
+### Remote
 
-- `scripts/git-hooks/pre-commit` → `.git/hooks/pre-commit`
-  - Corre `actionlint` + `shellcheck` em ficheiros de `.github/`
-    alterados. Espelha o CI job `workflow-lint`.
-- `scripts/git-hooks/commit-msg` → `.git/hooks/commit-msg`
-  - Valida o subject contra Conventional Commits.
+```bash
+git remote set-url gitea https://git.iedora.com/eduvhc/iedora.git
+```
 
-**Funciona em Windows** desde que tenhas Git Bash (acompanha o Git for
-Windows). Os hooks são bash; o Git para Windows fornece o interpretador
-automaticamente.
+### Credential helper (cache do PAT no OS)
+
+| OS | Comando |
+|---|---|
+| macOS | `git config --global credential.helper osxkeychain` |
+| Linux | `git config --global credential.helper libsecret` |
+| Windows | `git config --global credential.helper manager` (Git Credential Manager — built-in com Git for Windows) |
+
+### Gera o PAT (uma vez)
+
+1. https://git.iedora.com/user/settings/applications
+2. **Generate New Token**, scopes: `repository: read+write`
+3. Copia o token, **guarda no Bitwarden vault** (Secure Note:
+   `iedora-gitea-pat`)
+4. Primeira push pede `Username: eduvhc` e `Password: <PAT>` — o
+   keychain cacheia automaticamente
+
+Em **laptop novo**: o vault tem o PAT, cola na prompt da 1ª push, OS
+guarda.
+
+### Rotação
+
+A cada 6-12 meses regenera no Gitea + atualiza vault + invalida cache:
+
+```bash
+echo "url=https://git.iedora.com" | git credential reject
+# Próxima push pede credenciais novas
+```
+
+---
+
+## 4. Hooks (auto-instalados)
+
+`bun install` na raiz copia:
+
+- `scripts/git-hooks/pre-commit` → `actionlint` em ficheiros de
+  `.gitea/workflows/` alterados.
+- `scripts/git-hooks/commit-msg` → valida o subject contra Conventional
+  Commits.
+
+Funciona em macOS/Linux/Windows (Git Bash — vem com Git for Windows).
+Bypass de emergência: `git commit --no-verify`.
 
 ### Conventional Commits — formato
 
@@ -132,9 +173,9 @@ automaticamente.
 <type>(<scope>)?!?: <subject ≤ 72 chars>
 ```
 
-Types aceites: `feat fix perf docs refactor test chore ci build style`.
+Types: `feat fix perf docs refactor test chore ci build style`.
 
-Exemplos válidos:
+Exemplos:
 
 ```
 fix(ci): vitest 5 beta workaround for Bun __esModule bug
@@ -142,84 +183,66 @@ feat(menu)!: drop legacy slug API
 chore: bump deps
 ```
 
-Bypass de emergência: `git commit --no-verify` (evita ambos os hooks —
-usa só se souberes o que estás a fazer).
-
 ---
 
-## 4. Push flow (dia-a-dia)
+## 5. Push flow (dia-a-dia, qualquer laptop, qualquer rede)
 
 ```bash
-# branch + commit
 git checkout -b fix/something
 # ... edits ...
 git add -A
-git commit -m "fix(ci): mensagem curta"   # commit-msg + signing automáticos
-git push gitea fix/something                # SSH auto via config
+git commit -m "fix(scope): mensagem"   # commit-msg valida; Bitwarden assina
+git push gitea fix/something            # HTTPS via Cloudflare; keychain → PAT
+```
 
-# opcional — PR via API (CLI gh do GitHub não fala Gitea)
-curl -X POST -u eduvhc:$GITEA_TOKEN \
+Trunk-based (push direto ao main):
+
+```bash
+git checkout main
+git pull --rebase gitea main
+git commit -m "..."
+git push gitea main
+```
+
+Criar PR via API (não há `gh` para Gitea):
+
+```bash
+curl -X POST -u eduvhc:$(security find-generic-password -s git.iedora.com -w) \
   -H "Content-Type: application/json" \
   -d '{"title":"fix: something","head":"fix/something","base":"main"}' \
   https://git.iedora.com/api/v1/repos/eduvhc/iedora/pulls
 ```
 
-Para empurrar direto ao `main` (trunk-based, default):
+---
 
-```bash
-git checkout main
-git pull --rebase gitea main
-# ... edits ...
-git commit -m "..."
-git push gitea main
-```
+## 6. Onboarding novo laptop
+
+1. Instala Git, Bun, Bitwarden Desktop
+2. Login no Bitwarden, **Enable SSH Agent** em Settings
+3. Appende `SSH_AUTH_SOCK` ao shell rc (§ 1)
+4. `git config --global` para signing (§ 2) e credential.helper (§ 3)
+5. `git clone https://git.iedora.com/eduvhc/iedora.git`
+6. `cd iedora && bun install`   (instala hooks)
+7. Primeira push: cola PAT do vault na prompt
 
 ---
 
-## 5. Onboarding nova máquina
+## 7. Troubleshooting
 
-Se a máquina é nova (sem `ci_ed25519` existente):
+**`ssh-add -l` diz "The agent has no identities".** Bitwarden Desktop
+fechado, SSH Agent não está enabled em Settings, ou `SSH_AUTH_SOCK`
+aponta para path errado — confirma a tabela em § 1.
 
-```bash
-# 1. Gera chave dedicada (sem passphrase para auto-push, ou com passphrase + agent)
-ssh-keygen -t ed25519 -f ~/.ssh/ci_ed25519 -C "ci@$(hostname)-$(date +%Y%m%d)"
-
-# 2. Regista no Gitea
-cat ~/.ssh/ci_ed25519.pub
-# → cola em https://git.iedora.com/user/settings/keys com nome descritivo (ex: "operator-laptop2")
-
-# 3. Aplica § 1, § 2 acima
-
-# 4. Clona
-git clone ssh://git@192.168.50.53:3022/eduvhc/iedora.git
-cd iedora
-bun install   # instala hooks automaticamente
-```
-
----
-
-## 6. Troubleshooting
-
-**`Permission denied (publickey)` no push.** A `id_ed25519` default não
-está registada no Gitea. Confirma que a SSH config aponta para a chave
-correta:
-
-```bash
-ssh -v git@192.168.50.53 -p 3022 2>&1 | grep "Offering\|Server accepts"
-# Deve mostrar: Offering public key: ~/.ssh/ci_ed25519
-```
+**`fatal: Authentication failed for 'https://git.iedora.com/...'`.** PAT
+expirou ou foi revogado. Limpa cache: `echo "url=https://git.iedora.com" | git credential reject` e tenta de novo.
 
 **Commit recusado por `✗ commit message não-conventional`.** Reescreve
-o último commit: `git commit --amend -m "feat(scope): mensagem"`.
+o último: `git commit --amend -m "feat(scope): mensagem"`.
 
-**Signing falha com `error: gpg failed to sign the data`.** Provavelmente
-o caminho da chave está errado no config. Verifica:
+**Signing falha com `error: gpg failed to sign the data`.** Confirma que
+Bitwarden Desktop está aberto e unlocked. Testa:
+`echo test | ssh-keygen -Y sign -n git -f <(ssh-add -L | head -1)` deve
+produzir uma assinatura.
 
-```bash
-git config --global --get user.signingkey
-ls -la $(git config --global --get user.signingkey)
-```
-
-**Hooks não correm em Windows.** Garante que tens Git Bash instalado
-(parte do Git for Windows) e que o ficheiro `.git/hooks/commit-msg`
-tem permissões de execução (em Git Bash: `chmod +x .git/hooks/*`).
+**Hooks não correm em Windows.** Garante Git for Windows (Git Bash) e
+permissão de execução: `chmod +x .git/hooks/*` em Git Bash.
