@@ -94,12 +94,14 @@ jobs:
         run: /opt/audit-bin/gitleaks detect --baseline-path .gitleaks-baseline.json --redact --verbose --no-banner --exit-code 1
 
       - name: hadolint (Dockerfile lint)
-        # failure-threshold=error → warnings logam mas não quebram CI.
-        # Próxima leva: corrigir DL4006 (real bug — exit do `npm install
-        # … | tail -3` é o do tail).
-        run: /opt/audit-bin/hadolint --failure-threshold error apps/web/Dockerfile
+        # Wrapper converte findings em workflow annotations
+        # (::warning::/::error::) que Gitea renderiza inline no PR.
+        # Threshold: só level=error quebra CI. Warnings actuais aparecem
+        # no PR para tracking (DL3008/DL3003/DL4006).
+        run: .gitea/audit/run-hadolint.sh apps/web/Dockerfile
 
       - name: osv-scanner (lockfile CVEs)
-        # Picks up osv-scanner.toml do cwd. Suppressões known + tracked
-        # vivem lá com rationale + review (RFC3339 datetime).
-        run: /opt/audit-bin/osv-scanner --lockfile=bun.lock
+        # --format gh-annotations: native emission de annotations para
+        # cada CVE encontrada. Se houver findings novos, aparecem no PR
+        # como comments inline no lockfile.
+        run: /opt/audit-bin/osv-scanner --lockfile=bun.lock --format gh-annotations
