@@ -1,13 +1,21 @@
 # Pipeline — 4 jobs no mesmo workflow para gating natural e UI única:
 #
-#   changes → path filter   (computa output `source`)     [PR + push main + dispatch]
-#   ci      → correctness   (typecheck/lint/test)         [needs source=true; skip cron]
-#   audit   → security      (gitleaks/hadolint/osv)       [PR + push main + dispatch + cron]
-#   deploy  → kamal deploy  (needs ci+audit, source=true) [push main + dispatch]
+#   changes → path filter (2 outputs: code + deploy)       [PR + push main + dispatch]
+#   ci      → correctness (typecheck/lint/test)            [needs code=true; skip cron]
+#   audit   → security    (gitleaks/hadolint/osv)          [PR + push main + dispatch + cron]
+#   deploy  → kamal deploy                                  [needs deploy=true; push main + dispatch]
+#
+# `code` = .ts/.tsx/.js/.mjs/.cjs, package.json, bun.lock,
+#         tsconfig*, vitest.config*, eslint.config*
+# `deploy` = code + Dockerfile + config/** + .kamal/**
+#
+# NÃO accionam (apenas `audit` corre):
+#   docs/**, *.md, AGENTS.md, .gitignore,
+#   .gitea/workflows/**, .gitea/audit/**, .gitea/deploy/**,
+#   homelab-core-infra/** (afecta infra, não app)
 #
 # `audit` corre sempre — gitleaks scan histórico, secrets podem aparecer
-# em docs também. `ci` e `deploy` skip-am quando só docs/non-source
-# mudam, poupando tempo de CI em PRs documentais.
+# em docs também.
 #
 # Steps inline (não composite actions) para o Gitea Actions mostrar
 # cada step individualmente — bug #31397 ofusca steps dentro de
@@ -43,7 +51,8 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     outputs:
-      source: ${{ steps.filter.outputs.source }}
+      code: ${{ steps.filter.outputs.code }}
+      deploy: ${{ steps.filter.outputs.deploy }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,17 +63,28 @@ jobs:
       - id: filter
         shell: bash
         # bash + `git diff --name-only` em vez de dorny/paths-filter:
-        # Gitea Actions tem issues conhecidos com getFilesChanged
-        # (issue #23919) e o proxy para actions externos não sempre
-        # garante context completo. Esta implementação é debuggable
-        # (echo do diff), zero deps externas, e funciona em PR + push.
+        # Gitea bug #23919 (getFilesChanged retorna paths vazios) pode
+        # quebrar o action externo. Esta implementação é debuggable
+        # (echo do diff), zero deps, e funciona em PR + push.
+        #
+        # Dois outputs separados:
+        #   code   → afecta typecheck/lint/test (.ts/.tsx/.js, deps,
+        #            configs de teste). Aciona job `ci`.
+        #   deploy → code + Dockerfile + config Kamal + secrets/hooks.
+        #            Aciona job `deploy` (rebuild + push da imagem).
+        #
+        # Mudanças que NÃO accionam nada: docs, AGENTS.md, .gitignore,
+        # workflows próprios, homelab-core-infra (compose/runner config
+        # — afecta infra, não a app), `.gitea/audit/`, `.gitea/deploy/`
+        # (scripts do runner, não da imagem).
         run: |
           set -euo pipefail
 
           # Manual trigger override — força tudo a correr
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "→ workflow_dispatch — forçar source=true"
-            echo "source=true" >> "$GITHUB_OUTPUT"
+            echo "→ workflow_dispatch — forçar code=true deploy=true"
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -76,8 +96,6 @@ jobs:
             HEAD="${{ github.event.after }}"
           fi
 
-          # Edge case: BASE all-zeros = primeiro push da branch.
-          # Compara contra empty tree para listar tudo como "changed".
           if [ "$BASE" = "0000000000000000000000000000000000000000" ] || [ -z "$BASE" ]; then
             BASE=$(git hash-object -t tree --stdin </dev/null)
           fi
@@ -88,12 +106,26 @@ jobs:
           echo "$CHANGED"
           echo "───────────────────"
 
-          if echo "$CHANGED" | grep -qE '\.(ts|tsx|js|mjs|cjs|json)$|^bun\.lock$|(^|/)Dockerfile$|^config/|^\.kamal/|^\.gitea/workflows/|^\.gitea/audit/|^\.gitea/deploy/|^homelab-core-infra/'; then
-            echo "→ source=true (algum ficheiro relevante mudou)"
-            echo "source=true" >> "$GITHUB_OUTPUT"
+          # Code = só ficheiros que afectam typecheck/lint/test.
+          CODE_RE='\.(ts|tsx|js|mjs|cjs)$|(^|/)package\.json$|^bun\.lock$|(^|/)tsconfig.*\.json$|(^|/)vitest\.config\.|(^|/)eslint\.config\.'
+
+          # Deploy = code + tudo o que afecta a imagem ou o Kamal config.
+          DEPLOY_RE="$CODE_RE"'|(^|/)Dockerfile$|^config/|^\.kamal/'
+
+          if echo "$CHANGED" | grep -qE "$CODE_RE"; then
+            echo "→ code=true"
+            echo "code=true" >> "$GITHUB_OUTPUT"
           else
-            echo "→ source=false (só docs/non-source)"
-            echo "source=false" >> "$GITHUB_OUTPUT"
+            echo "→ code=false"
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if echo "$CHANGED" | grep -qE "$DEPLOY_RE"; then
+            echo "→ deploy=true"
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "→ deploy=false"
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
           fi
 
   # ─────────────────────────────────────────────────────────────────
@@ -104,7 +136,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   ci:
     needs: changes
-    if: github.event_name != 'schedule' && (github.event_name == 'workflow_dispatch' || needs.changes.outputs.source == 'true')
+    if: github.event_name != 'schedule' && (github.event_name == 'workflow_dispatch' || needs.changes.outputs.code == 'true')
     concurrency:
       group: ci-${{ github.ref }}
       cancel-in-progress: true
@@ -205,7 +237,7 @@ jobs:
   # kamal-remote-ssh--... preserva cache em volumes Docker entre runs.
   # ─────────────────────────────────────────────────────────────────
   deploy:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.source == 'true')
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.deploy == 'true')
     needs: [changes, ci, audit]
     concurrency:
       group: deploy-production
