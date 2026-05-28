@@ -52,6 +52,14 @@ if [ -z "$ZO_PASS" ]; then
   exit 1
 fi
 
+# CLOUDFLARE_API_TOKEN para o Caddy fazer DNS-01 challenge (auto-issue
+# cert LE para git.iedora.com sem precisar de challenge HTTP público).
+CF_TOKEN=$(get CLOUDFLARE_API_TOKEN)
+if [ -z "$CF_TOKEN" ]; then
+  echo "BWS key em falta: CLOUDFLARE_API_TOKEN" >&2
+  exit 1
+fi
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # `.env` é sempre materializado localmente; com DOCKER_HOST=ssh://, o
@@ -60,6 +68,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ( cd "$HERE" && umask 077 && cat > .env <<EOF
 ZO_ROOT_USER_EMAIL=${ZO_EMAIL}
 ZO_ROOT_USER_PASSWORD=${ZO_PASS}
+CLOUDFLARE_API_TOKEN=${CF_TOKEN}
 EOF
 )
 
@@ -159,10 +168,25 @@ grep -qxF "$PUB" /root/.ssh/authorized_keys || {
   echo "  + public key autorizada em authorized_keys"
 }
 
-# 6. Cleanup: artefactos do método antigo (Gitea registry + buildkit
-#    workarounds) já não usados com Kamal Local Registry.
+# 6. /etc/hosts: git.iedora.com → 127.0.0.1 — para o builder local
+#    fazer push para o Caddy (host port 4443) em vez de seguir a DNS
+#    pública (CF tunnel). Builder + docker daemon do Beelink usam
+#    /etc/hosts. Tráfego externo (browser, CI) continua via CF normal.
+HOSTS_ENTRY="127.0.0.1 git.iedora.com"
+if ! grep -qxF "$HOSTS_ENTRY" /etc/hosts; then
+  echo "$HOSTS_ENTRY" >> /etc/hosts
+  echo "  + /etc/hosts: git.iedora.com → 127.0.0.1"
+else
+  echo "  ✓ /etc/hosts já tem git.iedora.com → 127.0.0.1"
+fi
+
+# 7. Cleanup: artefactos dos métodos antigos
 docker buildx ls 2>/dev/null | awk '/^kamal-/{print $1}' | xargs -r -n1 docker buildx rm 2>/dev/null || true
 rm -f /root/.docker/buildx/buildkitd.toml /etc/buildkit/buildkitd.toml
+# Remove gitea-registry route do kamal-proxy se existir (tentei LE
+# direct mas CF intercepta os ACME challenges; agora é Caddy a fazer
+# TLS termination via DNS-01).
+docker exec kamal-proxy kamal-proxy remove gitea-registry 2>/dev/null || true
 REMOTE
   echo "✓ Beelink ready (Kamal local + /opt/iedora)"
 fi

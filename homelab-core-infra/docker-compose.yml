@@ -33,6 +33,10 @@ volumes:
   # `gitea-runner` (lê). Mantém o token de registo fora do BWS — é um
   # detalhe interno do compose, não atravessa boundary alguma.
   gitea_runner_token:
+  # Caddy persistência (certs LE + ACME state). Sem isto, cada
+  # restart do container re-acquire o cert (e bate no rate limit).
+  caddy_data:
+  caddy_config:
 
 services:
   openobserve:
@@ -133,6 +137,35 @@ services:
       - gitea_data:/var/lib/gitea
       - gitea_runner_token:/token
     restart: "no"
+    logging: { driver: json-file, options: { max-size: 10m } }
+
+  # ── Caddy reverse proxy com TLS via Cloudflare DNS-01 ───────────────
+  # Termina TLS para hostnames internos do homelab (git.iedora.com via
+  # Caddy → gitea:3000). Cert auto-renew via CF DNS-01 challenge —
+  # bypassa o CF proxy (LE não precisa de chegar publicamente, só ao
+  # API token via DNS TXT record). CLOUDFLARE_API_TOKEN é injectado
+  # pelo `up.sh` via .env (lido do BWS).
+  #
+  # Porto host 4443 (não :443) porque kamal-proxy já ocupa :443.
+  # Builder usa `registry.server: git.iedora.com:4443` em deploy.yml
+  # + /etc/hosts override no Beelink (127.0.0.1 git.iedora.com).
+  caddy:
+    build:
+      context: ./caddy
+    container_name: caddy
+    restart: unless-stopped
+    profiles: [extras]
+    networks:
+      homelab-core:
+        aliases: [caddy]
+    ports:
+      - "4443:443"
+    environment:
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     logging: { driver: json-file, options: { max-size: 10m } }
 
   # ── Gitea Actions runner (act_runner) ────────────────────────────────
