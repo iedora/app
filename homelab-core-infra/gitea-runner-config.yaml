@@ -43,6 +43,7 @@ container:
   valid_volumes:
     - /var/cache/buildx
     - /var/cache/bun
+    - /var/cache/audit-tools
     - /data/cache
 
 host: {}

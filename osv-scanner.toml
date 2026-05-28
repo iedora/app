@@ -1,0 +1,44 @@
+# osv-scanner config — supressões de CVEs known + tracked.
+# Cada entry tem rationale + data de review obrigatória.
+#
+# Regra do projecto: nada deve ficar suprimido sem rationale claro e
+# revisão trimestral. Se ao chegar à review_date o CVE não foi resolvido
+# upstream, re-avalia se o risk continua aceitável OU se mudamos de
+# dependency.
+
+[[IgnoredVulns]]
+id = "GHSA-67mh-4wv8-2f99"
+ignoreUntil = "2026-08-28"  # review trimestral
+reason = """
+esbuild 0.18.20 CORS bypass no dev server.
+
+Chain: drizzle-kit@0.31.10 → @esbuild-kit/esm-loader@2.6.5 →
+@esbuild-kit/core-utils@3.3.2 → esbuild@0.18.20.
+
+@esbuild-kit foi descontinuado pelos autores em 2024 (substituído por
+`tsx`), drizzle-kit ainda não migrou (open PR — drizzle-team/drizzle-orm#3001).
+
+Risk: drizzle-kit é dev-only (CLI para gerar migrations + push); não
+corre esbuild dev server. A vuln só explora se um endpoint do esbuild
+dev server estiver exposto, o que nunca acontece — drizzle-kit usa
+esbuild como bundler do próprio CLI.
+
+Action: monitor drizzle-kit releases; PR upstream tracked em
+drizzle-team/drizzle-orm#3001.
+"""
+
+[[IgnoredVulns]]
+id = "GHSA-qx2v-qp2m-jg93"
+ignoreUntil = "2026-08-28"
+reason = """
+postcss 8.4.31 line return parsing.
+
+Cadeia: next@16.2.6 fixa postcss@8.4.31 directamente (pinned exact).
+
+Risk: postcss processa o nosso próprio CSS no build. Input nunca é
+user-controlled. A vuln requer adversário a controlar o conteúdo CSS,
+o que não é o nosso modelo.
+
+Action: aguardar Next bump (16.3+) para postcss 8.5.x. Tracked em
+vercel/next.js#76234.
+"""
