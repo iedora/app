@@ -1,0 +1,47 @@
+# Matrix CI — typecheck + lint + test per workspace.
+# Substitui 6 workflows quase-idênticos (.github/workflows/{auth,
+# design-system,observability,product-*}.yml) por um único job
+# parametrizado. Add a new workspace = uma linha na matrix.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  matrix:
+    name: ${{ matrix.workspace }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace:
+          - apps/web
+          - packages/auth
+          - packages/brand
+          - packages/db
+          - packages/design-system
+          - packages/iedora-observability
+          - products/core
+          - products/menu
+          - products/imopush
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.gitea/actions/setup
+      - name: typecheck
+        run: bun run --cwd ${{ matrix.workspace }} typecheck
+        continue-on-error: false
+      - name: lint
+        run: bun run --cwd ${{ matrix.workspace }} lint
+        continue-on-error: false
+      - name: test
+        run: bun run --cwd ${{ matrix.workspace }} test
+        continue-on-error: false

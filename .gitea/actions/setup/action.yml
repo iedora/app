@@ -1,0 +1,35 @@
+# Composite action: workspace setup. Port direto de .github/actions/setup
+# para Gitea Actions. Instala Bun (versão fixa), restaura cache global do
+# bun install, e resolve todos os workspaces.
+#
+# Caller usa: `uses: ./.gitea/actions/setup`. Checkout é responsabilidade
+# do caller.
+
+name: 'Setup workspace'
+description: 'Install Bun, prime the install cache, resolve every Bun workspace.'
+
+inputs:
+  bun-version:
+    description: 'Bun version. Pin matches AGENTS.md.'
+    required: false
+    default: '1.3.14'
+
+runs:
+  using: composite
+  steps:
+    - name: Install Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: ${{ inputs.bun-version }}
+
+    - name: Cache Bun install dir
+      uses: actions/cache@v4
+      with:
+        path: ~/.bun/install/cache
+        key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          bun-${{ runner.os }}-
+
+    - name: Resolve workspaces
+      shell: bash
+      run: bun install --frozen-lockfile

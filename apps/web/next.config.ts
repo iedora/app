@@ -19,6 +19,11 @@ const nextConfig: NextConfig = {
     '@iedora/product-imopush',
     '@iedora/product-menu',
   ],
+  // Força drizzle-orm + postgres-js a ficarem em node_modules do
+  // standalone bundle (em vez de inlined nos webpack chunks). É
+  // necessário para os `<workspace>/migrate.mjs` (pre-deploy hook)
+  // os conseguirem resolver via Node's resolution standard.
+  serverExternalPackages: ['drizzle-orm', 'postgres'],
   // No `outputFileTracingIncludes` for migrate scripts — they're
   // bundled in apps/web/Dockerfile's `migrate-bundler` stage (single
   // ESM file each, all deps inlined). The Next standalone output is

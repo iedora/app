@@ -73,6 +73,13 @@ yarn-debug.log*
 .env.*.local
 !.env.test
 
+# Kamal secrets — populated locally, never committed.
+# Covers `.kamal/secrets`, `.kamal/secrets-common`, `.kamal/secrets.<destination>`.
+/.kamal/secrets*
+
+# homelab-core-infra .env (provider-side secrets for shared infra).
+/homelab-core-infra/.env
+
 # vercel
 .vercel
 

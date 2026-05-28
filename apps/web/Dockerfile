@@ -133,6 +133,28 @@ COPY --from=builder --chown=nextjs:nextjs /workspace/apps/web/.next/standalone .
 COPY --from=builder --chown=nextjs:nextjs /workspace/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder --chown=nextjs:nextjs /workspace/apps/web/public ./apps/web/public
 
+# Drizzle migrations — fora do Next bundle. Cada workspace traz o seu
+# migrate.mjs (thin wrapper) + drizzle/ SQL. O helper canónico vive em
+# @iedora/db (packages/db/src/migrate.mjs), partilhado por todos.
+# Wrappers usam import relativo para o helper (sem dependência de
+# node_modules entre workspaces).
+COPY --from=builder --chown=nextjs:nextjs /workspace/packages/db/src/migrate.mjs ./packages/db/src/migrate.mjs
+COPY --from=builder --chown=nextjs:nextjs /workspace/packages/auth/drizzle     ./packages/auth/drizzle
+COPY --from=builder --chown=nextjs:nextjs /workspace/packages/auth/migrate.mjs ./packages/auth/migrate.mjs
+COPY --from=builder --chown=nextjs:nextjs /workspace/products/menu/drizzle     ./products/menu/drizzle
+COPY --from=builder --chown=nextjs:nextjs /workspace/products/menu/migrate.mjs ./products/menu/migrate.mjs
+COPY --from=builder --chown=nextjs:nextjs /workspace/products/imopush/drizzle     ./products/imopush/drizzle
+COPY --from=builder --chown=nextjs:nextjs /workspace/products/imopush/migrate.mjs ./products/imopush/migrate.mjs
+
+# Next webpack inline-bundles drizzle-orm + postgres em chunks (mesmo com
+# serverExternalPackages, em monorepos com transpilePackages a cascata
+# vence). Os migrate.mjs vivem FORA do Next runtime, precisam destes
+# packages no node_modules standard. Instalamos fresh aqui — ~20 MB,
+# zero ambiguity.
+RUN cd /app && npm install --omit=dev --no-package-lock --no-fund --no-audit \
+    drizzle-orm@0.45.2 postgres@3.4.9 2>&1 | tail -3
+RUN chown -R nextjs:nextjs /app/node_modules /app/package*.json 2>/dev/null || true
+
 # Next writes prerender + optimized-image caches under .next/cache at first
 # request. The standalone copy doesn't create that path; pre-create it
 # owned by the runtime user so the very first request doesn't EPERM.
@@ -157,5 +179,9 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 # actual repo (`<GHCR_USER>/iedora`) or fine-grained PATs can't push here —
 # package-to-repo association is the linking key.
 LABEL org.opencontainers.image.source="https://github.com/eduvhc/iedora"
+
+# Kamal verifica este label antes de aceitar a imagem (evita correr
+# imagens de outros services no mesmo host).
+LABEL service="iedora-web"
 
 CMD ["node", "server.js"]

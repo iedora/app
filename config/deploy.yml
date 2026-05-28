@@ -1,0 +1,97 @@
+# Kamal base config — shared across destinations.
+# Destination-specific (servers, etc.) em `deploy.<destination>.yml`.
+# Correr sempre com `-d <destination>` (e.g. `kamal deploy -d production`).
+#
+# Coexiste com o `infra-web` actual; kamal-proxy publica em host:3001
+# para cloudflared ser apontado para lá quando estiver validado.
+
+service: iedora-web
+
+image: eduvhc/web
+
+ssh:
+  user: root
+  keys:
+    - ~/.ssh/ci_ed25519
+
+registry:
+  server: ghcr.io
+  username: eduvhc
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+builder:
+  arch: amd64
+  remote: ssh://root@192.168.50.53
+  context: .
+  dockerfile: apps/web/Dockerfile
+
+accessories:
+  postgres:
+    image: postgres:17
+    roles:
+      - web
+    env:
+      clear:
+        POSTGRES_USER: postgres
+        POSTGRES_DB: postgres
+      secret:
+        - POSTGRES_PASSWORD
+    files:
+      - config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    directories:
+      - data:/var/lib/postgresql/data
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    roles:
+      - web
+    cmd: tunnel --no-autoupdate run
+    env:
+      secret:
+        - TUNNEL_TOKEN
+    # host.docker.internal needed para chegar ao Gitea em host:3030
+    # (rede Docker separada `homelab-core`).
+    options:
+      add-host: host.docker.internal:host-gateway
+
+env:
+  clear:
+    CORE_BASE_URL: https://core.iedora.com
+    CORE_COOKIE_DOMAIN: .iedora.com
+    CORE_TRUSTED_ORIGINS: https://iedora.com,https://menu.iedora.com,https://core.iedora.com
+    NEXT_PUBLIC_CORE_URL: https://core.iedora.com
+    NEXT_PUBLIC_MENU_URL: https://menu.iedora.com
+    NEXT_PUBLIC_IMOPUSH_URL: https://imopush.iedora.com
+    IEDORA_BOOTSTRAP_ADMIN_EMAILS: eduardoferdcarvalho@gmail.com
+    LOG_LEVEL: info
+    # OpenObserve corre em homelab-core-infra (rede separada). App
+    # chega lá via host.docker.internal — habilitado em options.add-host.
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://host.docker.internal:5080/api/default
+    # OO admin email — não é secret (email é PII, não auth). O password
+    # sim, fica em BWS e é composto em OTEL_EXPORTER_OTLP_HEADERS.
+    OPENOBSERVE_ADMIN_EMAIL: eduardoferdcarvalho@gmail.com
+    # R2 backend para uploads do menu (logos, banners, QR stickers).
+    # Endpoint + region + bucket são deriváveis da conta CF; só as
+    # access keys são secret.
+    S3_ENDPOINT: https://2716bf6ee8be2880904e70f19050d2ef.r2.cloudflarestorage.com
+    S3_REGION: auto
+    S3_BUCKET: iedora-assets
+  secret:
+    - CORE_DATABASE_URL
+    - MENU_DATABASE_URL
+    - IMOPUSH_DATABASE_URL
+    - CORE_SECRET
+    - OTEL_EXPORTER_OTLP_HEADERS
+    - S3_ACCESS_KEY
+    - S3_SECRET_KEY
+    # Descomenta quando a key existir em BWS:
+    # - KIMI_GENERATIVE_AI_API_KEY
+
+proxy:
+  app_port: 3000
+  healthcheck:
+    path: /up
+    interval: 5
+  run:
+    http_port: 3001

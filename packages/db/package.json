@@ -6,7 +6,8 @@
   "description": "Shared drizzle-orm + postgres-js setup. Per-product packages define their own schemas and instantiate via createDb(url, schema). PGLite test fixture lives here too \u2014 generic over schema.",
   "exports": {
     ".": "./src/index.ts",
-    "./testing": "./src/testing.ts"
+    "./testing": "./src/testing.ts",
+    "./migrate": "./src/migrate.mjs"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
