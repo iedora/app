@@ -31,17 +31,14 @@ registry:
     - KAMAL_REGISTRY_PASSWORD
 
 builder:
-  # `multiarch: false` é necessário para forçar o docker driver
-  # (= daemon do host, respeita /etc/hosts). Sem isto, Kamal cria
-  # um docker-container buildkit que tem o seu próprio /etc/hosts
-  # e ignora o override `127.0.0.1 git.iedora.com` no Beelink —
-  # buildkit tentaria resolver via DNS público (CF) e fazer push
-  # para a edge CF (com 4443 não exposto = timeout).
+  # Kamal 2.11 cria um docker-container buildkit `kamal-local-docker-
+  # container` para builds. Esse container tem o seu próprio /etc/hosts
+  # e ignora o override `127.0.0.1 git.iedora.com` do Beelink.
   #
-  # Com docker driver: push usa o HTTP client do daemon do host
-  # que respeita /etc/hosts → Caddy local → Gitea.
+  # Pre-create no workflow `.gitea/workflows/deploy.yml` com
+  # `--driver-opt network=host` para o buildkit partilhar a network
+  # do host (resolve via /etc/hosts → Caddy local → Gitea).
   arch: amd64
-  multiarch: false
   context: .
   dockerfile: apps/web/Dockerfile
 
