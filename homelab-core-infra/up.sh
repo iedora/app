@@ -108,14 +108,14 @@ if [ -n "$HOST" ]; then
   ssh "$SSH_TARGET" KAMAL_VERSION="$KAMAL_VERSION" BWS_VERSION="$BWS_VERSION" bash <<'REMOTE'
 set -euo pipefail
 
-# 1. Ruby + build toolchain (necessário para o gem ed25519 compilar)
-if ! command -v gem >/dev/null || ! command -v gcc >/dev/null; then
-  echo "  → apt install ruby + build toolchain"
+# 1. Ruby + build toolchain (gem ed25519) + git (clone /opt/iedora)
+if ! command -v gem >/dev/null || ! command -v gcc >/dev/null || ! command -v git >/dev/null; then
+  echo "  → apt install ruby + build toolchain + git"
   apt-get update -qq
   apt-get install -y -qq --no-install-recommends \
-    ca-certificates ruby ruby-dev build-essential
+    ca-certificates ruby ruby-dev build-essential git
 else
-  echo "  ✓ ruby + build toolchain presentes"
+  echo "  ✓ ruby + build toolchain + git presentes"
 fi
 
 # 2. Kamal gem (scope global, root user)
@@ -222,11 +222,13 @@ if [ "$BOOTSTRAP_CI" = "1" ]; then
     done
   fi
 
-  # 2. Criar PAT novo (scope write:package = push para registry OCI)
+  # 2. Criar PAT novo. Scopes:
+  #    - write:package — push para Gitea OCI registry (Kamal builds)
+  #    - read:repository — git clone/fetch de /opt/iedora no Beelink
   TNAME="${TOKEN_PREFIX}$(date +%Y%m%d-%H%M)"
   CI_PAT=$(curl -fsS "${AUTH[@]}" \
     -H "Content-Type: application/json" \
-    -d "{\"name\":\"$TNAME\",\"scopes\":[\"write:package\"]}" \
+    -d "{\"name\":\"$TNAME\",\"scopes\":[\"write:package\",\"read:repository\"]}" \
     "$GITEA_URL/api/v1/users/$GITEA_USER/tokens" | jq -r '.sha1')
 
   if [ -z "$CI_PAT" ] || [ "$CI_PAT" = "null" ]; then
@@ -246,4 +248,33 @@ if [ "$BOOTSTRAP_CI" = "1" ]; then
     *) echo "✗ publish failed HTTP $HTTP: $(cat /tmp/.gitea-secret-resp)" >&2; exit 1 ;;
   esac
   rm -f /tmp/.gitea-secret-resp
+
+  # 4. Setup git auth + clone /opt/iedora no Beelink (se --host passado).
+  #    Beelink usa o PAT para git fetch/clone via /root/.netrc;
+  #    /opt/iedora é o cwd onde Kamal corre os deploys. CI só faz
+  #    ssh-trigger; sem rsync.
+  if [ -n "$HOST" ]; then
+    NETRC_FILE=$(mktemp)
+    chmod 600 "$NETRC_FILE"
+    cat > "$NETRC_FILE" <<EOF
+machine git.iedora.com
+login $GITEA_USER
+password $CI_PAT
+EOF
+    scp -q "$NETRC_FILE" "$SSH_TARGET:/root/.netrc"
+    rm -f "$NETRC_FILE"
+    # shellcheck disable=SC2087  # vars expanded client-side é intencional
+    ssh "$SSH_TARGET" bash <<REMOTE_GIT
+set -e
+chmod 600 /root/.netrc
+if [ -d /opt/iedora/.git ]; then
+  cd /opt/iedora && git fetch origin --prune
+  echo "  ✓ /opt/iedora já é git repo — fetch OK"
+else
+  rm -rf /opt/iedora
+  git clone https://git.iedora.com:4443/$REPO.git /opt/iedora
+  echo "  + /opt/iedora cloned"
+fi
+REMOTE_GIT
+  fi
 fi

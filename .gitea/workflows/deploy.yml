@@ -63,27 +63,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     container:
-      # SSH key bind-mounted directamente do host (runner está no
-      # Beelink, key já vive em /root/.ssh/ci_ed25519). Path
-      # whitelistado em homelab-core-infra/gitea-runner-config.yaml
-      # valid_volumes. Sem fetch do BWS no runner = sem bws install,
-      # sem jq, sem python3.
-      #
-      # node:24-bookworm-slim em vez de debian:bookworm-slim porque
-      # `actions/checkout@v4` é Node action (requer node 20+ no
-      # PATH; act-runner não injecta).
-      image: node:24-bookworm-slim
+      # SSH key bind-mounted directamente do host (runner vive no
+      # Beelink). Apenas ssh-trigger ao Kamal — source vem do git
+      # pull no Beelink (sem rsync gigante a cada deploy).
+      image: debian:bookworm-slim
       volumes:
         - /root/.ssh/ci_ed25519:/root/.ssh/ci_ed25519:ro
     steps:
-      - uses: actions/checkout@v4
-
-      - name: rsync source + trigger Kamal on Beelink
-        # 1. apt: rsync + openssh-client (debian:bookworm-slim é minimal)
-        # 2. rsync source para /opt/iedora — Beelink tem Kamal local
-        # 3. ssh trigger `kamal deploy` no Beelink, env vars in-line.
-        #    BWS_ACCESS_TOKEN é passado ao Kamal para o `secrets fetch`.
-        #    KAMAL_BWS_PROJECT_ID está hardcoded em .kamal/secrets.production.
+      - name: Trigger Kamal on Beelink (git fetch + deploy)
+        # Sem checkout/rsync: o Beelink faz git fetch + checkout do
+        # commit SHA (auth via /root/.netrc para git.iedora.com,
+        # gerado pelo `up.sh --bootstrap-ci`). Source de verdade
+        # vive lá; CI só dispara.
         shell: bash
         env:
           BWS_ACCESS_TOKEN: ${{ secrets.BWS_ACCESS_TOKEN }}
@@ -91,24 +82,17 @@ jobs:
         run: |
           set -e
           apt-get update -qq
-          apt-get install -y -qq --no-install-recommends rsync openssh-client ca-certificates
+          apt-get install -y -qq --no-install-recommends openssh-client ca-certificates
 
           SSH_OPTS=(-i /root/.ssh/ci_ed25519 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/tmp/known_hosts)
 
-          rsync -azP --delete --exclude='.git' --exclude='node_modules' \
-            -e "ssh ${SSH_OPTS[*]}" \
-            ./ root@192.168.50.53:/opt/iedora/
-
-          # Kamal usa git para determinar a versão (commit hash) por
-          # default; como excluímos `.git` do rsync (payload mais
-          # pequeno), passamos `--version` explicitamente com o SHA
-          # do commit que o CI checkouted.
-          #
           # shellcheck disable=SC2087  # intentional: env vars expanded
-          # client-side, send resolved values to SSH (server doesn't have them).
+          # client-side, send resolved values to SSH.
           ssh "${SSH_OPTS[@]}" root@192.168.50.53 bash <<EOF
           set -e
           cd /opt/iedora
+          git fetch origin
+          git checkout '$GITHUB_SHA'
           export BWS_ACCESS_TOKEN='$BWS_ACCESS_TOKEN'
           export KAMAL_REGISTRY_PASSWORD='$KAMAL_REGISTRY_PASSWORD'
           kamal lock release -d production || true
