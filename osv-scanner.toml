@@ -8,7 +8,7 @@
 
 [[IgnoredVulns]]
 id = "GHSA-67mh-4wv8-2f99"
-ignoreUntil = "2026-08-28"  # review trimestral
+ignoreUntil = 2026-08-28T00:00:00Z  # review trimestral (RFC3339)
 reason = """
 esbuild 0.18.20 CORS bypass no dev server.
 
@@ -29,7 +29,7 @@ drizzle-team/drizzle-orm#3001.
 
 [[IgnoredVulns]]
 id = "GHSA-qx2v-qp2m-jg93"
-ignoreUntil = "2026-08-28"
+ignoreUntil = 2026-08-28T00:00:00Z
 reason = """
 postcss 8.4.31 line return parsing.
 
