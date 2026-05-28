@@ -96,8 +96,9 @@ jobs:
           export BWS_ACCESS_TOKEN='$BWS_ACCESS_TOKEN'
           export KAMAL_REGISTRY_PASSWORD='$KAMAL_REGISTRY_PASSWORD'
           kamal lock release -d production || true
-          # Sem --version: Kamal lê HEAD após o checkout (ver
-          # configuration.rb:452 git_version). Daemon BuildKit cacheia
-          # layers nativamente — cache block não é preciso.
-          kamal deploy -d production
+          # 'kamal setup' em vez de 'kamal deploy' — setup eh idempotente
+          # e GARANTE que accessories (postgres) estao up antes do app.
+          # Plain 'kamal deploy' nao boota accessories (ver
+          # service-references/kamal/lib/kamal/cli/main.rb).
+          kamal setup -d production
           EOF
