@@ -175,24 +175,28 @@ services:
     image: curlimages/curl:8.10.1
     container_name: gitea-runner-init
     # Depende do admin-init para garantir que admin user existe (precisamos
-    # de Basic auth para chamar /api/v1/admin/runners/registration-token).
+    # de Basic auth para chamar /api/v1/admin/actions/runners/registration-token).
     depends_on:
       gitea-admin-init:
         condition: service_completed_successfully
     networks:
       homelab-core:
+    # curlimages/curl corre como UID 100 por default; volume /token é
+    # criado root:root pelo daemon. Corremos como root para escrever lá.
+    user: "0"
     environment:
       GITEA_ADMIN_USERNAME: ${GITEA_ADMIN_USERNAME}
       GITEA_ADMIN_PASSWORD: ${GITEA_ADMIN_PASSWORD}
     entrypoint: ["sh", "-c"]
     command:
       - |
+        set -e
         TOKEN=$$(curl -fsS -X POST -u "$$GITEA_ADMIN_USERNAME:$$GITEA_ADMIN_PASSWORD" \
           "http://gitea:3000/api/v1/admin/actions/runners/registration-token" \
           | sed -E 's/.*"token":"([^"]+)".*/\1/')
         if [ -z "$$TOKEN" ]; then echo "failed to obtain runner token" >&2; exit 1; fi
         printf '%s' "$$TOKEN" > /token/runner-token
-        echo "✓ runner registration token obtido"
+        echo "✓ runner registration token obtido (len=$${#TOKEN})"
     volumes:
       - gitea_runner_token:/token
     restart: "no"
