@@ -9,7 +9,7 @@ import {
   detectStaffPreset,
   detectTenantPreset,
   isStaffRole,
-} from './permissions'
+} from './role-presets'
 import { SCOPES, ALL_SCOPES } from './scopes'
 
 /**

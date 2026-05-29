@@ -14,7 +14,7 @@ import {
   STAFF_ROLE_PRESETS,
   detectStaffPreset,
   type StaffRoleKey,
-} from '@iedora/auth/permissions'
+} from '@iedora/auth/role-presets'
 import { listUsers } from '@iedora/auth/server'
 import { AdminPage } from '@iedora/product-core/shared/ui/admin-page'
 

@@ -63,4 +63,4 @@ export const requireScope = cache((scope: Scope) =>
 )
 
 export type { AuthGateway, Session } from './ports'
-export { IEDORA_ADMIN_ROLE } from './roles'
+export { IEDORA_ADMIN_ROLE } from '@iedora/auth'

@@ -70,7 +70,7 @@ export const user = coreSchema.table('user', {
    * `tenant_member.scopes`, scoped to each tenant). Non-null for
    * staff: the array IS the source of truth; preset labels like
    * `'iedora-admin'` are detected by `detectStaffPreset(scopes)`
-   * in `./permissions` for UI display only.
+   * in `./role-presets` for UI display only.
    */
   scopes: text('scopes').array().$type<Scope[]>(),
   /** Flag flipped by `banUser()` (formerly better-auth admin plugin). */
@@ -154,7 +154,7 @@ export const tenant = coreSchema.table('tenant', {
  * inside that tenant as an explicit array of scope strings.
  *
  * Why scopes (and not a role string): roles are UX presets, not data.
- * `TENANT_ROLE_PRESETS` in `./permissions.ts` expand a label like
+ * `TENANT_ROLE_PRESETS` in `./role-presets.ts` expand a label like
  * `'owner'` / `'viewer'` to its scope array on the way in; on the way
  * out, the same module's `detectPreset()` can reverse-map for display.
  * Persisting only the scopes means a renamed/removed preset doesn't

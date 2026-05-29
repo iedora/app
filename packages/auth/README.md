@@ -14,7 +14,8 @@ src/
   auth.ts          The canonical better-auth instance (lazy-init).
   client.ts        Browser-side client (better-auth/react + plugin set).
   db.ts            Postgres pool against the iedora_auth DB (lazy).
-  permissions.ts   `statement` + `ac` + role bindings (member/admin/owner + iedoraAdmin).
+  role-presets.ts  Named bundles of scopes (iedora-admin/iedora-support + owner/admin/member/viewer) derived from `scopes.ts::SCOPES`.
+  scopes.ts        Canonical scope catalogue (`SCOPES.<product>.<kind>.<resource>.<verb>`) — single source of truth for the taxonomy.
   schema.ts        Drizzle schema for the iedora_auth tables.
   index.ts         Server entry — re-exports the above.
 drizzle/           Generated SQL migrations.
@@ -70,8 +71,11 @@ const ok = await auth.api.userHasPermission({
 if (!ok) redirect('/forbidden')
 ```
 
-Extending the taxonomy = one entry in `permissions.ts::statement`,
-optionally plus a line per role binding.
+Extending the taxonomy = one entry in `scopes.ts::SCOPES`. The
+`iedora-admin` / `owner` presets pick up new scopes automatically via
+prefix filters; add explicit entries to `role-presets.ts::STAFF_ROLE_PRESETS`
+/ `TENANT_ROLE_PRESETS` only when a narrower preset should also carry
+the new scope.
 
 ## Migrations
 

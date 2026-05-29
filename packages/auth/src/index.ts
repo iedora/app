@@ -2,19 +2,18 @@
  * @iedora/auth — public API.
  *
  * Server entry. Browser code imports from `@iedora/auth/client` instead
- * (the `better-auth/react` client lives there). Permissions taxonomy
- * (`statement`, `ac`, role definitions) is also re-exported here for
- * convenience; deep import `@iedora/auth/permissions` for the same
- * surface without pulling the server-only modules.
+ * (the `better-auth/react` client lives there). The role-preset layer
+ * (`STAFF_ROLE_PRESETS`, `TENANT_ROLE_PRESETS`, role literals) is also
+ * re-exported here for convenience; deep import `@iedora/auth/role-presets`
+ * for the same surface without pulling the server-only modules.
  */
 
 export { getAuth, auth } from './auth'
 export type { Auth, AuthSession } from './auth'
 
-// Role presets + literals (single source of truth for staff role IDs)
+// Role presets + literals (UX shortcuts derived from `./scopes::SCOPES` —
+// the only source of truth for the scope catalogue).
 export {
-  statement,
-  ac,
   STAFF_ROLES,
   IEDORA_ADMIN_ROLE,
   IEDORA_SUPPORT_ROLE,
@@ -24,10 +23,9 @@ export {
   detectStaffPreset,
   detectTenantPreset,
   isStaffRole,
-  type Statement,
   type StaffRoleKey,
   type TenantRolePresetKey,
-} from './permissions'
+} from './role-presets'
 
 export { schema } from './schema'
 export { getCoreDb } from './db'

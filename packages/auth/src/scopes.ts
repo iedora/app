@@ -17,8 +17,10 @@
  *
  * Adding a scope:
  *   1. Add the verb to the relevant resource map below.
- *   2. Bind it on the role in `permissions.ts::statement` + the role
- *      definition (or rely on the wildcard for iedora-admin).
+ *   2. Add it to the relevant preset in `role-presets.ts::STAFF_ROLE_PRESETS`
+ *      or `TENANT_ROLE_PRESETS` — or rely on the `iedora-admin` /
+ *      `owner` wildcards (`.filter(s => s.startsWith(...))`), which
+ *      pick up new scopes automatically.
  *   3. The `Scope` union, `ALL_SCOPES`, and the admin Access page
  *      pick it up automatically.
  *

@@ -10,7 +10,7 @@
     "./client": "./src/client.ts",
     "./next": "./src/next.ts",
     "./server": "./src/server/index.ts",
-    "./permissions": "./src/permissions.ts",
+    "./role-presets": "./src/role-presets.ts",
     "./scopes": "./src/scopes.ts",
     "./audit": "./src/audit.ts"
   },

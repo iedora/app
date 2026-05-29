@@ -4,7 +4,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { nextCookies } from 'better-auth/next-js'
 import { getCoreDb } from './db'
 import { schema } from './schema'
-import { IEDORA_ADMIN_ROLE, STAFF_ROLE_PRESETS, detectStaffPreset } from './permissions'
+import { IEDORA_ADMIN_ROLE, STAFF_ROLE_PRESETS, detectStaffPreset } from './role-presets'
 import { recordAudit } from './audit'
 
 /**
