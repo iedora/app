@@ -4,18 +4,13 @@
 
 ```bash
 bun install                     # uma vez
-docker compose -f dev/docker-compose.yml --env-file dev/.env up -d   # postgres + s3mock
+bun run dev:up                  # postgres + s3mock
 bun run dev:migrate             # criar schema nas DBs locais
-cd apps/web && bun run dev      # HMR em :3000
+bun run dev                     # next dev em :3000
 ```
 
-Ou via atalhos:
-
-```bash
-bun run dev:up                  # docker compose up -d
-bun run dev:migrate             # migrations
-bun run dev                     # next dev
-```
+Tudo lê `dev/local.env` (tracked, sem secrets). Não precisas de
+criar nenhum `.env` à mão.
 
 ## Serviços
 
@@ -29,14 +24,11 @@ as databases `menu`, `core` e `imopush`.
 
 ## .env
 
-O `apps/web/.env` é gitignored. As vars `NEXT_PUBLIC_*` sobrescrevem
-para `localhost:3000`. Se precisas de apontar para serviços remotos,
-cria `apps/web/.env.local`:
-
-```ini
-MENU_DATABASE_URL=postgresql://postgres:Password1!@localhost:5432/menu
-CORE_DATABASE_URL=postgresql://postgres:Password1!@localhost:5432/core
-```
+`dev/local.env` (tracked) é a única fonte para dev — DB URLs, S3,
+better-auth, NEXT_PUBLIC_*. Para overrides locais (apontar para
+serviços remotos, etc.) cria `dev/local.env.override` e exporta
+manualmente, ou usa `apps/web/.env.local` (gitignored, ganha
+prioridade sobre o que `bun --env-file` injectou).
 
 ## Comandos
 

@@ -86,8 +86,8 @@ bun run db:generate    # produces drizzle/NNNN_…sql
 bun run db:migrate     # applies pending migrations
 ```
 
-In prod, Stage 3 of the deploy pipeline runs `db:migrate` against the
-`core` database (see `infra/app-state/`).
+In prod, Kamal's pre-deploy hook runs `db:migrate` against the
+`core` database before the app container hot-swap.
 
 ## Why a shared package, not a per-product config
 

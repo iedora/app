@@ -2,11 +2,12 @@
  * Applies @iedora/core-auth's Drizzle migrations against the `core` Postgres
  * database. Runs in three places:
  *
- *   1. CI — apps/web/scripts/migrate-test.mjs spawns it before the e2e
+ *   1. local dev — `bun run dev:migrate` (root) chains every product's
+ *      migrate.mjs after `bun run dev:up`.
+ *   2. CI — apps/web/scripts/migrate-test.mjs spawns it before the e2e
  *      build, against the ephemeral postgres service container.
- *   2. local dev — bin/dev-stack step 2 runs it after `docker compose up`.
- *   3. prod — Stage 3 of the deploy pipeline (`bin/iedora app`) runs it
- *      against the Hetzner Postgres before the app container hot-swap.
+ *   3. prod — Kamal pre-deploy hook runs it against the production
+ *      Postgres before the app container hot-swap.
  *
  * Real work lives in @iedora/db/scripts/run-migrations — this file is
  * the thin per-product entrypoint that picks the env var, computes the

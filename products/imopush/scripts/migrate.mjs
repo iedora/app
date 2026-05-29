@@ -5,10 +5,9 @@
  * supplies the schema + lock name.
  *
  * Runs in three places:
- *   1. CI — apps/web/scripts/migrate-test.mjs spawns it before e2e build.
- *   2. local dev — bin/dev-stack step 2.
- *   3. prod — Stage 3 of the deploy pipeline (`bin/iedora app`), against
- *      Hetzner Postgres before the app container hot-swap.
+ *   1. local dev — `bun run dev:migrate` (root).
+ *   2. CI — apps/web/scripts/migrate-test.mjs spawns it before e2e build.
+ *   3. prod — Kamal pre-deploy hook before the app container hot-swap.
  */
 
 import { fileURLToPath } from 'node:url'

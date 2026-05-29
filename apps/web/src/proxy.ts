@@ -26,9 +26,8 @@ const SESSION_COOKIES = [
  *
  *   1. **Host-based rewrites** — for hosts whose surface has a
  *      `rewritePath` (e.g. `iedora.com → /house/*`, `core.iedora.com
- *      → /core/*`). The matched surface comes from the generated
- *      registry at `./generated/surfaces.ts` (single source of truth:
- *      `infra/deploy/cmd/iedora/topology.go`).
+ *      → /core/*`). The matched surface comes from the hand-maintained
+ *      registry at `./generated/surfaces.ts`.
  *
  *   2. **Cross-host guard** for namespace paths. Direct visits to
  *      another surface's namespace (`menu.iedora.com/house*`,

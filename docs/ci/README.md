@@ -34,4 +34,6 @@ que respeita o daemon → push localhost simples, sem TLS hacks.
 ## Nota
 
 O pipeline legado (Go + Tofu: `bin/iedora-env`, `bin/iedora`, `infra/`)
-foi removido. Kamal + `home-infra/` é o fluxo actual.
+foi removido em commit `6077874` quando migrámos de
+Hetzner+Tofu+GHCR para Beelink+Kamal+Gitea. Kamal + `home-infra/` é o
+fluxo actual.

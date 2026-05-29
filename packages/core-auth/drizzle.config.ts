@@ -9,8 +9,8 @@ import { defineConfig } from 'drizzle-kit'
  *   bun run db:generate    (after editing src/schema.ts)
  *   bun run db:migrate     (applies pending migrations)
  *
- * Stage 3 of the deploy pipeline runs `db:migrate` against the prod
- * `core` database (see infra/app-state).
+ * In prod, Kamal's pre-deploy hook runs `db:migrate` against the prod
+ * `core` database before the app container hot-swap.
  */
 export default defineConfig({
   schema: './src/schema.ts',

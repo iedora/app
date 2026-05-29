@@ -154,9 +154,8 @@ export async function runMigrations({
   const dbName = dbNameFromUrl(databaseUrl)
   const startedAt = Date.now()
 
-  // Extract parent trace context from TRACEPARENT env, if the
-  // orchestrator (iedora migrate, Stage 3 configurators) set it. No-op
-  // otherwise — the migrate.run span just becomes its own root.
+  // Extract parent trace context from TRACEPARENT env, if a caller set
+  // it. No-op otherwise — the migrate.run span just becomes its own root.
   const parentCtx = propagation.extract(context.active(), process.env)
 
   log(`target database "${dbName}"`)

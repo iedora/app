@@ -1,4 +1,5 @@
 # Iedora-specific dev infra — Postgres + s3mock.
+# Env vem de `dev/local.env` (tracked, single source of truth p/ dev).
 # Next.js corre no host (não no Docker) via `bun run dev`.
 #
 # OpenObserve vive em `home-infra/openobserve/docker-compose.yml`
