@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import {
   ActiveSidebarLinks,
@@ -11,6 +12,8 @@ import {
   SidebarTrigger,
   Wordmark,
 } from '@iedora/design-system'
+import { signInUrl } from '@iedora/product-core/url'
+import { publicUrl } from '@iedora/product-menu/shared/url'
 import {
   getEffectiveOrganizationId,
   getSession,
@@ -26,24 +29,33 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  // Soft fetches only — layouts don't re-render on navigation in Next 16, so
-  // a stale `redirect()` here would leak across pages. Real gating lives in
-  // the per-page DAL guards (`verifySession`, `requireActiveOrganization`).
+  // Auth gate lives here AND in each page's DAL (`requireActiveOrganization`).
+  // Layout-level redirect is OK here because the conditions are uniform
+  // across every dashboard descendant: no session → sign-in; session
+  // but no active org → onboarding. The per-page DAL guards stay as
+  // belt-and-braces (and as the source of truth for testing).
+  //
+  // Without this gate the dashboard layout would render briefly before
+  // the page's `requireActiveOrganization()` redirect fires — flash of
+  // empty dashboard chrome on the way to /menu/onboarding. Reported
+  // by eduvhc 2026-05-29.
   const session = await getSession()
-  const organizationId = session?.user
-    ? await getEffectiveOrganizationId()
-    : null
-  const plan = organizationId
-    ? await getOrganizationPlan(organizationId)
-    : null
+  if (!session?.user) {
+    redirect(signInUrl(publicUrl('/menu/dashboard').toString()))
+  }
+  const organizationId = await getEffectiveOrganizationId()
+  if (!organizationId) {
+    redirect('/menu/onboarding')
+  }
   // Sidebar restaurants section. Lists every restaurant in the active org
   // so the operator can hop between them without going back to /dashboard.
-  // Empty when the user is logged out or has no restaurants yet — the
-  // section header is suppressed in that case (see candidates below).
-  const restaurants = organizationId
-    ? await listRestaurantsWithCounts(organizationId)
-    : []
-  const showAnalyticsLink = plan ? planHas(plan, 'analytics') : false
+  // Empty when the org has no restaurants yet — the section header is
+  // suppressed in that case (see candidates below).
+  const [plan, restaurants] = await Promise.all([
+    getOrganizationPlan(organizationId),
+    listRestaurantsWithCounts(organizationId),
+  ])
+  const showAnalyticsLink = planHas(plan, 'analytics')
   // QR codes admin is cross-tenant (`requireScope` in
   // `products/menu/src/features/qr-codes/`). Anyone whose `user.role`
   // is `iedora-admin` sees it. Sessions / users admin live under the
