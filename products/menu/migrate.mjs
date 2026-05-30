@@ -2,7 +2,7 @@
 // Thin wrapper sobre @iedora/db/migrate (helper canónico em data layer).
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { runMigrations } from '@iedora/db/migrate'
+import { runMigrations } from '../../packages/platform/db/src/migrate.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 await runMigrations({
