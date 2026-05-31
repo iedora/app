@@ -77,12 +77,6 @@ yarn-debug.log*
 !apps/web/.env
 !apps/web/.env.test
 
-# Kamal secrets — só o default `.kamal/secrets` (plain-text) é
-# gitignored. Os ficheiros `secrets-common` e `secrets.<destination>`
-# são templates (invocam `kamal secrets fetch --adapter bitwarden-sm`
-# em runtime) e estão tracked para o CI poder fazer `kamal deploy`.
-/.kamal/secrets
-
 # home-infra/<service>/.env é COMMITTED — só config non-secret (ex:
 # email, domain). Secrets ficam em BWS, injectados em runtime via
 # `bws run`. Negate a rule `.env` global acima para estes paths:

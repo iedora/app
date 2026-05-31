@@ -6,7 +6,7 @@ faz build local (amd64 via buildx) + push GHCR + SSH ao Beelink.
 ## Stack
 
 - **Registry:** GHCR (`ghcr.io/eduvhc/iedora-web`). Auth via `gh auth token`.
-- **Host:** Beelink (`192.168.50.53`). Único container pré-Kamal: pihole.
+- **Host:** Beelink. Acesso via **Tailscale MagicDNS** (`iedora-beelink`) — funciona de qualquer rede com a app Tailscale ligada. SSH config (`~/.ssh/config`) mapeia `iedora-beelink` → `root` + key `~/.ssh/ci_ed25519`. Único container pré-Kamal: pihole.
 - **Ingress:** Cloudflare tunnel `iedora` → cloudflared accessory → kamal-proxy
   (mesma docker network, por container name). TLS termina no CF.
 - **Accessories Kamal** (em `config/deploy.yml`):
@@ -15,7 +15,9 @@ faz build local (amd64 via buildx) + push GHCR + SSH ao Beelink.
   - `otel-collector` (scrape kamal-proxy + OTLP da app → OO)
   - `cloudflared` (tunnel ingress)
 - **Secrets:** SOPS+age em `~/.config/iedora/secrets.sops.yaml` (decrypt key
-  em `~/.config/sops/age/keys.txt`). Lidos por `.kamal/secrets` em runtime.
+  em `~/.config/sops/age/keys.txt`, creation rule em `~/.config/iedora/.sops.yaml`).
+  `.kamal/secrets` faz `eval $(sops -d --output-type dotenv …)` — auto-importa
+  **todas** as keys do SOPS, sem lista a manter.
 - **Infra declarativa:** `infra/` (Tofu) gere CF zone + tunnel + DNS.
 
 ## Pré-requisitos no Mac
@@ -23,22 +25,59 @@ faz build local (amd64 via buildx) + push GHCR + SSH ao Beelink.
 ```bash
 gem install kamal -v 2.11.0
 brew install sops age tofu gh docker
+brew install --cask tailscale          # app — login no mesmo tailnet do Beelink
 gh auth login                          # scopes: write:packages, read:packages
 docker buildx create --use             # uma vez, para emulação amd64
 ```
 
-SOPS entries necessárias (`sops ~/.config/iedora/secrets.sops.yaml`):
+`CLOUDFLARE_API_TOKEN` é carregado do macOS Keychain pelo `~/.zshrc`:
+
+```bash
+security add-generic-password -a "$USER" -s CLOUDFLARE_API_TOKEN -w
+# adiciona ao ~/.zshrc:
+# export CLOUDFLARE_API_TOKEN="$(security find-generic-password -a "$USER" -s CLOUDFLARE_API_TOKEN -w 2>/dev/null)"
+```
+
+## Secrets — gestão
+
+**Single source of truth para valores estáticos:** `~/.config/iedora/secrets.sops.yaml`.
+Editas com `sops <ficheiro>` (abre `$EDITOR` com plaintext, re-encripta ao salvar).
+
+Conteúdo actual:
 
 | Key | O que é |
 |---|---|
 | `CORE_SECRET` | better-auth JWT secret |
 | `POSTGRES_PASSWORD` | password root do postgres accessory |
 | `OPENOBSERVE_ADMIN_PASSWORD` | password da admin UI do OO (collector usa para Basic auth) |
-| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | R2 creds |
-| `DEEPSEEK_API_KEY` | LLM |
+| `DEEPSEEK_API_KEY` | LLM (DeepSeek) |
+| `MOONSHOT_API_KEY` | LLM (Moonshot/Kimi) |
 
-`TUNNEL_TOKEN` e `KAMAL_REGISTRY_PASSWORD` não vão para o SOPS —
-saem de `infra/.tunnel-token` (Tofu output) e de `gh auth token`.
+**Não vivem no SOPS** (são gerados):
+
+| Key | Origem |
+|---|---|
+| `KAMAL_REGISTRY_PASSWORD` | `gh auth token` (rotaciona automaticamente) |
+| `TUNNEL_TOKEN` | `tofu apply` escreve em `infra/live/tofu/.tunnel-token` |
+| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | `tofu apply` (R2 creds via CF API) |
+| `CORE_DATABASE_URL`, `MENU_DATABASE_URL`, `IMOPUSH_DATABASE_URL` | Compostos a partir de `POSTGRES_PASSWORD` em `.kamal/secrets` |
+| `ZO_ROOT_USER_PASSWORD`, `OTEL_AUTH_HEADER` | Derivados de `OPENOBSERVE_ADMIN_PASSWORD` |
+
+**Workflow — adicionar secret novo a prod (2 ficheiros):**
+
+```bash
+# 1. valor → SOPS
+sops ~/.config/iedora/secrets.sops.yaml      # adiciona linha "NOVO_SECRET: valor"
+
+# 2. declarar em deploy.yml (committed)
+#    infra/live/kamal/deploy.yml → env.secret:
+#      - NOVO_SECRET
+
+# 3. deploy
+bun run deploy
+```
+
+`.kamal/secrets` **não é editado** — auto-importa tudo do SOPS via `eval $(sops -d --output-type dotenv …)`. Só mexes nele se quiseres lógica de derivação nova (nova DB, novo header composto, etc).
 
 ## Day 0 — primeiro deploy
 
@@ -55,7 +94,7 @@ aplicar migrations automaticamente. Termina com smoke check em `https://iedora.c
 Verificar manualmente:
 
 ```bash
-ssh root@192.168.50.53 'docker ps'              # iedora-web, kamal-proxy, postgres, openobserve, otel-collector, cloudflared, pihole
+ssh root@iedora-beelink 'docker ps'             # iedora-web, kamal-proxy, postgres, openobserve, otel-collector, cloudflared, pihole
 curl https://iedora.com/up                       # 200
 ```
 
@@ -100,11 +139,11 @@ bun run kamal proxy reboot                      # kamal-proxy recarrega host rou
 ## Ops
 
 ```bash
-HOST=192.168.50.53
+HOST=iedora-beelink                              # via Tailscale MagicDNS
 ssh root@$HOST docker logs -f --tail=200 iedora-web
 ssh -t root@$HOST docker exec -it iedora-web-postgres psql -U postgres
 ssh root@$HOST docker ps
-open http://192.168.50.53:5080                  # OpenObserve UI
+open http://iedora-beelink:5080                  # OpenObserve UI (precisa de Tailscale ligado)
 ```
 
 ## Tear-down (raro)
