@@ -23,8 +23,10 @@ const serverSchema = z.object({
   // Must match the hostname the menu serves in THIS environment
   // (`https://menu.iedora.com` prod, `https://staging-menu.iedora.com` staging,
   // `http://localhost:3000/menu` dev). A PLAIN runtime var (not `NEXT_PUBLIC_`),
-  // so the same image serves any env; read server-side via this schema.
-  MENU_SURFACE_URL: z.url(),
+  // so the same image serves any env; read server-side via this schema. Defaults
+  // to the prod menu host so a deployment that hasn't set it yet (or prod itself)
+  // stays correct — no crash window during the env-var migration.
+  MENU_SURFACE_URL: z.url().default('https://menu.iedora.com'),
 })
 
 type ServerEnv = z.infer<typeof serverSchema>
