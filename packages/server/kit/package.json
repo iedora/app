@@ -15,9 +15,10 @@
   "scripts": {
     "typecheck": "tsgo --noEmit",
     "lint": "eslint src --cache --cache-location node_modules/.cache/.eslintcache",
-    "test": "vitest run --passWithNoTests"
+    "test": "bun test"
   },
   "dependencies": {
+    "@node-rs/argon2": "catalog:",
     "hono": "catalog:",
     "jose": "catalog:",
     "kysely": "catalog:",
