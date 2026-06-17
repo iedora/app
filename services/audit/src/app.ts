@@ -1,26 +1,22 @@
-import { Hono } from "hono";
+import { createServiceApp } from "@iedora/server-kit";
 
 import type { AuditDeps } from "./deps";
 import { eventsRoutes } from "./features/events/events.routes";
 
-// Composition root: wires shared deps into each feature slice and mounts them.
-// Business logic lives in features/<slice>/, never here. Exported (with its
-// type) so the admin BFF can build a typed Hono RPC client.
+// Composition root: a service app (shared Env + global onError) with routes
+// chained so the exported type carries the full route tree for Hono RPC.
+// Business logic lives in features/<slice>/, never here.
 export function buildApp(deps: AuditDeps) {
-  const app = new Hono();
-
-  app.get("/up", async (c) => {
-    try {
-      await deps.database.ping();
-      return c.json({ ok: true });
-    } catch {
-      return c.json({ ok: false }, 503);
-    }
-  });
-
-  app.route("/obs", eventsRoutes(deps));
-
-  return app;
+  return createServiceApp()
+    .get("/up", async (c) => {
+      try {
+        await deps.database.ping();
+        return c.json({ ok: true });
+      } catch {
+        return c.json({ ok: false }, 503);
+      }
+    })
+    .route("/obs", eventsRoutes(deps));
 }
 
 export type AuditApp = ReturnType<typeof buildApp>;

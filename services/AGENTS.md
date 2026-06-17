@@ -31,15 +31,30 @@ services/<svc>/src/
 Rules:
 - **No cross-layer folders** (`store/`, `handlers/`, `services/`). Code is grouped
   by feature, so a change to one capability touches one slice.
-- **`app.ts` stays thin** — it only mounts slice route factories and exposes `/up`.
-  No business logic.
+- **`app.ts` stays thin** — build it with `createServiceApp()` (from server-kit:
+  the shared Hono `Env` + a global `onError`), then **chain** `.get()/.route()`
+  and return the chained value so the exported app type carries the full route
+  tree for Hono **RPC**. No business logic here.
 - A slice route factory takes `deps` and returns a Hono instance:
-  `export function <slice>Routes(deps): Hono { … }`; `app.route("/<base>", …)`.
-- **Shared, service-wide** concerns (DB schema types, the deps interface) sit at
-  `src/` root; truly cross-service code goes in `packages/server/*` or
-  `packages/platform/contracts`.
-- Validate at the slice edge with the shared **zod contracts**; never duplicate a
-  payload type the frontend also consumes.
+  `export function <slice>Routes(deps): Hono<ServiceEnv> { … }`; mount with
+  `app.route("/<base>", …)`. (Modular `app.route`, never RoR-style controllers.)
+- **Validate at the edge with `@hono/zod-validator`** (`zValidator("query"|"json"|…,
+  schema)`) using the shared **zod contracts**, and read `c.req.valid(...)`. Never
+  hand-roll `safeParse`; never duplicate a payload type the frontend consumes.
+- **Shared, service-wide** concerns (DB types, the deps interface) sit at `src/`
+  root; cross-service code goes in `packages/server/*` or `packages/platform/contracts`.
+
+## Kysely / database
+
+- One `Database<DB>` per service (server-kit), on Bun's native `SQL` via
+  `kysely-postgres-js`. Transactions: `database.runInTx(...)`; reads/writes use
+  `database.db` (the active tx or the pool — AsyncLocalStorage, ports Go `pgtx`).
+- **DB types are generated**, not hand-written: `bun run db:codegen` runs
+  `kysely-codegen` against the service DB → `src/db.generated.ts` (committed).
+  Regenerate after every migration; `schema.ts` just aliases the generated `DB`.
+- Hand-written SQL stays first-class via Kysely's `sql` tag (keyset comparisons,
+  `ON CONFLICT`, etc.). Migrations are the existing goose `.sql`, applied by
+  server-kit's advisory-locked runner.
 
 ## Testing
 

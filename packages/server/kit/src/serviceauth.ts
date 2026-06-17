@@ -1,6 +1,8 @@
 import { createMiddleware } from "hono/factory";
 import { importJWK, jwtVerify, type CryptoKey } from "jose";
 
+import type { ServiceEnv } from "./http";
+
 // Verifies the internal service tokens minted by the auth service (EdDSA),
 // porting Go internal/serviceauth.Verifier + Middleware: algorithm pinned to
 // EdDSA (algorithm-confusion defense), issuer + audience checked, and the
@@ -44,7 +46,7 @@ export async function verifyServiceToken(v: ServiceVerifier, token: string): Pro
 
 /** Hono middleware: 401 unless a valid service bearer token is present; sets `clientId`. */
 export function serviceAuth(v: ServiceVerifier) {
-  return createMiddleware<{ Variables: { clientId: string } }>(async (c, next) => {
+  return createMiddleware<ServiceEnv>(async (c, next) => {
     const header = c.req.header("authorization") ?? "";
     const token = header.startsWith("Bearer ") ? header.slice(7) : "";
     if (!token) return c.json({ error: "missing bearer token" }, 401);

@@ -16,9 +16,11 @@ function log(msg: string, extra: Record<string, unknown> = {}): void {
  * serve starts a Hono app under Bun.serve and wires SIGTERM/SIGINT graceful
  * shutdown: stop accepting connections + drain in-flight requests, run
  * onShutdown, then exit — bounded by a hard timeout. Ports the lifecycle of the
- * Go internal/boot.Serve helper.
+ * Go internal/boot.Serve helper. Accepts any Hono regardless of its Env/Schema
+ * generics (an RPC-typed app carries a route schema in its type).
  */
-export function serve(app: Hono, opts: ServeOptions) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function serve(app: Hono<any, any, any>, opts: ServeOptions) {
   const server = Bun.serve({ port: opts.port, fetch: app.fetch });
   log("listening", { service: opts.name, port: opts.port });
 

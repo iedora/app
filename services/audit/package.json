@@ -11,6 +11,7 @@
     "dev": "bun run --hot src/index.ts",
     "start": "bun run src/index.ts",
     "migrate": "bun run src/migrate.ts",
+    "db:codegen": "kysely-codegen --dialect postgres --url ${AUDIT_DATABASE_URL:-postgres://iedora:iedora@localhost:55433/audit} --exclude-pattern '(schema_migrations|audit_log_default)' --out-file src/db.generated.ts",
     "typecheck": "tsgo --noEmit",
     "lint": "eslint src --cache --cache-location node_modules/.cache/.eslintcache",
     "test": "bun test"
@@ -18,6 +19,7 @@
   "dependencies": {
     "@iedora/contracts": "workspace:*",
     "@iedora/server-kit": "workspace:*",
+    "@hono/zod-validator": "catalog:",
     "hono": "catalog:",
     "kysely": "catalog:"
   },
@@ -26,6 +28,8 @@
     "@types/bun": "catalog:",
     "eslint": "catalog:",
     "jose": "catalog:",
+    "kysely-codegen": "catalog:",
+    "pg": "catalog:",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:"
   }
