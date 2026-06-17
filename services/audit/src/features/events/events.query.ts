@@ -1,7 +1,7 @@
 import type { AuditFilter, AuditQueryResponse, AuditRecord } from "@iedora/contracts";
 import { type Kysely, sql } from "kysely";
 
-import type { AuditDB } from "./schema";
+import type { AuditDB } from "../../schema";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
