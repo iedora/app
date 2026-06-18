@@ -25,6 +25,31 @@ export const registerRequest = z.object({
 });
 export type RegisterRequest = z.infer<typeof registerRequest>;
 
+export const createTenantRequest = z.object({ name: z.string().min(1) });
+export type CreateTenantRequest = z.infer<typeof createTenantRequest>;
+
+export const tenant = z.object({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string().optional(),
+});
+export type Tenant = z.infer<typeof tenant>;
+
+export const whoamiResponse = z.object({
+  userId: z.string(),
+  tenantId: z.string().optional(),
+  roles: z.array(z.string()),
+  email: z.string().optional(),
+});
+export type WhoamiResponse = z.infer<typeof whoamiResponse>;
+
+export const serviceTokenResponse = z.object({
+  accessToken: z.string(),
+  expiresAt: z.string(),
+  tokenType: z.literal("Bearer"),
+});
+export type ServiceTokenResponse = z.infer<typeof serviceTokenResponse>;
+
 // Access-token claims (EdDSA), mirroring internal/auth/crypto/jwt.go Claims.
 export const accessClaims = z.object({
   sub: z.string(),

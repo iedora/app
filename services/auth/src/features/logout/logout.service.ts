@@ -1,6 +1,6 @@
 import { hashRefreshToken } from "@iedora/server-kit";
 
-import { findByTokenHash, revokeFamily } from "../../data/sessions";
+import { findByTokenHash, revokeAllForUser, revokeFamily } from "../../data/sessions";
 import type { AuthDeps } from "../../deps";
 import type { RequestMeta } from "../../session";
 
@@ -21,6 +21,21 @@ export async function logout(deps: AuthDeps, refreshToken: string, meta: Request
       userAgent: meta.userAgent ?? undefined,
       ipHash: meta.ipHash ?? undefined,
       meta: { session_id: cur.id },
+    });
+  });
+}
+
+// LogoutAll revokes every session for a user (all devices). Ports service.LogoutAll.
+export async function logoutAll(deps: AuthDeps, userId: string, meta: RequestMeta): Promise<void> {
+  await deps.db.runInTx(async () => {
+    await revokeAllForUser(deps.db.db, userId);
+    await deps.auditor.recordSync({
+      action: "auth.session.logout_all",
+      actor: { type: "user", id: userId },
+      targetType: "user",
+      targetId: userId,
+      userAgent: meta.userAgent ?? undefined,
+      ipHash: meta.ipHash ?? undefined,
     });
   });
 }

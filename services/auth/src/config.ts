@@ -27,6 +27,7 @@ export interface AuthConfig {
   serviceClients: string; // "id:secret,id2:secret2"
   serviceAudience: string;
   serviceTokenTtl: string;
+  serviceTokenTtlMs: number;
 }
 
 // Mirrors the Go auth Config (internal/apps/auth/config.go). All vars match the
@@ -50,5 +51,6 @@ export function loadConfig(): AuthConfig {
     serviceClients: env("SERVICE_CLIENTS", ""),
     serviceAudience: env("SERVICE_AUDIENCE", "iedora-internal"),
     serviceTokenTtl: env("SERVICE_TOKEN_TTL", "10m"),
+    serviceTokenTtlMs: durationMs(env("SERVICE_TOKEN_TTL", "10m"), 10 * 6e4),
   };
 }

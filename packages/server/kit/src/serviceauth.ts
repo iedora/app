@@ -1,5 +1,7 @@
+import type { KeyObject } from "node:crypto";
+
 import { createMiddleware } from "hono/factory";
-import { importJWK, jwtVerify, type CryptoKey } from "jose";
+import { type CryptoKey, importJWK, jwtVerify, SignJWT } from "jose";
 
 import type { ServiceEnv } from "./http";
 
@@ -42,6 +44,41 @@ export async function verifyServiceToken(v: ServiceVerifier, token: string): Pro
   if (payload.typ !== "service") throw new Error("not a service token");
   if (!payload.sub) throw new Error("service token missing subject");
   return payload.sub;
+}
+
+export interface ServiceIssuerConfig {
+  privateKey: CryptoKey | KeyObject;
+  kid: string;
+  issuer: string;
+  audience: string;
+  ttl?: string | number; // jose duration; default "10m"
+}
+
+// Mints internal service tokens (EdDSA, typ="service") for the client-
+// credentials grant — ports Go internal/serviceauth.Issuer.
+export class ServiceTokenIssuer {
+  constructor(private readonly cfg: ServiceIssuerConfig) {}
+
+  issue(clientId: string): Promise<string> {
+    return new SignJWT({ typ: "service" })
+      .setProtectedHeader({ alg: "EdDSA", kid: this.cfg.kid })
+      .setSubject(clientId)
+      .setIssuer(this.cfg.issuer)
+      .setAudience(this.cfg.audience)
+      .setIssuedAt()
+      .setExpirationTime(this.cfg.ttl ?? "10m")
+      .sign(this.cfg.privateKey);
+  }
+}
+
+/** Parses the "id1:secret1,id2:secret2" client registry (port of ParseClients). */
+export function parseClients(s: string): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const pair of s.split(",")) {
+    const [id, secret] = pair.split(":");
+    if (id?.trim() && secret?.trim()) m.set(id.trim(), secret.trim());
+  }
+  return m;
 }
 
 /** Hono middleware: 401 unless a valid service bearer token is present; sets `clientId`. */

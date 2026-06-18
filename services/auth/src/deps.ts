@@ -1,4 +1,10 @@
-import type { Auditor, Database, JwtIssuer } from "@iedora/server-kit";
+import type {
+  Auditor,
+  Database,
+  JwtIssuer,
+  ServiceTokenIssuer,
+  UserVerifier,
+} from "@iedora/server-kit";
 
 import type { AuthConfig } from "./config";
 import type { AuthDB } from "./schema";
@@ -7,7 +13,10 @@ import type { AuthDB } from "./schema";
 // hashing uses server-kit's functions directly; the relay is started in index.ts.
 export interface AuthDeps {
   db: Database<AuthDB>;
-  issuer: JwtIssuer;
+  issuer: JwtIssuer; // mints user access tokens
+  userVerifier: UserVerifier; // verifies our own access tokens on authed routes
+  serviceIssuer: ServiceTokenIssuer; // client-credentials → service tokens
+  serviceClients: Map<string, string>; // clientId → secret
   auditor: Auditor; // OutboxWriter — records into the auth DB's outbox
   cfg: AuthConfig;
 }

@@ -23,9 +23,12 @@ const txCtx = new AsyncLocalStorage<Kysely<any>>();
 export class Database<DB> {
   readonly root: Kysely<DB>;
 
-  constructor(url: string) {
+  // poolMax caps the underlying Bun SQL connection pool. Bun's default is large;
+  // on a single small VM many service pools would exhaust Postgres's
+  // max_connections, so default to a modest 10 (override per service).
+  constructor(url: string, opts: { poolMax?: number } = {}) {
     this.root = new Kysely<DB>({
-      dialect: new PostgresJSDialect({ postgres: new SQL(url) }),
+      dialect: new PostgresJSDialect({ postgres: new SQL(url, { max: opts.poolMax ?? 10 }) }),
     });
   }
 

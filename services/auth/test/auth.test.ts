@@ -1,4 +1,13 @@
-import { Database, OutboxWriter, parseEd25519Seed, JwtIssuer, runMigrations } from "@iedora/server-kit";
+import {
+  Database,
+  JwtIssuer,
+  OutboxWriter,
+  ServiceTokenIssuer,
+  newUserVerifier,
+  parseClients,
+  parseEd25519Seed,
+  runMigrations,
+} from "@iedora/server-kit";
 import { SQL } from "bun";
 import { afterAll, beforeAll, expect, test } from "bun:test";
 
@@ -43,11 +52,21 @@ beforeAll(async () => {
     refreshCookieName: "iedora_refresh",
     cookieDomain: "",
     cookieSecure: false,
-    serviceClients: "",
+    serviceClients: "admin-bff:dev-secret",
     serviceAudience: "iedora-internal",
     serviceTokenTtl: "10m",
+    serviceTokenTtlMs: 10 * 6e4,
   };
-  app = buildApp({ db, issuer: new JwtIssuer({ keys: parseEd25519Seed(SEED), kid: "k1", issuer: cfg.jwtIssuer, audience: cfg.jwtAudience, accessTtl: cfg.accessTtl }), auditor: new OutboxWriter(db, "auth"), cfg });
+  const keys = parseEd25519Seed(SEED);
+  app = buildApp({
+    db,
+    issuer: new JwtIssuer({ keys, kid: "k1", issuer: cfg.jwtIssuer, audience: cfg.jwtAudience, accessTtl: cfg.accessTtl }),
+    userVerifier: newUserVerifier(keys.publicKey, cfg.jwtIssuer, cfg.jwtAudience),
+    serviceIssuer: new ServiceTokenIssuer({ privateKey: keys.privateKey, kid: "k1", issuer: cfg.jwtIssuer, audience: cfg.serviceAudience, ttl: cfg.serviceTokenTtl }),
+    serviceClients: parseClients(cfg.serviceClients),
+    auditor: new OutboxWriter(db, "auth"),
+    cfg,
+  });
 });
 
 afterAll(async () => {
@@ -115,6 +134,50 @@ test("logout revokes the session", async () => {
   const c = refreshCookie(loginRes)!;
   expect((await app.request("/auth/logout", withCookie(c))).status).toBe(200);
   expect((await app.request("/auth/refresh", withCookie(c))).status).toBe(401);
+});
+
+test("client-credentials token endpoint mints a service token (and rejects bad secrets)", async () => {
+  const basic = (id: string, secret: string) =>
+    `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`;
+  const ok = await app.request("/auth/token", { method: "POST", headers: { authorization: basic("admin-bff", "dev-secret") } });
+  expect(ok.status).toBe(200);
+  const body = (await ok.json()) as { accessToken: string; tokenType: string };
+  expect(body.tokenType).toBe("Bearer");
+  expect(body.accessToken).toBeTruthy();
+
+  const bad = await app.request("/auth/token", { method: "POST", headers: { authorization: basic("admin-bff", "wrong") } });
+  expect(bad.status).toBe(401);
+});
+
+test("tenants: create a tenant, then refresh picks up the tid; whoami reflects identity", async () => {
+  const reg = await app.request("/auth/register", json({ email: "b@iedora.com", password: "correct horse battery staple", name: "B" }));
+  const access = ((await reg.json()) as { accessToken: string }).accessToken;
+  const cookie = refreshCookie(reg)!;
+  const bearer = { headers: { authorization: `Bearer ${access}` } };
+
+  // whoami before any tenant
+  const who = await app.request("/auth/whoami", bearer);
+  expect(who.status).toBe(200);
+  expect(((await who.json()) as { tenantId?: string }).tenantId).toBeUndefined();
+
+  // create a tenant (caller becomes owner)
+  const created = await app.request("/auth/tenants", { method: "POST", headers: { authorization: `Bearer ${access}`, "content-type": "application/json" }, body: JSON.stringify({ name: "Acme" }) });
+  expect(created.status).toBe(200);
+  expect(((await created.json()) as { name: string }).name).toBe("Acme");
+
+  // refresh now mints a tenant-scoped token (the onboarding flow)
+  const refreshed = await app.request("/auth/refresh", { method: "POST", headers: { cookie: `iedora_refresh=${cookie}` } });
+  expect(refreshed.status).toBe(200);
+  expect(((await refreshed.json()) as { tenantId?: string }).tenantId).toBeTruthy();
+});
+
+test("logout-all revokes every device session", async () => {
+  const reg = await app.request("/auth/register", json({ email: "c@iedora.com", password: "correct horse battery staple", name: "C" }));
+  const access = ((await reg.json()) as { accessToken: string }).accessToken;
+  const cookie = refreshCookie(reg)!;
+  const res = await app.request("/auth/logout-all", { method: "POST", headers: { authorization: `Bearer ${access}` } });
+  expect(res.status).toBe(200);
+  expect((await app.request("/auth/refresh", { method: "POST", headers: { cookie: `iedora_refresh=${cookie}` } })).status).toBe(401);
 });
 
 test("JWKS serves the EdDSA public key", async () => {

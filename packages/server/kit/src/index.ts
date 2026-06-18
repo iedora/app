@@ -10,3 +10,4 @@ export * from "./outbox";
 export * from "./password";
 export * from "./serviceauth";
 export * from "./tokens";
+export * from "./userauth";
