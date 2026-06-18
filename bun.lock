@@ -40,6 +40,9 @@
     "packages/platform/api-client": {
       "name": "@iedora/api-client",
       "version": "0.1.0",
+      "dependencies": {
+        "@iedora/contracts": "workspace:*",
+      },
       "devDependencies": {
         "@iedora/eslint-config": "workspace:*",
         "@types/node": "^22.19.19",
@@ -179,6 +182,7 @@
         "@dnd-kit/utilities": "^3.2.2",
         "@iedora/api-client": "workspace:*",
         "@iedora/brand": "workspace:*",
+        "@iedora/contracts": "workspace:*",
         "@iedora/design-system": "workspace:*",
         "clsx": "^2.1.1",
         "qrcode": "^1.5.4",

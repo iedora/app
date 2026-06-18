@@ -24,10 +24,12 @@ export default async function AdminRestaurantsPage() {
     name: r.name,
     slug: r.slug,
     tenantId: r.tenantId,
-    menuCount: r.menuCount,
-    dishCount: r.dishCount,
+    // The staff directory row carries `menus`/`items`/`createdAt` (the service's
+    // field names); map them onto the table's display fields.
+    menuCount: r.menus,
+    dishCount: r.items,
     views30d: r.views30d,
-    updatedAt: r.updatedAt,
+    updatedAt: r.createdAt,
   }))
 
   return (

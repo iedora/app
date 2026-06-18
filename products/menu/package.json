@@ -53,6 +53,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@iedora/api-client": "workspace:*",
     "@iedora/brand": "workspace:*",
+    "@iedora/contracts": "workspace:*",
     "@iedora/design-system": "workspace:*",
     "clsx": "^2.1.1",
     "qrcode": "^1.5.4",

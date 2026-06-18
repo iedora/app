@@ -1,229 +1,64 @@
 import 'server-only'
 import { apiJson, MENU_URL } from '@iedora/api-client'
+import type {
+  Analytics,
+  CategoryUpdate,
+  IdentityPatch,
+  ItemWrite,
+  MenuNode,
+  MenuSummary,
+  MenuUpdate,
+  PlanLimits,
+  PresignedUpload,
+  PublicMenuPayload,
+  QRCode,
+  Restaurant,
+  RestaurantRef,
+  RestaurantSummary,
+  StaffOverview,
+  StaffRestaurantRow,
+  UploadTarget,
+} from '@iedora/contracts'
 
 /**
- * Typed client for the Go menu service — the menu product's ONLY data
- * surface. DTOs mirror the Go structs (services/internal/menu); one
- * function per endpoint, all server-side via the Bearer-attaching
- * `apiJson` (which refreshes once on 401).
+ * Typed client for the menu service — the menu product's ONLY data surface.
+ * Payload types are the SHARED @iedora/contracts schemas (the same ones the
+ * service validates against); one function per endpoint, all server-side via
+ * the Bearer-attaching `apiJson` (which refreshes once on 401).
  */
 
-// --- DTOs (mirror services/internal/menu/domain.go etc.) ---
-
-export type LocalizedText = Record<string, string>
-export type Theme = Record<string, unknown>
-
-export type Variant = {
-  label: string
-  labelI18n?: LocalizedText
-  priceCents: number
-}
-
-export type Restaurant = {
-  id: string
-  tenantId: string
-  name: string
-  slug: string
-  description?: string
-  descriptionI18n?: LocalizedText
-  logoUrl?: string
-  bannerUrl?: string
-  theme?: Theme
-  defaultLanguage: string
-  supportedLanguages: string[]
-  onboardingCompletedAt?: string
-  updatedAt: string
-}
-
-export type ItemNode = {
-  id: string
-  categoryId: string
-  name: string
-  nameI18n?: LocalizedText
-  description?: string
-  descriptionI18n?: LocalizedText
-  priceCents: number
-  currency: string
-  imageUrl?: string
-  position: number
-  available: boolean
-  tags: string[]
-  variants: Variant[]
-}
-
-export type CategoryNode = {
-  id: string
-  menuId: string
-  name: string
-  nameI18n?: LocalizedText
-  description?: string
-  descriptionI18n?: LocalizedText
-  position: number
-  items: ItemNode[]
-}
-
-export type MenuNode = {
-  id: string
-  name: string
-  nameI18n?: LocalizedText
-  description?: string
-  descriptionI18n?: LocalizedText
-  position: number
-  active: boolean
-  categories: CategoryNode[]
-}
-
-export type RestaurantSummary = {
-  id: string
-  name: string
-  slug: string
-  updatedAt: string
-  menuCount: number
-  dishCount: number
-}
-
-export type MenuSummary = {
-  id: string
-  name: string
-  active: boolean
-  position: number
-  updatedAt: string
-  categoryCount: number
-  dishCount: number
-}
-
-export type PlanLimits = {
-  code: string
-  restaurants: number // -1 = unlimited
-  monthlyViews: number
-  aiGenerationsWeek: number
-}
-
-export type DailyPoint = { day: string; count: number }
-
-export type Analytics = {
-  range: string
-  totalScans: number
-  todayScans: number
-  dailyBreakdown: DailyPoint[]
-  menus: { total: number; active: number }
-  dishes: { total: number; lastAddedAt: string | null }
-  languages: string[]
-}
-
-// Public (unauthenticated) read model.
-export type PublicVariant = { label: string; priceCents: number }
-export type PublicItem = {
-  id: string
-  name: string
-  description?: string
-  priceCents: number
-  currency: string
-  imageUrl?: string
-  tags: string[]
-  variants: PublicVariant[]
-}
-export type PublicCategory = {
-  id: string
-  name: string
-  description?: string
-  items: PublicItem[]
-}
-export type PublicMenu = {
-  id: string
-  name: string
-  description?: string
-  categories: PublicCategory[]
-}
-export type PublicMenuPayload = {
-  restaurant: {
-    name: string
-    slug: string
-    description?: string
-    logoUrl?: string
-    bannerUrl?: string
-    theme?: Theme
-  }
-  menus: PublicMenu[]
-  defaultLanguage: string
-  supportedLanguages: string[]
-  currentLanguage: string
-}
-
-// Staff surface.
-export type StaffRestaurantRow = {
-  id: string
-  tenantId: string
-  name: string
-  slug: string
-  menuCount: number
-  dishCount: number
-  views30d: number
-  updatedAt: string
-}
-export type StaffOverview = {
-  restaurants: number
-  activeMenus: number
-  items: number
-  viewsToday: number
-  views30d: number
-  qrBound: number
-  qrUnbound: number
-  topByViews: StaffRestaurantRow[]
-}
-export type QRCode = {
-  code: string
-  restaurantId?: string
-  restaurantName?: string
-  restaurantSlug?: string
-  label?: string
-  boundAt?: string
-  createdAt: string
-}
-export type RestaurantRef = {
-  id: string
-  tenantId: string
-  name: string
-  slug: string
-}
-
-export type PresignedUpload = {
-  uploadUrl: string
-  publicUrl: string
-  key: string
-  expiresInSeconds: number
-  maxBytes: number
-}
-export type UploadTarget =
-  | 'restaurant-logo'
-  | 'restaurant-banner'
-  | 'item-photo'
-  | 'menu-import-photo'
-
-// Write payloads (mirror service_builder.go / service.go).
-export type TextFields = {
-  name: string
-  nameI18n?: LocalizedText
-  description?: string
-  descriptionI18n?: LocalizedText
-}
-export type MenuUpdate = TextFields & { active: boolean }
-export type CategoryUpdate = TextFields
-export type ItemWrite = TextFields & {
-  priceCents: number
-  currency?: string
-  available?: boolean
-  tags?: string[]
-  variants?: Variant[]
-}
-export type IdentityPatch = {
-  name?: string
-  description?: string
-  descriptionI18n?: LocalizedText
-  theme?: Theme
-  defaultLanguage?: string
-  supportedLanguages?: string[]
-}
+// Re-exported so existing imports from this module keep resolving; the
+// definitions now live in @iedora/contracts (single source of truth).
+export type {
+  Analytics,
+  CategoryNode,
+  CategoryUpdate,
+  DailyPoint,
+  IdentityPatch,
+  ItemNode,
+  ItemWrite,
+  LocalizedText,
+  MenuNode,
+  MenuSummary,
+  MenuUpdate,
+  PlanLimits,
+  PresignedUpload,
+  PublicCategory,
+  PublicItem,
+  PublicMenu,
+  PublicMenuPayload,
+  PublicVariant,
+  QRCode,
+  Restaurant,
+  RestaurantRef,
+  RestaurantSummary,
+  StaffOverview,
+  StaffRestaurantRow,
+  TextFields,
+  Theme,
+  UploadTarget,
+  Variant,
+} from '@iedora/contracts'
 
 // --- tenant-level ---
 

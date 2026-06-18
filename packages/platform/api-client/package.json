@@ -13,6 +13,9 @@
     "lint": "eslint src --cache --cache-location node_modules/.cache/.eslintcache",
     "test": "vitest run --passWithNoTests"
   },
+  "dependencies": {
+    "@iedora/contracts": "workspace:*"
+  },
   "peerDependencies": {
     "next": "^16.2.6"
   },

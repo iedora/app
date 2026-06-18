@@ -8,16 +8,15 @@
  *    connection, so we re-issue it under `Path=/` with our attributes.
  */
 
+import type { TokenResponse } from '@iedora/contracts'
+
 export const ACCESS_COOKIE = 'iedora_access'
 export const REFRESH_COOKIE = 'iedora_refresh'
 
-/** JSON body of the Go auth endpoints (register/login/refresh). */
-export type TokenResponse = {
-  accessToken: string
-  expiresAt: string // RFC3339
-  userId: string
-  tenantId?: string
-}
+/** JSON body of the auth endpoints (register/login/refresh) — the shared
+ *  @iedora/contracts schema the auth service validates against. Re-exported
+ *  for the existing consumers that import it from this module. */
+export type { TokenResponse }
 
 /** Cookie write in a shape both `cookies()` and NextResponse accept. */
 export type CookieWrite = {
