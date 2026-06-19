@@ -22,6 +22,18 @@ const nextConfig: NextConfig = {
   // DEPLOYMENT_VERSION build-arg from CI (typically commit SHA).
   deploymentId: process.env.DEPLOYMENT_VERSION,
   allowedDevOrigins: ['menu.733113.xyz'],
+  // Marketing landing photography is served from Unsplash's CDN.
+  // Explicit object form (omitting `search` so any query string matches);
+  // the `new URL()` shorthand does not reliably register the host on Next 16.
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        pathname: '/**',
+      },
+    ],
+  },
   // The public-menu view beacon. The page renders <img src="/track/:slug">;
   // the Go menu service answers with a 1×1 gif and counts the view.
   async rewrites() {
