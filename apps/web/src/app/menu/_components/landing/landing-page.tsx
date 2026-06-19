@@ -10,7 +10,9 @@ import {
   Pencil,
   Play,
   QrCode,
+  Sparkles,
   Star,
+  UtensilsCrossed,
 } from "lucide-react";
 import { Button } from "@iedora/design-system";
 import { signInUrl, signUpUrl } from "@iedora/product-menu/shared/auth-urls";
@@ -79,7 +81,8 @@ const SOCIALS: { name: string; path: React.ReactNode }[] = [
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full bg-[var(--cinnabar-soft)] px-3 py-1.5 text-[13px] font-semibold text-[var(--cinnabar)]">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--cinnabar-soft)] px-3 py-1.5 text-[13px] font-semibold text-[var(--cinnabar)]">
+      <Sparkles size={14} strokeWidth={2} className="shrink-0" />
       {children}
     </span>
   );
@@ -107,7 +110,7 @@ export default async function LandingPage() {
       <header className="sticky top-0 z-30 border-b border-border bg-[color-mix(in_srgb,var(--paper)_88%,transparent)] backdrop-blur">
         <nav className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-6">
           <Link href="/menu" className="flex items-center gap-2 no-underline">
-            <span className="grid size-8 place-items-center rounded-lg bg-primary font-[family-name:var(--display)] text-[18px] font-extrabold text-white">i</span>
+            <span className="grid size-8 place-items-center rounded-lg bg-primary text-white"><UtensilsCrossed size={17} strokeWidth={2.2} /></span>
             <span className="font-[family-name:var(--display)] text-[21px] font-extrabold tracking-[-0.02em] text-foreground">iedora</span>
           </Link>
           <ul className="ml-auto hidden items-center gap-7 md:flex">
@@ -246,7 +249,7 @@ export default async function LandingPage() {
         <div className="mx-auto grid max-w-6xl gap-10 px-6 py-14 md:grid-cols-[1.4fr_repeat(3,1fr)]">
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
-              <span className="grid size-7 place-items-center rounded-lg bg-primary font-[family-name:var(--display)] text-[15px] font-extrabold text-white">i</span>
+              <span className="grid size-7 place-items-center rounded-lg bg-primary text-white"><UtensilsCrossed size={15} strokeWidth={2.2} /></span>
               <span className="font-[family-name:var(--display)] text-[18px] font-extrabold text-foreground">iedora</span>
             </div>
             <p className="max-w-xs text-[14px] leading-[1.55] text-muted-foreground">{t("footer.tagline")}</p>
