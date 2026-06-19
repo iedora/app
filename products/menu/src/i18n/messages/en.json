@@ -564,7 +564,10 @@
   "Landing": {
     "nav": {
       "getStarted": "Get started",
-      "signIn": "Sign in"
+      "signIn": "Sign in",
+      "features": "Features",
+      "how": "How it works",
+      "pricing": "Pricing"
     },
     "hero": {
       "accent": "today's special",

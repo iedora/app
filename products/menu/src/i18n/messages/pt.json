@@ -564,7 +564,10 @@
   "Landing": {
     "nav": {
       "getStarted": "Começar",
-      "signIn": "Entrar"
+      "signIn": "Entrar",
+      "features": "Funcionalidades",
+      "how": "Como funciona",
+      "pricing": "Preços"
     },
     "hero": {
       "accent": "especial de hoje",

@@ -67,7 +67,18 @@ export default async function LandingPage() {
             <span className="grid size-8 place-items-center rounded-lg bg-primary text-white"><UtensilsCrossed size={17} strokeWidth={2.2} /></span>
             <span className="font-[family-name:var(--display)] text-[20px] font-extrabold tracking-[-0.02em] text-foreground">iedora</span>
           </Link>
-          <div className="ml-auto flex items-center gap-2.5">
+          <ul className="ml-auto hidden items-center gap-7 lg:flex">
+            {[
+              { label: t("nav.features"), href: "#features" },
+              { label: t("nav.how"), href: "#how" },
+              { label: t("nav.pricing"), href: "#pricing" },
+            ].map((l) => (
+              <li key={l.href}>
+                <a href={l.href} className="text-[15px] font-medium text-muted-foreground no-underline transition-colors hover:text-foreground">{l.label}</a>
+              </li>
+            ))}
+          </ul>
+          <div className="ml-auto flex items-center gap-2.5 lg:ml-7">
             <LangSwitch />
             <Button as="a" href={SIGN_IN_HREF} variant="secondary" size="sm">{t("nav.signIn")}</Button>
           </div>
