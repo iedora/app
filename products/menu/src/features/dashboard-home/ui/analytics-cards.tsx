@@ -20,7 +20,7 @@ export function KpiCard({
   return (
     <article
       data-testid={testId}
-      className="border border-border bg-background p-3 sm:p-5"
+      className="rounded-[18px] border border-border bg-background p-3 sm:p-5"
     >
       <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
         {eyebrow}
@@ -28,7 +28,7 @@ export function KpiCard({
       <div className="mt-3 text-[28px] font-semibold tabular-nums leading-none text-brand">
         {value}
       </div>
-      <div className="mt-2 font-serif text-[12px] italic text-muted-foreground">
+      <div className="mt-2 text-[12px] text-muted-foreground">
         {caption}
       </div>
     </article>
@@ -58,7 +58,7 @@ export function ScansCard({
   return (
     <article
       data-testid="analytics-scans"
-      className="border border-border bg-background p-3 sm:p-5"
+      className="rounded-[18px] border border-border bg-background p-3 sm:p-5"
     >
       <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
         {labels.eyebrow}
@@ -67,7 +67,7 @@ export function ScansCard({
         <span className="text-[28px] font-semibold tabular-nums leading-none text-brand">
           {total.toLocaleString()}
         </span>
-        <span className="font-serif text-[12px] italic text-muted-foreground">
+        <span className="text-[12px] text-muted-foreground">
           {labels.tagline}
         </span>
       </div>
@@ -143,7 +143,7 @@ export function ScansChart({
   return (
     <article
       data-testid="scans-chart"
-      className="border border-border bg-background p-3 sm:p-5"
+      className="rounded-[18px] border border-border bg-background p-3 sm:p-5"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
@@ -152,7 +152,7 @@ export function ScansChart({
         {peakLabel && (
           <div
             data-testid="scans-chart-peak"
-            className="font-serif text-[12px] italic text-muted-foreground"
+            className="text-[12px] text-muted-foreground"
           >
             {peakLabel}
           </div>

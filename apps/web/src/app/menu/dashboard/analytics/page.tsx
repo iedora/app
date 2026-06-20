@@ -78,10 +78,10 @@ export default async function AnalyticsPage({
             aria-selected={isSelected}
             data-test-id={`analytics-range-${r}`}
             className={
-              'border px-2.5 py-1 text-[12.5px] no-underline transition-colors ' +
+              'rounded-full border px-3.5 py-1 text-[12.5px] font-medium no-underline transition-colors ' +
               (isSelected
-                ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)]'
-                : 'border-[var(--ink-40)] text-[var(--ink)] hover:bg-[var(--ink)] hover:text-[var(--paper)]')
+                ? 'border-primary bg-primary text-white'
+                : 'border-border text-foreground hover:border-primary hover:text-primary')
             }
           >
             {tDash(`analytics.range.${r}`)}
