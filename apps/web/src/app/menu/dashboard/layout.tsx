@@ -105,7 +105,7 @@ export default async function DashboardLayout({
   //   ── Account ──                ← billing + AI usage live under here
   //   Billing / Misc
   //   ── Admin ──                  ← only for cross-tenant tools
-  //   QR Codes                       (sessions / users live in the Go admin BFF)
+  //   QR Codes                       (sessions / users live in the admin BFF)
   //
   // No "Home" entry — the wordmark in the sidebar header already routes
   // to /dashboard and the dashboard's own role is now the org overview,

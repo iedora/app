@@ -1,7 +1,7 @@
 /**
  * Public API of the restaurant-slug slice.
  *
- * Slug ALLOCATION and RENAME are owned by the Go menu service:
+ * Slug ALLOCATION and RENAME are owned by the menu service:
  * `POST /api/restaurants` generates a unique slug from the name, and
  * `POST /api/restaurants/{slug}/slug` validates + 409s on collision
  * (see `renameSlug` in `shared/api.ts` / the identity `updateSlug`

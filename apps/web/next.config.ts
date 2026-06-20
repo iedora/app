@@ -35,12 +35,12 @@ const nextConfig: NextConfig = {
     ],
   },
   // The public-menu view beacon. The page renders <img src="/track/:slug">;
-  // the Go menu service answers with a 1×1 gif and counts the view.
+  // the menu service answers with a 1×1 gif and counts the view.
   async rewrites() {
     return [
       {
         source: '/track/:slug',
-        destination: `${process.env.MENU_URL ?? 'http://localhost:8084'}/public/track/:slug`,
+        destination: `${process.env.MENU_URL ?? 'http://localhost:8184'}/public/track/:slug`,
       },
     ]
   },

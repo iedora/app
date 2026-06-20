@@ -9,13 +9,13 @@ import { getRestaurant, type MenuSummary, type Restaurant } from '../../shared/a
 /**
  * Auth slice — thin guards over the access-token session.
  *
- * Authorization proper lives in the Go menu service: every API call is
+ * Authorization proper lives in the menu service: every API call is
  * verified there (tenant scoping, restaurant ownership, staff role).
  * These guards only decide WHERE to send an unauthenticated /
  * tenant-less visitor; they never query data.
  */
 
-/** Operator roles minted by the Go auth service (internal/authz). */
+/** Operator roles minted by the auth service (internal/authz). */
 const STAFF_ROLES = ['iedora-admin', 'iedora-support'] as const
 
 export type { Session }
@@ -62,7 +62,7 @@ export const requireActiveOrganization = cache(
 
 /**
  * Session + ownership guard keyed by restaurant slug. The ownership
- * check is the Go service's: a foreign or unknown slug 404s there
+ * check is the service's: a foreign or unknown slug 404s there
  * (staff tokens read cross-tenant), which we surface as `notFound()`.
  * Returns the full restaurant + its menu summaries so pages don't
  * re-fetch for the header.

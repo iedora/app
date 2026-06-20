@@ -3,7 +3,7 @@ import type { AssetTargetKind, UploadConstraints } from './types'
 const IMAGE_MIME = ['image/jpeg', 'image/png', 'image/webp'] as const
 
 /**
- * Client-side constraint hints per target. Mirrors the Go menu service's
+ * Client-side constraint hints per target. Mirrors the menu service's
  * upload policy (services/internal/menu) — the server re-validates on
  * presign, so drift here only costs an extra round-trip, never a hole.
  */

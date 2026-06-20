@@ -24,7 +24,7 @@ export default async function QrPage({
   const publicOrigin = `${proto}://${host}`
   const brandedUrl = `${publicOrigin}/r/${r.slug}`
 
-  // Bound stickers for this restaurant. Note: the Go service only
+  // Bound stickers for this restaurant. Note: the service only
   // exposes the staff-wide QR list, so this is empty for non-staff
   // operators (the shelf section simply doesn't render).
   const stickerRows = await listQrCodesForRestaurant(r.id)

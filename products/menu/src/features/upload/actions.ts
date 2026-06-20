@@ -6,11 +6,11 @@ import type { PresignedUpload } from '../../shared/api'
 import type { AssetTarget } from './types'
 
 /**
- * Server action shells over the Go menu service's upload endpoints.
+ * Server action shells over the menu service's upload endpoints.
  * Flow: presign (server) → browser PUTs the file straight to storage →
  * commit (server) persists the public URL on the restaurant / item.
  *
- * The Go service owns ALL authorization (Bearer token + slug scope),
+ * The service owns ALL authorization (Bearer token + slug scope),
  * key derivation, size/content-type limits, and the head-check on
  * commit — these only translate `ApiError` into the `{ ok, error }`
  * shape the `<ImageUpload>` component renders.

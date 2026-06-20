@@ -4,11 +4,11 @@
  * The access token only ever reaches this code from the `iedora_access`
  * HttpOnly cookie, which is written exclusively by our own server code
  * from Go auth-service responses. Every real API call is verified by
- * the Go services against the Ed25519 key; verifying again here would
+ * the services against the Ed25519 key; verifying again here would
  * add a JWKS round-trip without moving the trust boundary.
  */
 
-/** Claims minted by the Go auth service (`internal/auth/crypto/jwt.go`). */
+/** Claims minted by the auth service (`internal/auth/crypto/jwt.go`). */
 export type AccessClaims = {
   sub: string // user id
   tid?: string // active tenant id (absent until the user has one)

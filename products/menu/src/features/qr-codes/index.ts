@@ -8,7 +8,7 @@ import type { QrCodeListRow } from './stats'
 /**
  * Public API of the qr-codes slice. Mutations live in `./actions.ts`
  * ('use server' doesn't traverse barrels — see AGENTS.md rule #14).
- * The QR registry itself lives in the Go menu service; these loaders
+ * The QR registry itself lives in the menu service; these loaders
  * are thin, `cache()`-wrapped projections of its endpoints.
  */
 
@@ -51,7 +51,7 @@ export const resolveQrCode = cache(async (rawCode: string): Promise<QrCodeResolv
 })
 
 /**
- * Full registry for the staff admin surface. The Go service enforces
+ * Full registry for the staff admin surface. The service enforces
  * the staff role on the token; the page gates with `requireStaff`
  * first so the surface stays hidden from tenant users.
  */

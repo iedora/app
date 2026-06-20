@@ -117,7 +117,7 @@ export function SortableCategory({
       return
     }
     startTransition(async () => {
-      // The Go update replaces the full text set — carry the untouched
+      // The backend update replaces the full text set — carry the untouched
       // fields so a rename doesn't wipe description/translations.
       const res = await updateCategoryName(slug, category.id, {
         name: trimmed,

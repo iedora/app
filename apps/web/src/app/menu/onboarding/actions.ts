@@ -22,7 +22,7 @@ import { signInUrl } from '@iedora/product-menu/shared/auth-urls'
 import { publicUrl } from '@iedora/product-menu/shared/url'
 
 /**
- * Step-1 server action against the Go services:
+ * Step-1 server action against the services:
  *
  *   1. No tenant on the session yet (first sign-in)? Provision one via
  *      the auth service (`POST /auth/tenants`) with the access token
@@ -31,9 +31,9 @@ import { publicUrl } from '@iedora/product-menu/shared/url'
  *      tenant id, and persist BOTH cookies (legal here — server
  *      action). `serverFetch` reads `cookies()` per call, so the
  *      restaurant call below already sees the refreshed token.
- *   3. Create the restaurant via the Go menu service — it owns slug
+ *   3. Create the restaurant via the menu service — it owns slug
  *      derivation and the plan gate (422 over-limit → `{ error }`).
- *   4. Redirect into step 2 of the wizard with the slug Go returned.
+ *   4. Redirect into step 2 of the wizard with the slug the service returned.
  *
  * Users who already have a tenant (e.g. "add another restaurant")
  * skip 1–2 and go straight to the plan-gated create.
@@ -42,7 +42,7 @@ import { publicUrl } from '@iedora/product-menu/shared/url'
 const onboardingSchema = z.object({
   restaurantName: z.string().trim().min(2).max(80),
   // Menu's primary language (the first chip the owner picks). Falls back
-  // to the UI locale. Persisting the full offered set needs a Go update.
+  // to the UI locale. Persisting the full offered set needs a backend update.
   defaultLanguage: z
     .string()
     .trim()

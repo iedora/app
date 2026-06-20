@@ -11,11 +11,7 @@
   ],
   "scripts": {
     "dev": "bun run --cwd apps/web dev",
-    "dev:up": "docker compose -f ../backend/docker-compose.yml up -d --build",
-    "dev:down": "docker compose -f ../backend/docker-compose.yml down",
-    "dev:logs": "docker compose -f ../backend/docker-compose.yml logs -f",
-    "dev:reset": "docker compose -f ../backend/docker-compose.yml down -v",
-    "api:up": "docker compose up -d",
+    "api:up": "docker compose up -d --build",
     "api:down": "docker compose down",
     "api:logs": "docker compose logs -f",
     "api:reset": "docker compose down -v",

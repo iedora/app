@@ -3,7 +3,7 @@
  *
  * Post Go-backend migration the menu product holds NO infrastructure
  * config — databases, S3, auth secrets and rate limits all live with
- * the Go services (see services/). What's left is the product's own
+ * the services (see services/). What's left is the product's own
  * public origin, used for absolute URL construction.
  *
  * Two operating modes:

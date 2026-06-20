@@ -10,7 +10,7 @@ import type { AnalyticsRange } from './range'
  * repeated calls during a single render hit the API once.
  *
  * View tracking (the old `incrementDailyView`) lives entirely in the
- * Go service's public track beacon now — this slice only reads.
+ * service's public track beacon now — this slice only reads.
  */
 export const getOrganizationMonthlyViews = cache(async () => {
   const { count } = await getMonthlyViews()

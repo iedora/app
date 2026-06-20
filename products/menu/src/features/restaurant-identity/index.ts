@@ -20,7 +20,7 @@ export type { StaffRestaurantRow } from '../../shared/api'
 
 /**
  * Staff-only cross-tenant restaurant directory (admin restaurants
- * page). The Go service enforces the staff role on the token; the page
+ * page). The service enforces the staff role on the token; the page
  * gates with `requireStaff` first so non-staff never see the surface.
  */
 export const listRestaurantsDirectory = cache(async (q?: string) => {
@@ -31,7 +31,7 @@ export const listRestaurantsDirectory = cache(async (q?: string) => {
 /**
  * Active menus of one restaurant projected into the public render
  * shape, in the restaurant's default language — feeds the theme
- * editor's live preview. Ownership is enforced by the Go service
+ * editor's live preview. Ownership is enforced by the service
  * (the tree call 404s for foreign slugs).
  */
 export const loadThemePreviewMenus = cache(async (slug: string): Promise<PublicMenu[]> => {

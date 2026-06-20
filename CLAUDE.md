@@ -72,5 +72,5 @@ The app is mid-migration **from** an editorial look (paper/ink/cinnabar, Playfai
 ## Quick reference
 - Stack/auth/slices/commands → **`AGENTS.md`**. App shell rules → **`apps/web/CLAUDE.md`**.
 - Data shapes → `packages/platform/contracts/src/*` (zod: `publicMenu` / `publicItem` / `publicCategory`, billing invoices, etc.).
-- Run: `bun install` → `bun run dev:up` (Go backend) → `bun run dev` (`:3000`). Verify: `bun run typecheck`.
+- Run: `bun install` → `bun run api:up` → `bun run dev` (`:3000`). Verify: `bun run typecheck`.
 - Tests: co-located Vitest (`renderToStaticMarkup`, assert on `data-test-id`), one slice per file.

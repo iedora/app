@@ -1,7 +1,7 @@
 import { TEMPLATE_META } from './templates'
 
 /**
- * Operator-authored theme blob as stored by the Go menu service
+ * Operator-authored theme blob as stored by the menu service
  * (`restaurant.theme` JSONB — mirrored here so this module stays free
  * of any DB import). Forward-compatible: unknown keys pass through.
  */

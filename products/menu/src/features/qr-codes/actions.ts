@@ -7,7 +7,7 @@ import { generateQrCode, isValidQrCodeShape, normalizeQrCode } from './code'
 
 /**
  * Server actions for the staff QR-binding surface — thin wrappers over
- * the Go menu service's `/api/staff/qr-codes` endpoints. The service
+ * the menu service's `/api/staff/qr-codes` endpoints. The service
  * enforces the staff role on the Bearer token (a tenant user gets a
  * 403 translated into `{ ok: false }`); the only client-side logic
  * kept here is code normalisation + shape validation so typos fail
@@ -33,7 +33,7 @@ export async function createCodeAction(input: {
   restaurantId?: string
   label?: string
 }): Promise<ActionResult<{ code: string }>> {
-  // Generate client-side when no code is supplied — the Go endpoint
+  // Generate client-side when no code is supplied — the service endpoint
   // reports only an inserted count, and the form wants to echo the
   // created code back to the operator.
   let code: string

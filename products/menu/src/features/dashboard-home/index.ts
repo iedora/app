@@ -11,7 +11,7 @@ import { listRestaurants } from '../../shared/api'
  *
  * Per-restaurant menu summaries (the old `listMenusWithCounts`) come
  * straight from `requireRestaurantBySlug` / `getRestaurant(slug)` now —
- * the Go endpoint returns `{ restaurant, menus }` in one round-trip.
+ * the service endpoint returns `{ restaurant, menus }` in one round-trip.
  */
 export const listRestaurantsWithCounts = cache(async () => {
   const { restaurants } = await listRestaurants()

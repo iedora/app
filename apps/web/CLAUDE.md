@@ -5,7 +5,7 @@ iedora surface (menu / apex landing) from one process via
 host-based rewrites in `src/proxy.ts`. Routes live HERE (`src/app/`);
 the slices and shared utilities they import live in
 `@iedora/product-menu` and other workspace packages. ALL data, auth
-and business rules live in the Go services (`services/`), reached
+and business rules live in the services (`services/`), reached
 server-side through `@iedora/api-client`.
 
 Repo-level conventions: [`../../AGENTS.md`](../../AGENTS.md).
@@ -32,7 +32,7 @@ Repo-level conventions: [`../../AGENTS.md`](../../AGENTS.md).
    Each subpath is
    declared in the target package's `package.json::exports`.
    Adding business logic INSIDE a route file is the bug — that's
-   slice work (or Go work).
+   slice work (or backend work).
 
 2. **`src/proxy.ts` owns host dispatch + the auth gate.** It is the
    ONE place that refreshes an expired access token for page loads
@@ -84,15 +84,15 @@ apps/web/
     proxy.ts                       host-based rewrite + auth gate +
                                    token refresh
   next.config.ts                   transpilePackages + the /track/:slug
-                                   rewrite to the Go menu service
+                                   rewrite to the menu service
   tsconfig.json                    project references
   Dockerfile, next-env.d.ts, postcss.config.mjs
 ```
 
 ## Commands
 
-- `bun run dev` — Next.js dev server (Turbopack). Needs the Go backend
-  up first: `bun run dev:up` at the repo root.
+- `bun run dev` — Next.js dev server (Turbopack). Needs the Hono backend
+  up first: `bun run api:up` at the repo root.
 - `bun run build` — production build (standalone output for Docker).
 - `bun run start` — start the standalone server.
 - `bun run typecheck` — TS check without emit.

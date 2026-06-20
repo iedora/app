@@ -125,6 +125,6 @@ export const config = {
   // `up` and `track` are excluded alongside `api` — they serve every
   // host without rewrite (infra plumbing: container healthcheck + the
   // public-menu view beacon, which next.config.ts rewrites straight to
-  // the Go menu service).
+  // the menu service).
   matcher: ['/((?!api|up|track|_next/static|_next/image|.*\\.png$).*)'],
 }

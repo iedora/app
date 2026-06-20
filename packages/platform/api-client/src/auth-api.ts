@@ -1,5 +1,5 @@
 /**
- * Server-to-server calls against the Go auth service. Each token-minting
+ * Server-to-server calls against the auth service. Each token-minting
  * call returns the parsed JSON body plus the raw Set-Cookie headers so
  * the caller can re-issue the refresh cookie (see cookies.ts).
  */

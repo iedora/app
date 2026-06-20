@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Menu product — UI slices + thin server actions over the Go menu service (services/cmd/menu). The Next.js routes live in apps/web/src/app/; this package exposes its slice + shared barrels via explicit subpath exports so apps/web routes can import them by name (no tsconfig fallback).",
+  "description": "Menu product — UI slices + thin server actions over the menu service (services/cmd/menu). The Next.js routes live in apps/web/src/app/; this package exposes its slice + shared barrels via explicit subpath exports so apps/web routes can import them by name (no tsconfig fallback).",
   "exports": {
     ".": "./src/index.ts",
     "./i18n/messages/*.json": "./src/i18n/messages/*.json",

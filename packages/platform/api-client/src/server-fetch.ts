@@ -6,7 +6,7 @@ import { MENU_URL } from './config'
 import { ApiError } from './error'
 
 /**
- * Fetch against the Go menu API with the caller's Bearer token.
+ * Fetch against the menu API with the caller's Bearer token.
  *
  * `path` is service-relative (e.g. `/api/restaurants`); absolute URLs
  * pass through for other services. On a 401 with a live refresh cookie

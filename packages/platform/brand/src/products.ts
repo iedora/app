@@ -18,7 +18,7 @@
  * NOT `NEXT_PUBLIC_*`) so the same image serves any environment — set the value
  * per deployment. Read server-side at request time; absent in the browser, where
  * it falls back to the prod host (only cosmetic links call this client-side).
- * `MENU_URL` is taken (the Go menu service), hence `MENU_SURFACE_URL`.
+ * `MENU_URL` is taken (the menu service), hence `MENU_SURFACE_URL`.
  *
  * Adding a product:
  *   1. Append the id to `PRODUCTS`.

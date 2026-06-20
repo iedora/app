@@ -47,7 +47,7 @@ import { TenantContextSpanProcessor } from "./signals/processor";
  * `service.version`, `deployment.environment`, `host.name`), same
  * DELTA temporality (load-bearing for OpenObserve's `sum()` queries —
  * see register.ts notes), same parent-based sampling (so the migrate
- * container honours the Go orchestrator's sampling decision when
+ * container honours the orchestrator's sampling decision when
  * `TRACEPARENT` arrives via env). The W3C trace-context propagator is
  * registered as the global propagator so `propagation.extract(...)` /
  * `inject(...)` work with no extra wiring.

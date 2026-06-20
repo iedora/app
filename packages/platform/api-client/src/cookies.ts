@@ -3,7 +3,7 @@
  *
  *  - `iedora_access`  — the Go access JWT (15 min), mirrored out of the
  *    auth-service JSON response so middleware/RSCs can read it.
- *  - `iedora_refresh` — the opaque refresh token. The Go service sets it
+ *  - `iedora_refresh` — the opaque refresh token. The service sets it
  *    with `Path=/auth` (its own surface); we terminate the browser
  *    connection, so we re-issue it under `Path=/` with our attributes.
  */

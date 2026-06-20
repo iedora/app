@@ -11,7 +11,7 @@ import { getRestaurant, listRestaurants } from '../../../shared/api'
  * pending — the caller is free to render the "create another
  * restaurant" form.
  *
- * Tenant scoping comes from the access token (the Go service lists
+ * Tenant scoping comes from the access token (the service lists
  * only the caller's restaurants), so no tenantId parameter is needed.
  */
 export async function findPendingOnboardingRestaurant(): Promise<{

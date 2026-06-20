@@ -84,7 +84,7 @@ export function getPlanDisplay(code: string): PlanDisplay {
 
 /**
  * UI feature gate over the Go `PlanLimits` shape. Purely cosmetic
- * (hide a nav link, pre-disable a button) — the Go service is the
+ * (hide a nav link, pre-disable a button) — the service is the
  * authority on what the token may actually do.
  */
 export function planHas(plan: Pick<PlanLimits, 'code'>, feature: PlanFeature): boolean {

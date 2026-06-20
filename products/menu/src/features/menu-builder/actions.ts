@@ -6,13 +6,13 @@ import type { LocalizedText } from '../i18n'
 import * as api from '../../shared/api'
 
 /**
- * Server action shells — thin wrappers over the Go menu API. The Go
+ * Server action shells — thin wrappers over the menu API. The Go
  * service owns ALL validation, tenancy and ownership checks (the
  * Bearer token scopes every call); these only translate errors to the
  * `{ error }` shape the dialogs render, then revalidate the dashboard
  * paths so the router cache refetches.
  *
- * NOTE: the Go update endpoints REPLACE the full text field set
+ * NOTE: the service update endpoints REPLACE the full text field set
  * (name + description + i18n), so every updating action must receive
  * the complete fields from the UI (which has the tree in memory).
  */

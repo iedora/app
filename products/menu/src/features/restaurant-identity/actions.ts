@@ -11,8 +11,8 @@ import { FONTS, HEX_PATTERN, LAYOUTS } from '../menu-publishing/rsc/theme'
 import { isValidSlugShape } from '../restaurant-slug'
 
 /**
- * Server action shells — thin wrappers over the Go menu API's identity
- * PATCH. The Go service owns authorization (Bearer token + slug scope),
+ * Server action shells — thin wrappers over the menu API's identity
+ * PATCH. The service owns authorization (Bearer token + slug scope),
  * persistence and the default-language promotion; the zod parses here
  * only keep garbage out of the wire format so the editor gets a
  * friendly message instead of a generic 400.
@@ -59,7 +59,7 @@ export async function updateTheme(slug: string, input: unknown): Promise<ActionR
 }
 
 // defaultLanguage MUST be in supportedLanguages so the fallback chain
-// always has something to land on. The Go service performs the
+// always has something to land on. The service performs the
 // promote-on-switch rotation (source column ↔ i18n slot) when the
 // default changes.
 const LanguageInput = z
@@ -130,7 +130,7 @@ export async function updateIdentity(slug: string, input: unknown): Promise<Acti
 }
 
 /**
- * Rename the public URL slug. The Go service validates the shape and
+ * Rename the public URL slug. The service validates the shape and
  * 409s when the slug is taken. The action returns the new slug on
  * success so the client can `router.replace(/dashboard/r/<new>)` —
  * the old dashboard URL would 404 on next render because the slug no

@@ -15,7 +15,7 @@ import { completeOnboarding, type OnboardingFormState } from './actions'
  *     (display only; an independently editable slug + live availability
  *     check needs a backend endpoint — future).
  *   - Languages — pick the menu's languages; the first becomes
- *     `defaultLanguage` (persisting the full set needs a Go update —
+ *     `defaultLanguage` (persisting the full set needs a backend update —
  *     future). Always at least one selected.
  * The create flow / server action is behaviour-preserving.
  */

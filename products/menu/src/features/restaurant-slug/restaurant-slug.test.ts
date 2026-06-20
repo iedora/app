@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { isValidSlugShape, slugify } from './slugify'
 
 // ── Pure helpers ────────────────────────────────────────────────────────────
-// Allocation / rename behaviour lives in the Go menu service and is
+// Allocation / rename behaviour lives in the menu service and is
 // covered by its own integration tests; only the pure, framework-free
 // helpers are tested here.
 

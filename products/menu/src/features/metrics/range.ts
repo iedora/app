@@ -1,5 +1,5 @@
 /**
- * Analytics range registry — MUST stay in sync with the Go service's
+ * Analytics range registry — MUST stay in sync with the service's
  * `AnalyticsRanges` map (services/internal/menu/views.go), which is the
  * authority: an unknown range key 400s there.
  */

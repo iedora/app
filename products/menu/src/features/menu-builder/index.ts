@@ -12,7 +12,7 @@ import type { BuilderCategory, BuilderItem } from './ui/types'
  *
  * `loadBuilderData` is wrapped in React's `cache()` so a guard called twice
  * in a single render (page + child RSC) hits the API once. Ownership is
- * enforced by the Go service (the tree call 404s for foreign slugs).
+ * enforced by the service (the tree call 404s for foreign slugs).
  */
 export const loadBuilderData = cache(async (slug: string, menuId: string) => {
   const tree = await getMenuTree(slug)

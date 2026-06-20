@@ -15,7 +15,7 @@ import { brandUrl, isSameIedoraOrigin } from '@iedora/brand'
 
 /**
  * Auth server actions — the only code that exchanges credentials with
- * the Go auth service and writes the auth cookies. Forms submit here
+ * the auth service and writes the auth cookies. Forms submit here
  * via useActionState; on success the action redirects to the validated
  * `next` target, on failure it returns a state the form translates.
  */

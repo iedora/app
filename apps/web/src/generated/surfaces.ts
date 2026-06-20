@@ -1,6 +1,6 @@
 // Host-to-surface topology consumed by src/proxy.ts and per-surface pages.
 // Hand-maintained — adding a new surface here is rule #5 in apps/web/CLAUDE.md.
-// (Previously emitted by `iedora emit-topology`, retired with the Go pipeline.)
+// (Previously emitted by `iedora emit-topology`, retired with the CI pipeline.)
 //
 // Consumed SERVER-SIDE only (the middleware + the root server page), so the host
 // lists derive from this environment's runtime URL env vars (BRAND_URL,

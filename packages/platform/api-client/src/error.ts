@@ -1,4 +1,4 @@
-/** HTTP error from a Go service, surfaced with its status for mapping. */
+/** HTTP error from a service, surfaced with its status for mapping. */
 export class ApiError extends Error {
   readonly status: number
 
