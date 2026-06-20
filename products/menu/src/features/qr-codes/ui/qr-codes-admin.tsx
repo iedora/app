@@ -203,6 +203,8 @@ function CreateOneForm({ restaurants }: { restaurants: RestaurantOption[] }) {
             onChange={(e) => setCode(e.target.value)}
             placeholder="auto"
             maxLength={64}
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? 'qr-codes-create-one-error' : undefined}
             className={INPUT}
           />
         </div>
@@ -230,7 +232,7 @@ function CreateOneForm({ restaurants }: { restaurants: RestaurantOption[] }) {
         </div>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-3">
-        {error && <p className="text-[13px] text-[#D92D20]" data-test-id="qr-codes-create-one-error">{error}</p>}
+        {error && <p id="qr-codes-create-one-error" role="alert" className="text-[13px] text-[#D92D20]" data-test-id="qr-codes-create-one-error">{error}</p>}
         {success && <p className="text-[13px] text-muted-foreground" data-test-id="qr-codes-create-one-success">{success}</p>}
         <button type="submit" disabled={pending} className={BTN_PRIMARY} data-test-id="qr-codes-create-one-submit">
           {pending ? 'Creating…' : 'Create code'}
@@ -272,13 +274,15 @@ function BulkGenerateForm() {
           max={500}
           value={count}
           onChange={(e) => setCount(Number(e.target.value))}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? 'qr-codes-bulk-error' : undefined}
           className={`${INPUT} w-24 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none`}
         />
         <button type="submit" disabled={pending} className={BTN_PRIMARY} data-test-id="qr-codes-bulk-submit">
           {pending ? 'Generating…' : 'Generate batch'}
         </button>
       </div>
-      {error && <p className="text-[13px] text-[#D92D20]" data-test-id="qr-codes-bulk-error">{error}</p>}
+      {error && <p id="qr-codes-bulk-error" role="alert" className="text-[13px] text-[#D92D20]" data-test-id="qr-codes-bulk-error">{error}</p>}
       {generatedCount !== null && (
         <p className="text-[13px] text-muted-foreground" data-test-id="qr-codes-bulk-success">
           Generated {generatedCount} code{generatedCount === 1 ? '' : 's'} · see registry below

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import {
   Field,
+  FieldError,
   FieldInput,
   FieldLabel,
   FieldTextarea,
@@ -44,6 +45,7 @@ export function LocalizedFields({
   nameLabel = 'Name',
   descriptionLabel = 'Description',
   nameRequired = true,
+  nameError,
   showName = true,
   showDescription = true,
   showDefault = true,
@@ -65,6 +67,12 @@ export function LocalizedFields({
   nameLabel?: string
   descriptionLabel?: string
   nameRequired?: boolean
+  /**
+   * Validation message for the source (default-language) name. Only shown on
+   * the default tab — that's where the required source value lives; the
+   * translation tabs are optional and never block a save.
+   */
+  nameError?: string
   /**
    * Set false when the host already renders a mono-language name field
    * above (e.g. restaurant identity: name is a proper noun, only the
@@ -164,7 +172,7 @@ export function LocalizedFields({
         </div>
       )}
       {showName && (
-        <Field>
+        <Field error={Boolean(isDefaultTab && nameError)}>
           <FieldLabel htmlFor={`${id}-name`}>{nameLabel}</FieldLabel>
           <FieldInput
             id={`${id}-name`}
@@ -173,10 +181,17 @@ export function LocalizedFields({
             onChange={(e) => handleNameChange(e.target.value)}
             required={isDefaultTab && nameRequired}
             maxLength={nameMaxLength}
+            error={Boolean(isDefaultTab && nameError)}
+            aria-describedby={
+              isDefaultTab && nameError ? `${id}-name-msg` : undefined
+            }
             placeholder={
               isDefaultTab ? undefined : `Translation for ${activeLang}`
             }
           />
+          {isDefaultTab && nameError && (
+            <FieldError id={`${id}-name-msg`}>{nameError}</FieldError>
+          )}
         </Field>
       )}
       {showDescription && onDescriptionChange && (
