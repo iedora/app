@@ -87,8 +87,10 @@ export async function getAnalytics(range: string): Promise<Analytics> {
   return (await res.json()) as Analytics
 }
 
-export function getMonthlyViews() {
-  return apiJson<{ count: number }>('/api/views/month')
+export async function getMonthlyViews(): Promise<{ count: number }> {
+  const res = await menu.api.views.month.$get()
+  if (!res.ok) throw new ApiError(res.status, res.statusText)
+  return res.json()
 }
 
 // --- restaurant-scoped ---
