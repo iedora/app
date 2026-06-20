@@ -20,5 +20,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=deps /app /app
 USER bun
+# Every boot migrates the started service's database before running it (see
+# services/docker-entrypoint.sh). The entrypoint derives the service from the
+# CMD/args, so each Kamal role migrates only its own DB; compose reuses the
+# same script in dev, so dev and prod migrate-before-serve identically.
+ENTRYPOINT ["sh", "services/docker-entrypoint.sh"]
 # Default role; overridden per Kamal role. Each service serves /up for health.
 CMD ["bun", "run", "services/auth/src/index.ts"]
