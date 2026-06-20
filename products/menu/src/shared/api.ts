@@ -16,7 +16,6 @@ import type {
   Restaurant,
   RestaurantRef,
   RestaurantSummary,
-  StaffOverview,
   StaffRestaurantRow,
   UploadTarget,
 } from '@iedora/contracts'
@@ -109,9 +108,6 @@ export function updateIdentity(slug: string, patch: IdentityPatch) {
   })
 }
 
-export function deleteRestaurant(slug: string) {
-  return apiJson<void>(r(slug), { method: 'DELETE' })
-}
 
 export function renameSlug(slug: string, next: string) {
   return apiJson<void>(`${r(slug)}/slug`, {
@@ -236,10 +232,6 @@ export function resolveQRCode(code: string) {
 }
 
 // --- staff (cross-tenant; requires the staff role) ---
-
-export function staffOverview() {
-  return apiJson<StaffOverview>('/api/staff/overview')
-}
 
 export function staffDirectory(q?: string) {
   const qs = q ? `?q=${encodeURIComponent(q)}` : ''
