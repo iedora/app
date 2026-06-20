@@ -120,6 +120,12 @@
         "30d": "Scans by day · 30 days"
       },
       "chartPeak": "peak {count}",
+      "avgTimeLabel": "Avg. time",
+      "avgTimeCaption": "per guest visit",
+      "avgTimeNone": "no visits yet",
+      "topDishesLabel": "Top dishes",
+      "topDishesNone": "No dish views yet.",
+      "topDishesViews": "{count} views",
       "noData": "—"
     }
   },

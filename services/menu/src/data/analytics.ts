@@ -34,6 +34,12 @@ export interface DailyPoint {
   count: number;
 }
 
+export interface TopDish {
+  itemId: string;
+  itemName: string;
+  viewCount: number;
+}
+
 export interface Analytics {
   range: string;
   totalScans: number;
@@ -42,6 +48,8 @@ export interface Analytics {
   menus: { total: number; active: number };
   dishes: { total: number; lastAddedAt: string | null };
   languages: string[];
+  topDishes: TopDish[];
+  avgSessionSeconds: number | null;
 }
 
 // analytics aggregates the tenant's scans + content state for a range key from
@@ -65,6 +73,8 @@ export async function analytics(
     menus: { total: 0, active: 0 },
     dishes: { total: 0, lastAddedAt: null },
     languages: [],
+    topDishes: [],
+    avgSessionSeconds: null,
   };
 
   const counts = new Map<string, number>();
@@ -103,6 +113,28 @@ export async function analytics(
     SELECT DISTINCT unnest(r.supported_languages) AS lang FROM restaurants r WHERE r.tenant_id=${tenantId}`.execute(db);
   const set = new Set(langRows.rows.map((r) => r.lang));
   a.languages = Languages.filter((l) => set.has(l));
+
+  // Top dishes — most-viewed items over the range (current item name).
+  const topRows = await sql<{ item_id: string; item_name: string; views: number }>`
+    SELECT iv.item_id, i.name AS item_name, sum(iv.count)::int AS views
+    FROM item_view iv JOIN items i ON i.id = iv.item_id
+    WHERE iv.tenant_id=${tenantId} AND iv.day >= ${start}
+    GROUP BY iv.item_id, i.name
+    ORDER BY views DESC
+    LIMIT 5`.execute(db);
+  a.topDishes = topRows.rows.map((r) => ({
+    itemId: r.item_id,
+    itemName: r.item_name,
+    viewCount: Number(r.views),
+  }));
+
+  // Average guest dwell time over the range (whole seconds, null if no data).
+  const sessRows = await sql<{ avg: number | null }>`
+    SELECT round(avg(duration_seconds))::int AS avg FROM menu_session
+    WHERE tenant_id=${tenantId} AND day >= ${start}`.execute(db);
+  const avg = sessRows.rows[0]?.avg;
+  a.avgSessionSeconds = avg == null ? null : Number(avg);
+
   return a;
 }
 

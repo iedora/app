@@ -5,7 +5,7 @@ import { getCookie, setCookie } from "hono/cookie";
 
 import { resolveQRCode } from "../../data/qr";
 import { snapshotBySlug } from "../../data/tree";
-import { recordView } from "../../data/views";
+import { recordItemView, recordSession, recordView } from "../../data/views";
 import type { MenuDeps } from "../../deps";
 import { notFound } from "../../errors";
 import { localize, pick, pickLanguage } from "../../i18n";
@@ -122,5 +122,35 @@ export function publicRoutes(deps: MenuDeps) {
         // fire-and-forget: any rate-limit/db error still serves the pixel
       }
       return servePixel();
+    })
+    // Session-end beacon (navigator.sendBeacon on page hide): records the
+    // guest's dwell time and the set of dish ids that scrolled into view, in
+    // one fire-and-forget request. Powers "Avg. time" + "Top dishes".
+    .post("/track/:slug/session", async (c) => {
+      try {
+        await deps.limiter.allow("beacon", `ip:${clientIP(c)}`);
+        const rest = await snapshotBySlug(deps.db.db, c.req.param("slug"), true).then((s) => s?.restaurant);
+        if (!rest) return c.body(null, 204);
+        await deps.limiter.allow("beacon_rest", `rest:${rest.id}`);
+        const visitor = getCookie(c, VISITOR_COOKIE) ?? "";
+        const body = (await c.req.json().catch(() => ({}))) as {
+          durationSeconds?: unknown;
+          items?: unknown;
+        };
+        const now = new Date();
+        if (typeof body.durationSeconds === "number" && body.durationSeconds > 0) {
+          await recordSession(deps.db.db, rest, body.durationSeconds, now);
+        }
+        if (visitor && Array.isArray(body.items)) {
+          for (const itemId of body.items.slice(0, 100)) {
+            if (typeof itemId === "string" && itemId) {
+              await recordItemView(deps.db.db, rest, itemId, visitor, now);
+            }
+          }
+        }
+      } catch {
+        // fire-and-forget
+      }
+      return c.body(null, 204);
     });
 }

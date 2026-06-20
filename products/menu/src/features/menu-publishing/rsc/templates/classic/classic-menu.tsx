@@ -102,7 +102,7 @@ export function ClassicMenu({ restaurant: r, menus }: RenderProps) {
                       {c.items.map((it) => {
                         const variants = it.variants ?? []
                         return (
-                          <li key={it.id} className="flex items-start gap-4 py-4">
+                          <li key={it.id} data-item-id={it.id} className="flex items-start gap-4 py-4">
                             <div className="min-w-0 flex-1">
                               <div className="flex items-baseline justify-between gap-3">
                                 <h4 className="font-semibold leading-snug">{it.name}</h4>

@@ -8,7 +8,7 @@ import {
   type AnalyticsRange,
 } from '@iedora/product-menu/features/metrics'
 import { getOrganizationPlan, planHas } from '@iedora/product-menu/features/plans'
-import { KpiCard, ScansCard, ScansChart } from '@iedora/product-menu/features/dashboard-home/ui/analytics-cards'
+import { KpiCard, ScansCard, ScansChart, TopDishesCard, formatDuration } from '@iedora/product-menu/features/dashboard-home/ui/analytics-cards'
 import { DashboardPage } from '@iedora/product-menu/shared/ui/dashboard-page'
 
 const DEFAULT_RANGE: AnalyticsRange = '30d'
@@ -144,6 +144,17 @@ export default async function AnalyticsPage({
                 : tDash('analytics.noData')
             }
           />
+
+          <KpiCard
+            testId="analytics-avg-time"
+            eyebrow={tDash('analytics.avgTimeLabel')}
+            value={formatDuration(analytics.avgSessionSeconds)}
+            caption={
+              analytics.avgSessionSeconds == null
+                ? tDash('analytics.avgTimeNone')
+                : tDash('analytics.avgTimeCaption')
+            }
+          />
         </div>
 
         <ScansChart
@@ -157,6 +168,13 @@ export default async function AnalyticsPage({
               : null
           }
           locale={locale}
+        />
+
+        <TopDishesCard
+          title={tDash('analytics.topDishesLabel')}
+          emptyLabel={tDash('analytics.topDishesNone')}
+          viewsLabel={(n) => tDash('analytics.topDishesViews', { count: numberFmt.format(n) })}
+          dishes={analytics.topDishes}
         />
       </section>
     </DashboardPage>

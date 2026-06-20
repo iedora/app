@@ -6,6 +6,7 @@ import {
 } from '../../i18n'
 import type { ResolvedTheme } from './theme'
 import { MenuRenderer } from './menu-renderer'
+import { MenuTracker } from './menu-tracker'
 import type { PublicMenuData } from './types'
 
 /**
@@ -123,6 +124,7 @@ export function PublicMenuView({
           }}
         />
       )}
+      {showBeacon && <MenuTracker slug={data.restaurant.slug} />}
     </div>
   )
 }

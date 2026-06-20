@@ -34,13 +34,14 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // The public-menu view beacon. The page renders <img src="/track/:slug">;
-  // the menu service answers with a 1×1 gif and counts the view.
+  // Public-menu tracking beacons → menu service. `/track/:slug` is the 1×1
+  // view pixel; `/track/:slug/session` is the session-end beacon (dwell time +
+  // viewed dishes). Catch-all so both (and any future beacon) proxy through.
   async rewrites() {
     return [
       {
-        source: '/track/:slug',
-        destination: `${process.env.MENU_URL ?? 'http://localhost:8184'}/public/track/:slug`,
+        source: '/track/:path*',
+        destination: `${process.env.MENU_URL ?? 'http://localhost:8184'}/public/track/:path*`,
       },
     ]
   },

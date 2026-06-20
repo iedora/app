@@ -170,6 +170,13 @@ export type PlanLimits = z.infer<typeof planLimits>;
 export const dailyPoint = z.object({ day: z.string(), count: z.number().int() });
 export type DailyPoint = z.infer<typeof dailyPoint>;
 
+export const topDish = z.object({
+  itemId: z.string(),
+  itemName: z.string(),
+  viewCount: z.number().int(),
+});
+export type TopDish = z.infer<typeof topDish>;
+
 export const analytics = z.object({
   range: z.string(),
   totalScans: z.number().int(),
@@ -178,6 +185,9 @@ export const analytics = z.object({
   menus: z.object({ total: z.number().int(), active: z.number().int() }),
   dishes: z.object({ total: z.number().int(), lastAddedAt: z.string().nullable() }),
   languages: z.array(z.string()),
+  // Per-item engagement + guest dwell time (Pencil "Top dishes" / "Avg. time").
+  topDishes: z.array(topDish),
+  avgSessionSeconds: z.number().int().nullable(),
 });
 export type Analytics = z.infer<typeof analytics>;
 

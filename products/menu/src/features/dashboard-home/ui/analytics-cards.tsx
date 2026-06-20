@@ -188,3 +188,57 @@ export function ScansChart({
     </article>
   )
 }
+
+/**
+ * Top dishes — the most-viewed items over the range (Pencil "Top dishes").
+ * A ranked list; per-item view counts come from the new item-view tracking.
+ */
+export function TopDishesCard({
+  title,
+  emptyLabel,
+  viewsLabel,
+  dishes,
+}: {
+  title: string
+  emptyLabel: string
+  viewsLabel: (n: number) => string
+  dishes: { itemId: string; itemName: string; viewCount: number }[]
+}) {
+  return (
+    <article
+      data-testid="analytics-top-dishes"
+      className="rounded-[18px] border border-border bg-background p-4 sm:p-5"
+    >
+      <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+        {title}
+      </div>
+      {dishes.length === 0 ? (
+        <p className="mt-3 text-[13px] text-muted-foreground">{emptyLabel}</p>
+      ) : (
+        <ul className="mt-3 divide-y divide-border">
+          {dishes.map((d, i) => (
+            <li key={d.itemId} className="flex items-center gap-3 py-2.5">
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--cinnabar-soft)] text-[12px] font-bold text-primary">
+                {i + 1}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-foreground">
+                {d.itemName}
+              </span>
+              <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground">
+                {viewsLabel(d.viewCount)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </article>
+  )
+}
+
+/** Formats a dwell time in seconds as "1m 48s" / "12s" / "—" (null). */
+export function formatDuration(seconds: number | null): string {
+  if (seconds == null) return '—'
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return m > 0 ? `${m}m ${s}s` : `${s}s`
+}

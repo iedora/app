@@ -120,6 +120,12 @@
         "30d": "Scans por dia · 30 dias"
       },
       "chartPeak": "pico {count}",
+      "avgTimeLabel": "Tempo médio",
+      "avgTimeCaption": "por visita",
+      "avgTimeNone": "ainda sem visitas",
+      "topDishesLabel": "Pratos mais vistos",
+      "topDishesNone": "Ainda sem visualizações de pratos.",
+      "topDishesViews": "{count} visualizações",
       "noData": "—"
     }
   },
