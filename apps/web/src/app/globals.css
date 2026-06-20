@@ -806,16 +806,17 @@
   display: grid;
   gap: 14px;
   padding: 22px 22px 20px;
-  border: 1px solid var(--ink-14);
-  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--card);
   align-content: start;
 }
 .billing-plan-card[data-current="true"] {
-  background: var(--paper-2);
-  border-color: var(--ink-40);
+  background: var(--cinnabar-soft);
+  border-color: var(--primary);
 }
 .billing-plan-card[data-recommended="true"] {
-  border-color: var(--ink);
+  border-color: var(--primary);
 }
 .billing-plan-card__head {
   display: flex;
@@ -824,16 +825,16 @@
   flex-wrap: wrap;
 }
 .billing-plan-card__name {
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 22px;
   font-weight: 500;
   margin: 0;
-  color: var(--ink);
+  color: var(--foreground);
 }
 .billing-plan-card__tagline {
   margin: 0;
   font-size: 14px;
-  color: var(--ink-55);
+  color: var(--muted-foreground);
   line-height: 1.4;
 }
 .billing-plan-card__features {
@@ -843,7 +844,7 @@
   display: grid;
   gap: 8px;
   font-size: 14px;
-  color: var(--ink);
+  color: var(--foreground);
 }
 .billing-plan-card__features li {
   position: relative;
@@ -853,7 +854,7 @@
   content: "·";
   position: absolute;
   left: 6px;
-  color: var(--ink-40);
+  color: var(--muted-foreground);
 }
 .billing-plan-card__action {
   margin-top: 4px;
@@ -861,14 +862,14 @@
 .billing-plan-card__current {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin: 0;
-  font-family: var(--mono);
-  font-size: 11.5px;
-  letter-spacing: 0.18em;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: var(--ink);
-  padding: 8px 0;
+  color: var(--primary);
+  padding: 6px 0;
 }
 .billing-plan-card__current-dot {
   width: 8px;
@@ -891,16 +892,16 @@
   flex-wrap: wrap;
 }
 .billing-invoices__title {
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 18px;
   font-weight: 500;
   margin: 0;
-  color: var(--ink);
+  color: var(--foreground);
 }
 .billing-invoices__subtitle {
   margin: 4px 0 0;
   font-size: 13px;
-  color: var(--ink-55);
+  color: var(--muted-foreground);
 }
 .billing-invoices__years {
   display: flex;
@@ -913,28 +914,28 @@
   min-height: 32px;
   display: inline-flex;
   align-items: center;
-  border: 1px solid var(--ink-14);
-  color: var(--ink-55);
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
   text-decoration: none;
   letter-spacing: 0.1em;
   transition: color 100ms ease, background 100ms ease, border-color 100ms ease;
 }
 .billing-invoices__year:hover {
-  border-color: var(--ink-40);
-  color: var(--ink);
+  border-color: var(--muted-foreground);
+  color: var(--foreground);
 }
 .billing-invoices__year[data-active="true"] {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--paper);
+  background: var(--foreground);
+  border-color: var(--foreground);
+  color: var(--card);
 }
 .billing-invoices__empty {
   border: 1px dashed var(--ink-24);
   padding: 28px 16px;
   text-align: center;
-  font-family: var(--serif);
+  font-family: var(--display);
   font-style: italic;
-  color: var(--ink-55);
+  color: var(--muted-foreground);
   margin: 0;
 }
 .billing-invoice-list {
@@ -945,8 +946,8 @@
   gap: 10px;
 }
 .billing-invoice {
-  border: 1px solid var(--ink-14);
-  background: var(--paper);
+  border: 1px solid var(--border);
+  background: var(--card);
   padding: 14px 16px 14px;
   display: grid;
   gap: 4px;
@@ -958,9 +959,9 @@
   gap: 8px;
 }
 .billing-invoice__date {
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 15px;
-  color: var(--ink);
+  color: var(--foreground);
 }
 .billing-invoice__status {
   font-family: var(--mono);
@@ -971,21 +972,21 @@
 .billing-invoice__status[data-status="paid"] { color: #3d5a3a; }
 .billing-invoice__status[data-status="open"] { color: var(--cinnabar); }
 .billing-invoice__status[data-status="void"] {
-  color: var(--ink-40);
+  color: var(--muted-foreground);
   text-decoration: line-through;
 }
 .billing-invoice__plan {
   margin: 0;
   font-size: 13px;
-  color: var(--ink-55);
+  color: var(--muted-foreground);
 }
-.billing-invoice__period { color: var(--ink-55); }
+.billing-invoice__period { color: var(--muted-foreground); }
 .billing-invoice__amount {
   margin: 4px 0 0;
   font-family: var(--mono);
   font-size: 15px;
   font-variant-numeric: tabular-nums;
-  color: var(--ink);
+  color: var(--foreground);
 }
 
 /* ── Misc (Account → AI usage meter) ─────────────────────────────────── */
@@ -1009,25 +1010,25 @@
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;
-  color: var(--ink);
+  color: var(--foreground);
 }
 .misc-usage__remaining {
   font-family: var(--mono);
   font-size: 11.5px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ink-55);
+  color: var(--muted-foreground);
 }
 .misc-usage__bar {
   position: relative;
   height: 6px;
-  background: var(--ink-14);
+  background: var(--border);
   overflow: hidden;
 }
 .misc-usage__bar-fill {
   display: block;
   height: 100%;
-  background: var(--ink);
+  background: var(--foreground);
   transition: width 240ms ease;
 }
 .misc-usage[data-exhausted="true"] .misc-usage__bar-fill {
@@ -1036,7 +1037,7 @@
 .misc-usage__reset {
   margin: 0;
   font-size: 12.5px;
-  color: var(--ink-55);
+  color: var(--muted-foreground);
 }
 
 /* ── Settings cards (theme editor) ────────────────────────────────────
@@ -1082,17 +1083,17 @@
   flex-direction: column;
   gap: 14px;
   padding: 18px 18px 16px;
-  border: 1px solid var(--ink-14);
-  background: var(--paper);
-  color: var(--ink);
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
   text-decoration: none;
   cursor: pointer;
   transition: background 120ms ease, border-color 120ms ease;
 }
 
 .ds-card--linked:hover {
-  background: var(--paper-2);
-  border-color: var(--ink-40);
+  background: var(--muted);
+  border-color: var(--muted-foreground);
 }
 
 .ds-card--linked .ds-card__title {
