@@ -15,7 +15,9 @@
     "account": "Account",
     "misc": "Misc",
     "admin": "Admin",
-    "qrCodes": "QR Codes"
+    "qrCodes": "QR Codes",
+    "overview": "Overview",
+    "settings": "Settings"
   },
   "Auth": {
     "signIn": {
@@ -397,6 +399,7 @@
   "Misc": {
     "title": "Misc",
     "description": "Plan-scoped usage that doesn't fit on Billing yet.",
+    "account": "Account",
     "plans": {
       "menu_free": {
         "name": "Free"

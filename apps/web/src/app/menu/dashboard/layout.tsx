@@ -30,7 +30,6 @@ import {
   SidebarClose,
   SidebarFooter,
   SidebarProvider,
-  SidebarTrigger,
   Wordmark,
 } from '@iedora/design-system'
 import { signInUrl } from '@iedora/product-menu/shared/auth-urls'
@@ -41,6 +40,7 @@ import { listRestaurantsWithCounts } from '@iedora/product-menu/features/dashboa
 import { DEFAULT_PLAN, getOrganizationPlan, planHas } from '@iedora/product-menu/features/plans'
 import { LogoutButton } from '@iedora/product-menu/features/dashboard-home/ui/logout-button'
 import { UserLocaleSwitcher } from '@iedora/product-menu/features/dashboard-home/ui/user-locale-switcher'
+import { BottomNav, type BottomTab } from './_components/bottom-nav'
 
 export default async function DashboardLayout({
   children,
@@ -143,17 +143,31 @@ export default async function DashboardLayout({
   ]
   const navItems = candidates.filter((x): x is ActiveSidebarItem => Boolean(x))
 
+  // Mobile bottom tab bar (Pencil has no top-right drawer below `lg`).
+  // Curated to the handful of top destinations per role; the sidebar
+  // rail still carries the full nav on desktop. Account actions
+  // (locale + logout) live on the Settings/More tab → /dashboard/misc.
+  const bottomCandidates: ReadonlyArray<BottomTab | false> = isStaffAdmin
+    ? [
+        { href: '/menu/dashboard', label: nav('overview'), icon: 'overview', exact: true },
+        { href: '/menu/dashboard/admin/restaurants', label: nav('restaurants'), icon: 'restaurants' },
+        { href: '/menu/dashboard/admin/qr-codes', label: nav('qrCodes'), icon: 'qr' },
+        Boolean(tenantId) && { href: '/menu/dashboard/misc', label: nav('settings'), icon: 'settings' },
+      ]
+    : [
+        { href: '/menu/dashboard', label: nav('home'), icon: 'home', exact: true },
+        showAnalyticsLink && { href: '/menu/dashboard/analytics', label: nav('analytics'), icon: 'stats' },
+        Boolean(tenantId) && { href: '/menu/dashboard/billing', label: nav('billing'), icon: 'billing' },
+        Boolean(tenantId) && { href: '/menu/dashboard/misc', label: nav('settings'), icon: 'settings' },
+      ]
+  const bottomTabs = bottomCandidates.filter((x): x is BottomTab => Boolean(x))
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen flex-col bg-[var(--paper)] lg:flex-row">
-        {/* Hamburger floats top-left below `lg`, hidden at desktop. No
-            dedicated mobile bar — the page content claims the full
-            viewport and the button overlays it. */}
-        <SidebarTrigger
-          aria-label={t('openNavigation')}
-          data-test-id="dashboard-sidebar-trigger"
-        />
-
+        {/* Desktop nav is the sidebar rail (lg+); below `lg` the sidebar
+            stays off-canvas and the BottomNav below carries navigation —
+            no hamburger drawer, matching the Pencil mobile chrome. */}
         <Sidebar aria-label={nav('ariaLabel')} data-test-id="dashboard-chrome">
           <SidebarClose
             aria-label={t('closeNavigation')}
@@ -190,9 +204,11 @@ export default async function DashboardLayout({
           </SidebarFooter>
         </Sidebar>
 
-        <main className="ds-shell flex-1 pt-5 pb-10 sm:pt-7 sm:pb-14 lg:pt-8 lg:pb-16">
+        <main className="ds-shell flex-1 pt-5 pb-24 sm:pt-7 lg:pt-8 lg:pb-16">
           {children}
         </main>
+
+        <BottomNav tabs={bottomTabs} />
       </div>
     </SidebarProvider>
   )

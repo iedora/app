@@ -15,7 +15,9 @@
     "account": "Conta",
     "misc": "Outros",
     "admin": "Admin",
-    "qrCodes": "Códigos QR"
+    "qrCodes": "Códigos QR",
+    "overview": "Visão geral",
+    "settings": "Definições"
   },
   "Auth": {
     "signIn": {
@@ -397,6 +399,7 @@
   "Misc": {
     "title": "Outros",
     "description": "Uso ligado ao plano que ainda não encaixa na Faturação.",
+    "account": "Conta",
     "plans": {
       "menu_free": {
         "name": "Free"
