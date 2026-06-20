@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { sql } from "kysely";
 
-import { OTHER_TENANT, auth, json, jsonPatch, jsonPut, mintUserToken, useHarness } from "./harness";
+import { OTHER_TENANT, TENANT, auth, json, jsonPatch, jsonPut, mintUserToken, useHarness } from "./harness";
 
 // Dashboard slice: the tenant-scoped /api surface (restaurants, plan gate, tree,
 // builder edits, reorder, tenancy). Tests run in order against one scratch DB.
@@ -111,4 +111,26 @@ test("staff token reaches a foreign tenant's restaurant (cross-tenant scope)", a
   const staff = await mintUserToken(h, { tenant: OTHER_TENANT, roles: ["iedora-admin"] });
   const res = await h.app.request(`/api/restaurants/${slug}`, { headers: await auth(h, staff) });
   expect(res.status).toBe(200);
+});
+
+test("analytics ranks top dishes by views + averages session dwell over the range", async () => {
+  const k = h.db.root;
+  const rid = (await sql<{ id: string }>`SELECT id FROM restaurants WHERE slug=${slug}`.execute(k)).rows[0]!.id;
+  const [a, b] = (await sql<{ id: string }>`SELECT id FROM items WHERE restaurant_id=${rid} ORDER BY created_at LIMIT 2`.execute(k)).rows;
+  const day = new Date().toISOString().slice(0, 10);
+  // dish `a` out-views dish `b`; two sessions average to 90s.
+  await sql`INSERT INTO item_view (restaurant_id, tenant_id, item_id, day, count) VALUES
+            (${rid}, ${TENANT}, ${a!.id}, ${day}, 5), (${rid}, ${TENANT}, ${b!.id}, ${day}, 2)`.execute(k);
+  await sql`INSERT INTO menu_session (restaurant_id, tenant_id, day, duration_seconds) VALUES
+            (${rid}, ${TENANT}, ${day}, 60), (${rid}, ${TENANT}, ${day}, 120)`.execute(k);
+
+  const res = await h.app.request("/api/analytics?range=30d", { headers: await auth(h) });
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as {
+    topDishes: { itemId: string; viewCount: number }[];
+    avgSessionSeconds: number;
+  };
+  expect(body.topDishes[0]).toMatchObject({ itemId: a!.id, viewCount: 5 });
+  expect(body.topDishes[1]!.viewCount).toBe(2);
+  expect(body.avgSessionSeconds).toBe(90);
 });

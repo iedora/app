@@ -92,3 +92,37 @@ test("the view beacon serves a gif, sets a visitor cookie, and counts the view",
   const r = await sql<{ count: string }>`SELECT coalesce(sum(count),0)::text AS count FROM daily_view WHERE restaurant_id=${RID}`.execute(h.db.root);
   expect(Number(r.rows[0]!.count)).toBe(1);
 });
+
+test("the session beacon records dwell time + per-visitor/day-deduped dish views", async () => {
+  const k = h.db.root;
+  const itemId = (await sql<{ id: string }>`SELECT id FROM items WHERE restaurant_id=${RID} AND name='Bacalhau'`.execute(k)).rows[0]!.id;
+  const itemViews = async () =>
+    Number((await sql<{ n: string }>`SELECT coalesce(sum(count),0)::text AS n FROM item_view WHERE item_id=${itemId}`.execute(k)).rows[0]!.n);
+  const sessions = async () =>
+    Number((await sql<{ n: string }>`SELECT count(*)::text AS n FROM menu_session WHERE restaurant_id=${RID}`.execute(k)).rows[0]!.n);
+  const beacon = (slug: string, body: unknown, cookie?: string) =>
+    h.app.request(`/public/track/${slug}/session`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}) },
+      body: JSON.stringify(body),
+    });
+
+  // First visit: a session row + one item view for the dish.
+  expect((await beacon("tasca", { durationSeconds: 90, items: [itemId] }, "mm_v=v1")).status).toBe(204);
+  expect(await sessions()).toBe(1);
+  expect(await itemViews()).toBe(1);
+
+  // Same visitor + dish the same day → the item view dedups; a second session
+  // is still recorded (each visit times independently).
+  await beacon("tasca", { durationSeconds: 30, items: [itemId] }, "mm_v=v1");
+  expect(await itemViews()).toBe(1);
+  expect(await sessions()).toBe(2);
+
+  // No visitor cookie → the session counts, but item views can't be attributed.
+  await beacon("tasca", { durationSeconds: 45, items: [itemId] });
+  expect(await itemViews()).toBe(1);
+  expect(await sessions()).toBe(3);
+
+  // Unknown slug is a quiet 204 (fire-and-forget), never a 404.
+  expect((await beacon("nope", { durationSeconds: 10, items: [] }, "mm_v=v1")).status).toBe(204);
+});
