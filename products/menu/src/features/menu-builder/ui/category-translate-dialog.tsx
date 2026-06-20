@@ -46,10 +46,16 @@ export function CategoryTranslateDialog({
   )
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [nameError, setNameError] = useState<string | null>(null)
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
+    setNameError(null)
+    if (!name.trim()) {
+      setNameError('Name is required.')
+      return
+    }
     startTransition(async () => {
       const res = await updateCategoryTranslations(slug, categoryId, {
         name: name.trim(),
@@ -94,8 +100,13 @@ export function CategoryTranslateDialog({
             descriptionI18n={descriptionI18n}
             onDescriptionI18nChange={setDescriptionI18n}
             nameMaxLength={80}
+            nameError={nameError ?? undefined}
           />
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
           <DialogFooter>
             <Button
               type="button"
