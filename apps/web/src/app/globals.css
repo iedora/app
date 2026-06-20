@@ -1048,8 +1048,9 @@
  * over the visual hierarchy work that the old <hr>s tried to do.
  */
 .settings-card {
-  border: 1px solid var(--ink-14);
-  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--card);
   padding: 18px 18px 16px;
 }
 @media (min-width: 640px) {

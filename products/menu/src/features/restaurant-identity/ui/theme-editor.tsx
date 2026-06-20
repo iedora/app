@@ -119,7 +119,7 @@ export function ThemeEditor({
       <div className="order-1 lg:order-none lg:sticky lg:top-6 lg:h-fit">
         <PreviewLabel />
         <div
-          className="max-h-[60vh] overflow-auto border border-[var(--ink-14)] bg-[var(--paper)] lg:max-h-none lg:overflow-hidden"
+          className="max-h-[60vh] overflow-auto rounded-[18px] border border-border bg-card lg:max-h-none lg:overflow-hidden"
           data-test-id="theme-preview"
           data-layout={theme.layout}
         >
@@ -238,10 +238,10 @@ function LanguagesSection({
               key={lang.code}
               data-test-id={`lang-row-${lang.code}`}
               className={
-                'flex min-h-11 min-w-0 items-center gap-3 border px-3 py-2 ' +
+                'flex min-h-11 min-w-0 items-center gap-3 rounded-[12px] border px-3 py-2 ' +
                 (isSupported
-                  ? 'border-[var(--ink-40)] bg-[var(--paper-2)]'
-                  : 'border-[var(--ink-14)] bg-[var(--paper)]')
+                  ? 'border-primary bg-[var(--cinnabar-soft)]'
+                  : 'border-border bg-card')
               }
             >
               <Checkbox
@@ -627,13 +627,13 @@ function ThemeSection({
                 aria-pressed={selected}
                 data-test-id={`layout-${l.id}`}
                 className={
-                  'min-h-[72px] border p-3 text-left transition-colors ' +
+                  'min-h-[72px] rounded-[12px] border p-3 text-left transition-colors ' +
                   (selected
-                    ? 'border-[var(--ink)] bg-[var(--paper-2)]'
-                    : 'border-[var(--ink-14)] bg-[var(--paper)] hover:border-[var(--ink-40)]')
+                    ? 'border-primary bg-[var(--cinnabar-soft)]'
+                    : 'border-border bg-card hover:border-[color-mix(in_srgb,var(--cinnabar)_40%,transparent)]')
                 }
               >
-                <div className="font-[family-name:var(--serif)] text-base">
+                <div className="font-[family-name:var(--display)] text-base font-semibold">
                   {l.name}
                 </div>
                 <div className="mt-1 text-xs text-[var(--ink-55)]">
@@ -740,7 +740,7 @@ function ColorField({
           type="color"
           value={valid ? value : '#000000'}
           onChange={(e) => onChange(e.target.value)}
-          className="h-10 w-10 flex-shrink-0 cursor-pointer border border-[var(--ink-40)] bg-transparent p-0"
+          className="h-10 w-10 flex-shrink-0 cursor-pointer rounded-[10px] border border-border bg-transparent p-0"
           aria-label={`${label} picker`}
           data-test-id={`${id}-picker`}
         />

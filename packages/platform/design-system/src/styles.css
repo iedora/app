@@ -3045,3 +3045,22 @@ body.ds-loaded .ds-hero--in .ds-hero__trust   { opacity: 1; transform: translate
 }
 .ds-breadcrumb__sep { color: var(--ink-40); }
 
+/* Section header — warm-light section label (sans, quiet) instead of
+   the editorial mono/serif caps. Shared by the theme editor + the
+   menu-builder dialogs. */
+.ds-section-header__title {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: var(--t-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-55);
+}
+.ds-section-header__hint {
+  font-family: var(--sans);
+  font-size: var(--t-sm);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-40);
+}
+
