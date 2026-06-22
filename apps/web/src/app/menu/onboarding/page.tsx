@@ -10,6 +10,7 @@ import {
 } from '@iedora/product-menu/features/menu-onboarding'
 import { signInUrl } from '@iedora/product-menu/shared/auth-urls'
 import { publicUrl } from '@iedora/product-menu/shared/url'
+import { PRODUCTS, productUrl } from '@iedora/brand'
 import { OnboardingForm } from './onboarding-form'
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
@@ -49,7 +50,11 @@ export default async function OnboardingPage({
   return (
     <div className="min-h-screen bg-background text-foreground" data-test-id="onboarding-name-page">
       <div className="mx-auto flex min-h-screen max-w-md flex-col px-5 pb-8 pt-12">
-        <OnboardingForm languages={languages} locale={locale} />
+        <OnboardingForm
+          languages={languages}
+          locale={locale}
+          urlPrefix={`${productUrl(PRODUCTS.menu).replace(/^https?:\/\//, '')}/r/`}
+        />
       </div>
     </div>
   )

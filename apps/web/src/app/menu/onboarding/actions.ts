@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getLocale } from 'next-intl/server'
 import { z } from 'zod'
+import { friendlyZodMessage } from '../_components/zod-message'
 import {
   ACCESS_COOKIE,
   ApiError,
@@ -69,7 +70,7 @@ export async function completeOnboarding(
     const fieldErrors: Record<string, string> = {}
     for (const issue of parsed.error.issues) {
       const key = issue.path[0]
-      if (typeof key === 'string' && !fieldErrors[key]) fieldErrors[key] = issue.message
+      if (typeof key === 'string' && !fieldErrors[key]) fieldErrors[key] = friendlyZodMessage(issue)
     }
     return { fieldErrors }
   }

@@ -5,6 +5,7 @@ import type { PublicRestaurant } from '@iedora/product-menu/features/menu-publis
 import { loadThemePreviewMenus } from '@iedora/product-menu/features/restaurant-identity'
 import { ThemeEditor } from '@iedora/product-menu/features/restaurant-identity/ui/theme-editor'
 import { DashboardPage } from '@iedora/product-menu/shared/ui/dashboard-page'
+import { PRODUCTS, productUrl } from '@iedora/brand'
 import type { LanguageCode, LocalizedText } from '@iedora/product-menu/features/i18n'
 
 export default async function ThemePage({
@@ -40,6 +41,7 @@ export default async function ThemePage({
     >
       <ThemeEditor
         slug={slug}
+        urlPrefix={`${productUrl(PRODUCTS.menu).replace(/^https?:\/\//, '')}/r/`}
         restaurant={restaurant}
         restaurantDescriptionI18n={(r.descriptionI18n ?? {}) as LocalizedText}
         menus={menus}

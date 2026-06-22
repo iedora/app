@@ -1,4 +1,5 @@
 import { importPayload } from '@iedora/contracts'
+import { friendlyZodMessage } from '../../../../_components/zod-message'
 
 // Client-side validation of the pasted import JSON, kept free of any CodeMirror
 // imports so the form can call it during SSR/hydration and to gate the submit.
@@ -31,7 +32,7 @@ export function validateMenuJson(text: string): JsonValidation {
     state: 'invalid',
     problems: result.error.issues.map((issue) => ({
       path: issue.path.length ? issue.path.join('.') : '(root)',
-      message: issue.message,
+      message: friendlyZodMessage(issue),
     })),
   }
 }

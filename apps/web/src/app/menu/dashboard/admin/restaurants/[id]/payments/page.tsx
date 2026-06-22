@@ -46,7 +46,7 @@ export default async function AdminRestaurantPaymentsPage({
     <DashboardPage
       title={t('payments.title')}
       eyebrow={r.name}
-      description={`/m/${r.slug}`}
+      description={`/r/${r.slug}`}
       data-test-id="admin-restaurant-payments"
     >
       <div className="mb-5">

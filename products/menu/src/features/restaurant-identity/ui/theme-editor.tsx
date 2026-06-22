@@ -52,6 +52,7 @@ export function ThemeEditor({
   menus,
   initialTheme,
   initialLanguageSettings,
+  urlPrefix,
 }: {
   slug: string
   restaurant: PublicRestaurant
@@ -59,6 +60,8 @@ export function ThemeEditor({
   menus: PublicMenu[]
   initialTheme: ResolvedTheme
   initialLanguageSettings: LanguageSettings
+  /** Env-based public-menu prefix, e.g. "menu.iedora.com/r/" or "localhost:3000/menu/r/". */
+  urlPrefix: string
 }) {
   const router = useRouter()
   const initialIdentity: Identity = {
@@ -112,7 +115,7 @@ export function ThemeEditor({
           />
         </div>
         <div className="settings-card" data-test-id="settings-card-url">
-          <SlugSection currentSlug={slug} />
+          <SlugSection currentSlug={slug} urlPrefix={urlPrefix} />
         </div>
       </div>
 
@@ -477,7 +480,7 @@ function IdentitySection({
  * `/r/<slug>` URL. On save, we route the dashboard URL to the new slug
  * so the operator stays on the same page they were editing.
  */
-function SlugSection({ currentSlug }: { currentSlug: string }) {
+function SlugSection({ currentSlug, urlPrefix }: { currentSlug: string; urlPrefix: string }) {
   const router = useRouter()
   const t = useTranslations('Settings.Slug')
   const tc = useTranslations('Common')
@@ -524,7 +527,7 @@ function SlugSection({ currentSlug }: { currentSlug: string }) {
       <Field>
         <FieldLabel htmlFor="slug-input">{t('label')}</FieldLabel>
         <div className="flex flex-wrap items-baseline gap-1">
-          <span className="text-sm text-muted-foreground">menu.iedora.com/r/</span>
+          <span className="text-sm text-muted-foreground">{urlPrefix}</span>
           <FieldInput
             id="slug-input"
             data-test-id="slug-input"

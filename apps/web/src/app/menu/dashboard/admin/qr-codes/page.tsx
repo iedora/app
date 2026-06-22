@@ -8,6 +8,7 @@ import {
 import { computeQrStats } from '@iedora/product-menu/features/qr-codes/stats'
 import { QrCodesAdmin } from '@iedora/product-menu/features/qr-codes/ui/qr-codes-admin'
 import { DashboardPage } from '@iedora/product-menu/shared/ui/dashboard-page'
+import { PRODUCTS, productUrl } from '@iedora/brand'
 
 /**
  * Cross-tenant admin surface for binding QR codes to restaurants.
@@ -32,7 +33,10 @@ export default async function QrCodesAdminPage() {
   const h = await headers()
   const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000'
   const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https')
-  const publicOrigin = `${proto}://${host}`
+  // Keep the request host (tunnel/ngrok support) but add the menu surface's
+  // env path prefix ("/menu" in dev, "" in prod) so /q + /r links resolve.
+  const menuPath = new URL(productUrl(PRODUCTS.menu)).pathname.replace(/\/+$/, '')
+  const publicOrigin = `${proto}://${host}${menuPath}`
 
   const stats = computeQrStats(rows)
   const snapshotAt = new Date().toISOString()

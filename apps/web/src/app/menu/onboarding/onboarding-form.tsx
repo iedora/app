@@ -36,7 +36,16 @@ function slugPreview(value: string): string {
 
 type Lang = { code: string; label: string }
 
-export function OnboardingForm({ languages, locale }: { languages: Lang[]; locale: string }) {
+export function OnboardingForm({
+  languages,
+  locale,
+  urlPrefix,
+}: {
+  languages: Lang[]
+  locale: string
+  /** Env-based public-menu prefix, e.g. "menu.iedora.com/r/" or "localhost:3000/menu/r/". */
+  urlPrefix: string
+}) {
   const t = useTranslations('Onboarding')
   const [state, action, pending] = useActionState<OnboardingFormState, FormData>(
     completeOnboarding,
@@ -85,7 +94,7 @@ export function OnboardingForm({ languages, locale }: { languages: Lang[]; local
         <div>
           <label className="mb-1.5 block text-[14px] font-semibold text-foreground">{t('publicUrl')}</label>
           <div className="flex items-center gap-1 rounded-[12px] border border-border bg-[var(--muted)] px-4 py-3 text-[15px]" data-test-id="onboarding-public-url">
-            <span className="text-muted-foreground">iedora.com/m/</span>
+            <span className="text-muted-foreground">{urlPrefix}</span>
             <span className="truncate font-semibold text-foreground">{slug}</span>
             <Check size={18} strokeWidth={2.5} className="ml-auto shrink-0 text-[var(--green)]" />
           </div>

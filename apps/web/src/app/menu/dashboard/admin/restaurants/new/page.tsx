@@ -3,6 +3,7 @@ import { requireStaff } from '@iedora/product-menu/features/auth'
 import { listTenantsDirectory } from '@iedora/product-menu/features/restaurant-identity'
 import { LANGUAGE_META } from '@iedora/product-menu/features/i18n'
 import { DashboardPage } from '@iedora/product-menu/shared/ui/dashboard-page'
+import { PRODUCTS, productUrl } from '@iedora/brand'
 import { NewRestaurantForm } from './new-restaurant-form'
 
 /**
@@ -37,6 +38,7 @@ export default async function AdminNewRestaurantPage() {
         }))}
         languages={LANGUAGE_META.map((l) => ({ code: l.code, label: l.nativeName }))}
         defaultLanguage={locale}
+        urlPrefix={`${productUrl(PRODUCTS.menu).replace(/^https?:\/\//, '')}/r/`}
       />
     </DashboardPage>
   )

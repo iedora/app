@@ -6,6 +6,7 @@ import { requireStaff } from '@iedora/product-menu/features/auth'
 import { loadRestaurantDetail } from '@iedora/product-menu/features/restaurant-identity'
 import { AdminQrCard } from '@iedora/product-menu/features/restaurant-identity/ui/admin-qr-card'
 import { ApiError } from '@iedora/api-client'
+import { PRODUCTS, productUrl } from '@iedora/brand'
 import {
   AdminCard,
   AuditList,
@@ -55,7 +56,10 @@ export default async function AdminRestaurantDetailPage({
   const views14d = trend.reduce((sum, p) => sum + p.count, 0)
   const [t, planName] = await Promise.all([getTranslations('Admin'), planNamer()])
   const live = liveStatus(menus) === 'Live'
-  const publicUrl = `https://iedora.com/m/${r.slug}`
+  // Env-based public menu URL: productUrl() reads MENU_SURFACE_URL
+  // (http://localhost:3000/menu in dev, https://menu.iedora.com in prod), so
+  // the QR + displayed link resolve to the right host per environment.
+  const publicUrl = `${productUrl(PRODUCTS.menu)}/r/${r.slug}`
 
   return (
     <div className="space-y-6" data-test-id="admin-restaurant-detail">
@@ -113,7 +117,7 @@ export default async function AdminRestaurantDetailPage({
           <AdminCard title={t('detail.details')}>
             <InfoRow label={t('detail.id')} value={r.id} mono />
             <InfoRow label={t('detail.slug')} value={r.slug} mono />
-            <InfoRow label={t('detail.publicUrl')} value={`iedora.com/m/${r.slug}`} mono />
+            <InfoRow label={t('detail.publicUrl')} value={publicUrl.replace(/^https?:\/\//, '')} mono />
             <InfoRow label={t('detail.created')} value={formatDate(r.createdAt)} />
           </AdminCard>
 

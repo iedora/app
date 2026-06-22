@@ -40,10 +40,10 @@ function revalidateIdentityPages(slug: string) {
 // LAYOUTS comes from the templates registry (AGENTS.md hard rule #8) — the
 // enum here is derived at module load, so adding a template just shows up.
 const ThemeInput = z.object({
-  layout: z.enum(LAYOUTS.map((l) => l.id) as [string, ...string[]]),
-  font: z.enum(FONTS.map((f) => f.id) as [string, ...string[]]),
-  primaryColor: z.string().regex(HEX_PATTERN, 'Must be a #RRGGBB hex color'),
-  secondaryColor: z.string().regex(HEX_PATTERN, 'Must be a #RRGGBB hex color'),
+  layout: z.enum(LAYOUTS.map((l) => l.id) as [string, ...string[]], { error: 'Pick a layout.' }),
+  font: z.enum(FONTS.map((f) => f.id) as [string, ...string[]], { error: 'Pick a font.' }),
+  primaryColor: z.string({ error: 'Enter a primary color.' }).regex(HEX_PATTERN, 'Must be a #RRGGBB hex color'),
+  secondaryColor: z.string({ error: 'Enter a secondary color.' }).regex(HEX_PATTERN, 'Must be a #RRGGBB hex color'),
 })
 
 export async function updateTheme(slug: string, input: unknown): Promise<ActionResult> {
@@ -66,9 +66,13 @@ export async function updateTheme(slug: string, input: unknown): Promise<ActionR
 // default changes.
 const LanguageInput = z
   .object({
-    defaultLanguage: z.enum(LANGUAGE_CODES as unknown as [LanguageCode, ...LanguageCode[]]),
+    defaultLanguage: z.enum(LANGUAGE_CODES as unknown as [LanguageCode, ...LanguageCode[]], {
+      error: 'Pick a default language.',
+    }),
     supportedLanguages: z
-      .array(z.enum(LANGUAGE_CODES as unknown as [LanguageCode, ...LanguageCode[]]))
+      .array(z.enum(LANGUAGE_CODES as unknown as [LanguageCode, ...LanguageCode[]]), {
+        error: 'Pick at least one language.',
+      })
       .min(1, 'Pick at least one language'),
   })
   .refine((d) => d.supportedLanguages.includes(d.defaultLanguage), {
@@ -104,9 +108,9 @@ export async function updateLanguageSettings(
 // that the renderer would treat as truthy and try to render. Logo/banner
 // are managed by the ImageUpload component (features/upload/actions).
 const IdentityInput = z.object({
-  name: z.string().trim().min(1, 'Name is required').max(120),
+  name: z.string({ error: 'Name is required' }).trim().min(1, 'Name is required').max(120),
   description: z
-    .string()
+    .string({ error: 'Description must be text.' })
     .trim()
     .max(500)
     .transform((v) => (v === '' ? undefined : v)),
@@ -179,7 +183,7 @@ function provisionErrorKey(err: unknown): string {
 // garbage off the wire so the form shows a friendly message instead of a 422.
 const StaffCreateInput = z
   .object({
-    name: z.string().trim().min(1, 'nameRequired').max(120),
+    name: z.string({ error: 'nameRequired' }).trim().min(1, 'nameRequired').max(120),
     defaultLanguage: z.string().trim().min(2).max(10).optional(),
     tenantId: z.string().trim().min(1).optional(),
     newTenantName: z.string().trim().min(1).max(120).optional(),
@@ -237,7 +241,7 @@ export async function staffImportRestaurantAction(input: {
   }
 }
 
-const StaffNameInput = z.object({ name: z.string().trim().min(1, 'Enter a name.').max(80) })
+const StaffNameInput = z.object({ name: z.string({ error: 'Enter a name.' }).trim().min(1, 'Enter a name.').max(80) })
 
 /**
  * Staff identity override — a privileged rename of a restaurant's friendly name

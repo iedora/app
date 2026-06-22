@@ -163,7 +163,7 @@ export function RestaurantsTable({ rows }: { rows: AdminRestaurantRow[] }) {
                       >
                         {r.name}
                       </Link>
-                      <p className="truncate font-mono text-[11.5px] text-muted-foreground">/m/{r.slug}</p>
+                      <p className="truncate font-mono text-[11.5px] text-muted-foreground">/r/{r.slug}</p>
                     </div>
                   </div>
                   <span>

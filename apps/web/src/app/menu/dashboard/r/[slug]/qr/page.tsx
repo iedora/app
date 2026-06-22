@@ -4,6 +4,7 @@ import { requireRestaurantBySlug } from '@iedora/product-menu/features/auth'
 import { listQrCodesForRestaurant } from '@iedora/product-menu/features/qr-codes'
 import { RestaurantQrShelf } from '@iedora/product-menu/features/restaurant-identity/ui/restaurant-qr-shelf'
 import { DashboardPage } from '@iedora/product-menu/shared/ui/dashboard-page'
+import { PRODUCTS, productUrl } from '@iedora/brand'
 
 export default async function QrPage({
   params,
@@ -21,7 +22,11 @@ export default async function QrPage({
   const h = await headers()
   const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000'
   const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https')
-  const publicOrigin = `${proto}://${host}`
+  // Path prefix the menu surface lives under in THIS environment ("/menu" in
+  // dev, "" in prod where the host rewrite strips it). Keep the request host
+  // (tunnel/ngrok support, per above) and add the prefix so dev links resolve.
+  const menuPath = new URL(productUrl(PRODUCTS.menu)).pathname.replace(/\/+$/, '')
+  const publicOrigin = `${proto}://${host}${menuPath}`
   const brandedUrl = `${publicOrigin}/r/${r.slug}`
 
   // Bound stickers for this restaurant. Note: the service only

@@ -119,10 +119,13 @@ export function NewRestaurantForm({
   tenants,
   languages,
   defaultLanguage,
+  urlPrefix,
 }: {
   tenants: Tenant[]
   languages: Lang[]
   defaultLanguage: string
+  /** Env-based public-menu prefix the server computes, e.g. "menu.iedora.com/r/" or "localhost:3000/menu/r/". */
+  urlPrefix: string
 }) {
   const t = useTranslations('Admin.newRestaurant')
   const router = useRouter()
@@ -255,7 +258,7 @@ export function NewRestaurantForm({
                 <div>
                   <span className="mb-1.5 block text-[13px] font-semibold text-[var(--ink-soft)]">{t('manual.urlLabel')}</span>
                   <div className="flex items-center gap-1 rounded-[12px] border border-border bg-[var(--paper-2)] px-4 py-3 text-[15px]">
-                    <span className="text-muted-foreground">iedora.com/m/</span>
+                    <span className="text-muted-foreground">{urlPrefix}</span>
                     <span className="truncate font-semibold text-foreground">{slug}</span>
                     <Check size={16} strokeWidth={2.5} className="ml-auto shrink-0 text-[var(--green)]" />
                   </div>

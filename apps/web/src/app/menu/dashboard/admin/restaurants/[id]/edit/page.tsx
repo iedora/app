@@ -41,7 +41,7 @@ export default async function AdminRestaurantEditPage({
     <DashboardPage
       title={r.name}
       eyebrow={t('edit.eyebrow')}
-      description={`/m/${r.slug}`}
+      description={`/r/${r.slug}`}
       data-test-id="admin-restaurant-edit"
     >
       <div className="mb-5 flex flex-wrap gap-2">
