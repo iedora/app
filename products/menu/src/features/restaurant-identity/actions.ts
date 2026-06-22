@@ -229,6 +229,12 @@ export async function staffImportRestaurantAction(input: {
   const doc = payload as ImportPayload & { tenant?: string }
   const newTenantName = input.newTenantName?.trim()
   if (newTenantName && !doc.tenant) doc.tenant = newTenantName
+  // New-tenant mode with no explicit name: default the tenant to the
+  // restaurant's own name (mirrors the manual create form). Optional override
+  // is either the explicit newTenantName above or a `tenant` key in the JSON.
+  if (!doc.tenant && !input.tenantId?.trim() && doc.restaurant?.name) {
+    doc.tenant = doc.restaurant.name.trim()
+  }
   try {
     const { restaurant } = await api.staffImportRestaurant({
       tenantId: newTenantName || doc.tenant ? undefined : input.tenantId?.trim() || undefined,

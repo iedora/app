@@ -820,6 +820,8 @@
         "new": "Novo inquilino",
         "useExisting": "Usar existente",
         "newPlaceholder": "Nome do novo inquilino",
+        "newHint": "Opcional. Usa o nome do restaurante por omissão.",
+        "newHintNamed": "Opcional. Por omissão, usa <b>{name}</b>.",
         "hint": "O proprietário a quem este restaurante pertence."
       },
       "plan": {

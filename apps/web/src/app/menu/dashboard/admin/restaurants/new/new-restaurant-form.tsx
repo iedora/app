@@ -134,8 +134,10 @@ export function NewRestaurantForm({
   const [mode, setMode] = useState<Mode>('manual')
   const [error, setError] = useState<string | null>(null)
 
-  // Shared tenant selection. With no tenants yet, only "new" is possible.
-  const [tenantMode, setTenantMode] = useState<'existing' | 'new'>(tenants.length ? 'existing' : 'new')
+  // Shared tenant selection. A new tenant (named after the restaurant) is the
+  // default — the common one-tenant-per-restaurant case; switch to an existing
+  // one only when wanted.
+  const [tenantMode, setTenantMode] = useState<'existing' | 'new'>('new')
   const [tenantId, setTenantId] = useState(tenants[0]?.id ?? '')
   const [newTenantName, setNewTenantName] = useState('')
 
@@ -153,8 +155,13 @@ export function NewRestaurantForm({
   const slug = slugPreview(name)
   const errorText = error ? t(`errors.${error}`) : null
 
-  function resolveTenant(): { tenantId?: string; newTenantName?: string } {
-    return tenantMode === 'new' ? { newTenantName: newTenantName.trim() } : { tenantId }
+  // In "new tenant" mode the name is OPTIONAL and defaults to the restaurant
+  // name (the common one-tenant-per-restaurant case); the admin can override
+  // it. `defaultName` is the restaurant name on manual create; import resolves
+  // its own default from the payload server-side.
+  function resolveTenant(defaultName = ''): { tenantId?: string; newTenantName?: string } {
+    if (tenantMode !== 'new') return { tenantId }
+    return { newTenantName: newTenantName.trim() || defaultName.trim() }
   }
 
   function go(run: () => Promise<{ ok: true; id: string } | { ok: false; error: string }>) {
@@ -170,7 +177,7 @@ export function NewRestaurantForm({
   }
 
   const onCreate = () =>
-    go(() => staffCreateRestaurantAction({ name: name.trim(), defaultLanguage: language, ...resolveTenant() }))
+    go(() => staffCreateRestaurantAction({ name: name.trim(), defaultLanguage: language, ...resolveTenant(name) }))
   const onImport = () => go(() => staffImportRestaurantAction({ ...resolveTenant(), payloadText }))
 
   function copyPrompt() {
@@ -415,13 +422,24 @@ export function NewRestaurantForm({
                   value={newTenantName}
                   onChange={(e) => setNewTenantName(e.target.value)}
                   maxLength={120}
-                  placeholder={t('tenant.newPlaceholder')}
+                  placeholder={name.trim() || t('tenant.newPlaceholder')}
                   className="min-w-0 flex-1 bg-transparent text-[15px] text-foreground outline-none placeholder:text-muted-foreground"
                   data-test-id="new-restaurant-tenant-name"
                 />
               </div>
             )}
-            <p className="mt-2 text-[12px] text-muted-foreground">{t('tenant.hint')}</p>
+            <p className="mt-2 break-words text-[12px] leading-relaxed text-muted-foreground">
+              {tenantMode === 'existing' ? (
+                t('tenant.hint')
+              ) : name.trim() ? (
+                t.rich('tenant.newHintNamed', {
+                  name: name.trim(),
+                  b: (chunks) => <strong className="font-semibold text-foreground">{chunks}</strong>,
+                })
+              ) : (
+                t('tenant.newHint')
+              )}
+            </p>
           </section>
 
           <section className="flex items-center gap-3 rounded-[14px] bg-[var(--green-soft)] p-3.5" data-test-id="new-restaurant-plan">

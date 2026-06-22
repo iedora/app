@@ -820,6 +820,8 @@
         "new": "New tenant",
         "useExisting": "Use existing",
         "newPlaceholder": "New tenant name",
+        "newHint": "Optional. Defaults to the restaurant name.",
+        "newHintNamed": "Optional. Defaults to <b>{name}</b>.",
         "hint": "The owner this restaurant belongs to."
       },
       "plan": {
