@@ -188,6 +188,7 @@
       "name": "@iedora/server-kit",
       "version": "0.1.0",
       "dependencies": {
+        "@iedora/observability": "workspace:*",
         "@node-rs/argon2": "catalog:",
         "hono": "catalog:",
         "jose": "catalog:",

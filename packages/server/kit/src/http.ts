@@ -1,6 +1,62 @@
+import {
+  context,
+  IEDORA_RESTAURANT_ID,
+  IEDORA_TENANT_ID,
+  propagation,
+  SpanKind,
+  SpanStatusCode,
+  tracer,
+} from "@iedora/observability";
 import { type Env, Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
+
+// Reads W3C trace headers off the incoming Request so a span continues the
+// caller's trace instead of starting a detached one.
+const headerGetter = {
+  get: (h: Headers, k: string) => h.get(k) ?? undefined,
+  keys: (h: Headers) => Array.from(h.keys()),
+};
+
+// One SERVER span per request. Bun.serve/Hono aren't auto-instrumented, so this
+// is where backend HTTP tracing comes from: continue any propagated trace, name
+// the span by the matched route (low cardinality), and stamp status + tenant.
+// All of OTel no-ops until registerIedoraOtelNode runs with an OTLP endpoint, so
+// this is free when observability is off.
+export function otelHttp<E extends Env>() {
+  return createMiddleware<E>(async (c, next) => {
+    const method = c.req.method;
+    const route = c.req.routePath || c.req.path;
+    const parent = propagation.extract(context.active(), c.req.raw.headers, headerGetter);
+    await context.with(parent, () =>
+      tracer.startActiveSpan(`${method} ${route}`, { kind: SpanKind.SERVER }, async (span) => {
+        span.setAttribute("http.request.method", method);
+        span.setAttribute("url.path", c.req.path);
+        if (route) span.setAttribute("http.route", route);
+        try {
+          await next();
+        } catch (err) {
+          span.recordException(err as Error);
+          span.setStatus({ code: SpanStatusCode.ERROR, message: String(err) });
+          throw err;
+        } finally {
+          const status = c.res.status;
+          span.setAttribute("http.response.status_code", status);
+          if (status >= 500) span.setStatus({ code: SpanStatusCode.ERROR });
+          // Tenant attribution — set by userAuth / the scoped middleware inside
+          // next(), so it's available here. Read loosely: not every Env carries
+          // these vars.
+          const vars = c as unknown as { get: (k: string) => unknown };
+          const user = vars.get("user") as { tenantId?: string } | undefined;
+          if (user?.tenantId) span.setAttribute(IEDORA_TENANT_ID, user.tenantId);
+          const rest = vars.get("restaurant") as { id?: string } | undefined;
+          if (rest?.id) span.setAttribute(IEDORA_RESTAURANT_ID, rest.id);
+          span.end();
+        }
+      }),
+    );
+  });
+}
 
 // Shared bearer-token gate behind both userAuth and serviceAuth: parse the
 // `Authorization: Bearer …` header, 401 on missing, run `verify`, set the
@@ -41,6 +97,7 @@ export interface ServiceEnv {
 // carry user/tenant variables) can supply their own while reusing onError.
 export function createServiceApp<E extends Env = ServiceEnv>(): Hono<E> {
   const app = new Hono<E>();
+  app.use(otelHttp<E>()); // request tracing; no-op until OTel is configured
   app.onError((err, c) => {
     if (err instanceof HTTPException) return err.getResponse();
     console.error(JSON.stringify({ level: "error", msg: "unhandled error", err: String(err) }));

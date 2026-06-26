@@ -27,6 +27,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@iedora/observability": "workspace:*",
     "@node-rs/argon2": "catalog:",
     "hono": "catalog:",
     "jose": "catalog:",
