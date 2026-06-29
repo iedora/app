@@ -6,7 +6,8 @@ import {
 } from "@opentelemetry/sdk-trace-base";
 import { Hono } from "hono";
 
-import { otelHttp, createServiceApp } from "../src/http";
+import { otelHttp } from "../src/otel";
+import { createServiceApp } from "../src/http";
 import { SpanKind, SpanStatusCode, trace } from "@iedora/observability";
 
 const exporter = new InMemorySpanExporter();

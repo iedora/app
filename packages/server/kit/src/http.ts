@@ -1,100 +1,8 @@
-import {
-  context,
-  IEDORA_RESTAURANT_ID,
-  IEDORA_TENANT_ID,
-  propagation,
-  SpanKind,
-  SpanStatusCode,
-  trace,
-  tracer,
-} from "@iedora/observability";
 import { type Env, Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 
-// Reads W3C trace headers off the incoming Request so a span continues the
-// caller's trace instead of starting a detached one.
-const headerGetter = {
-  get: (h: Headers, k: string) => h.get(k) ?? undefined,
-  keys: (h: Headers) => Array.from(h.keys()),
-};
-
-// The originating client IP behind Cloudflare + kamal-proxy. PII — only ever
-// goes on the SERVER span (never a metric label or db statement). Trust
-// assumption: backend service ports are reachable only from that proxy boundary;
-// do not accept spoofable forwarding chains from direct clients here.
-function clientAddress(h: Headers): string | undefined {
-  const cf = h.get("cf-connecting-ip")?.trim();
-  if (cf) return cf;
-  return undefined;
-}
-
-// One SERVER span per request. Bun.serve/Hono aren't auto-instrumented, so this
-// is where backend HTTP tracing comes from: continue any propagated trace, name
-// the span by the matched route (low cardinality), and stamp status + tenant.
-// All of OTel no-ops until registerIedoraOtelNode runs with an OTLP endpoint, so
-// this is free when observability is off.
-export function otelHttp<E extends Env>(opts?: { captureRequestHeaders?: string[]; captureResponseHeaders?: string[] }) {
-  return createMiddleware<E>(async (c, next) => {
-    const method = c.req.method;
-    let route = c.req.path;
-    const parent = propagation.extract(context.active(), c.req.raw.headers, headerGetter);
-    const startTime = performance.now();
-    let hasErrorStatus = false;
-    await context.with(parent, () =>
-      tracer.startActiveSpan(`${method} ${route}`, { kind: SpanKind.SERVER }, async (span) => {
-        span.setAttribute("http.request.method", method);
-        span.setAttribute("url.path", c.req.path);
-        if (route) span.setAttribute("http.route", route);
-        const ip = clientAddress(c.req.raw.headers);
-        if (ip) span.setAttribute("client.address", ip);
-        for (const name of opts?.captureRequestHeaders ?? []) {
-          const value = c.req.header(name);
-          if (value) span.setAttribute(`http.request.header.${name}`, value);
-        }
-        try {
-          await next();
-        } catch (err) {
-          span.recordException(err as Error);
-          span.setStatus({ code: SpanStatusCode.ERROR, message: String(err) });
-          hasErrorStatus = true;
-          throw err;
-        } finally {
-          if (c.error && !hasErrorStatus) {
-            span.recordException(c.error);
-            span.setStatus({ code: SpanStatusCode.ERROR, message: String(c.error) });
-            hasErrorStatus = true;
-          }
-          const status = c.res.status;
-          const matchedRoute = c.req.routePath;
-          if (matchedRoute && matchedRoute !== c.req.path) {
-            route = matchedRoute;
-            span.updateName(`${method} ${route}`);
-            span.setAttribute("http.route", route);
-          }
-          span.setAttribute("http.response.status_code", status);
-          span.setAttribute("http.duration", performance.now() - startTime);
-          const contentLength = c.res.headers.get("content-length");
-          if (contentLength) span.setAttribute("http.response.body.size", Number(contentLength));
-          for (const name of opts?.captureResponseHeaders ?? []) {
-            const value = c.res.headers.get(name);
-            if (value) span.setAttribute(`http.response.header.${name}`, value);
-          }
-          if (status >= 500 && !hasErrorStatus) span.setStatus({ code: SpanStatusCode.ERROR });
-          // Tenant attribution — set by userAuth / the scoped middleware inside
-          // next(), so it's available here. Read loosely: not every Env carries
-          // these vars.
-          const vars = c as unknown as { get: (k: string) => unknown };
-          const user = vars.get("user") as { tenantId?: string } | undefined;
-          if (user?.tenantId) span.setAttribute(IEDORA_TENANT_ID, user.tenantId);
-          const rest = vars.get("restaurant") as { id?: string } | undefined;
-          if (rest?.id) span.setAttribute(IEDORA_RESTAURANT_ID, rest.id);
-          span.end();
-        }
-      }),
-    );
-  });
-}
+import { otelHttp, traceIds } from "./otel";
 
 // Shared bearer-token gate behind both userAuth and serviceAuth: parse the
 // `Authorization: Bearer …` header, 401 on missing, run `verify`, set the
@@ -142,15 +50,9 @@ export function createServiceApp<E extends Env = ServiceEnv>(
     if (err instanceof HTTPException) return err.getResponse();
     // Correlate the error log with its trace so a log line is a jump-off point
     // into the full span tree (this is why per-layer breadcrumb logging isn't
-    // needed). Empty trace ids when OTel is off.
-    const sc = trace.getActiveSpan()?.spanContext();
+    // needed). No ids when OTel is off.
     console.error(
-      JSON.stringify({
-        level: "error",
-        msg: "unhandled error",
-        err: String(err),
-        ...(sc ? { trace_id: sc.traceId, span_id: sc.spanId } : {}),
-      }),
+      JSON.stringify({ level: "error", msg: "unhandled error", err: String(err), ...traceIds() }),
     );
     return c.json({ error: "internal error" }, 500);
   });

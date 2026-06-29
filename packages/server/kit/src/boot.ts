@@ -1,5 +1,6 @@
-import { registerIedoraOtelNode, shutdownIedoraOtel } from "@iedora/observability";
 import type { Hono } from "hono";
+
+import { initOtel, shutdownOtel } from "./otel";
 
 export interface ServeOptions {
   name: string;
@@ -22,11 +23,7 @@ function log(msg: string, extra: Record<string, unknown> = {}): void {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function serve(app: Hono<any, any, any>, opts: ServeOptions) {
-  // OpenTelemetry (traces + metrics) for this service. The Node variant avoids
-  // @vercel/otel (which misbehaves outside Next/under bun). It no-ops in tests
-  // and when OTEL_EXPORTER_OTLP_ENDPOINT is unset, so this ships dark and is
-  // switched on purely by setting that env — no code change to enable.
-  registerIedoraOtelNode({ serviceName: opts.name });
+  initOtel(opts.name); // OTel for this service; no-ops in tests / when unconfigured
 
   const server = Bun.serve({ port: opts.port, fetch: app.fetch });
   log("listening", { service: opts.name, port: opts.port });
@@ -40,7 +37,7 @@ export function serve(app: Hono<any, any, any>, opts: ServeOptions) {
     try {
       await server.stop();
       await opts.onShutdown?.();
-      await shutdownIedoraOtel(); // flush any buffered spans/metrics before exit
+      await shutdownOtel(); // flush any buffered spans/metrics before exit
     } finally {
       clearTimeout(timer);
       process.exit(0);

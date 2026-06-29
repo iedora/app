@@ -3,20 +3,7 @@
 // base URL + a token source) so each endpoint method is one line instead of the
 // repeated token() → fetch(Bearer) → !res.ok throw → json() boilerplate.
 
-import { context, propagation } from "@iedora/observability";
-
-/** Injects the W3C `traceparent` (+ baggage) so a service-to-service call
- *  continues the caller's trace — the Node OTel variant has no fetch
- *  auto-instrumentation, so we propagate by hand here. No-op until OTel is
- *  registered (no global propagator → nothing written). */
-function withTrace(headers: Record<string, string>): Record<string, string> {
-  propagation.inject(context.active(), headers, {
-    set: (carrier, key, value) => {
-      carrier[key] = value;
-    },
-  });
-  return headers;
-}
+import { withTrace } from "./otel"; // outbound traceparent injection
 
 /** Anything that can mint/return a service bearer token (e.g. ServiceTokenSource). */
 export interface TokenSource {
