@@ -10,6 +10,7 @@
     "./boot": "./src/boot.ts",
     "./db": "./src/db.ts",
     "./http": "./src/http.ts",
+    "./otel": "./src/otel.ts",
     "./jwt": "./src/jwt.ts",
     "./mailer": "./src/mailer.ts",
     "./audit": "./src/audit.ts",
@@ -27,6 +28,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@iedora/observability": "workspace:*",
     "@node-rs/argon2": "catalog:",
     "hono": "catalog:",
     "jose": "catalog:",
@@ -36,6 +38,7 @@
   },
   "devDependencies": {
     "@iedora/eslint-config": "workspace:*",
+    "@opentelemetry/sdk-trace-base": "^2.8.0",
     "@types/bun": "catalog:",
     "@types/nodemailer": "^6.4.17",
     "eslint": "catalog:",

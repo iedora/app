@@ -3,6 +3,8 @@
 // base URL + a token source) so each endpoint method is one line instead of the
 // repeated token() → fetch(Bearer) → !res.ok throw → json() boilerplate.
 
+import { withTrace } from "./otel"; // outbound traceparent injection
+
 /** Anything that can mint/return a service bearer token (e.g. ServiceTokenSource). */
 export interface TokenSource {
   token(): Promise<string>;
@@ -41,7 +43,7 @@ export class ServiceClient {
   async get<T>(path: string, allow: number[] = []): Promise<T | null> {
     const token = await this.tokens.token();
     const res = await fetch(`${this.base}${path}`, {
-      headers: { authorization: `Bearer ${token}` },
+      headers: withTrace({ authorization: `Bearer ${token}` }),
     });
     if (allow.includes(res.status)) return null;
     if (!res.ok) throw new ServiceClientError(this.name, path, res.status);
@@ -54,7 +56,7 @@ export class ServiceClient {
     const token = await this.tokens.token();
     const res = await fetch(`${this.base}${path}`, {
       method: "POST",
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      headers: withTrace({ authorization: `Bearer ${token}`, "content-type": "application/json" }),
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new ServiceClientError(this.name, path, res.status);

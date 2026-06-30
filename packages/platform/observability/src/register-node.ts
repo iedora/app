@@ -1,4 +1,5 @@
-import { metrics, trace, propagation } from "@opentelemetry/api";
+import { context, metrics, trace, propagation } from "@opentelemetry/api";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import { W3CTraceContextPropagator } from "@opentelemetry/core";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import {
@@ -9,9 +10,6 @@ import { resourceFromAttributes, defaultResource } from "@opentelemetry/resource
 import {
   BasicTracerProvider,
   BatchSpanProcessor,
-  ParentBasedSampler,
-  AlwaysOnSampler,
-  TraceIdRatioBasedSampler,
 } from "@opentelemetry/sdk-trace-base";
 import {
   MeterProvider,
@@ -25,7 +23,9 @@ import {
 } from "@opentelemetry/semantic-conventions";
 import { ATTR_HOST_NAME } from "@opentelemetry/semantic-conventions/incubating";
 
+import { parseOtlpHeaders } from "./signals/otlp";
 import { TenantContextSpanProcessor } from "./signals/processor";
+import { defaultSampler } from "./signals/sampler";
 
 /**
  * Bundle-friendly OTel registration for short-lived Node scripts.
@@ -50,7 +50,9 @@ import { TenantContextSpanProcessor } from "./signals/processor";
  * container honours the orchestrator's sampling decision when
  * `TRACEPARENT` arrives via env). The W3C trace-context propagator is
  * registered as the global propagator so `propagation.extract(...)` /
- * `inject(...)` work with no extra wiring.
+ * `inject(...)` work with no extra wiring. The AsyncLocalStorage context
+ * manager keeps the active span across Bun/Hono async boundaries so child
+ * DB spans and outbound traceparent injection attach to the request span.
  *
  * Use for any short-lived Node script (migrations, one-shot CLIs,
  * cron-style jobs) that ships bundled. Pair with `shutdownIedoraOtel()`
@@ -69,13 +71,6 @@ export type RegisterNodeOptions = {
 
 const DEFAULT_METRIC_EXPORT_INTERVAL_MS = 60_000;
 
-function defaultSampler(environment: string) {
-  const root =
-    environment === "production"
-      ? new TraceIdRatioBasedSampler(0.1)
-      : new AlwaysOnSampler();
-  return new ParentBasedSampler({ root });
-}
 
 export function registerIedoraOtelNode(opts: RegisterNodeOptions): void {
   if (process.env.NODE_ENV === "test") return;
@@ -113,9 +108,11 @@ export function registerIedoraOtelNode(opts: RegisterNodeOptions): void {
   // Tracer provider. BatchSpanProcessor only flushes periodically;
   // shutdownIedoraOtel() flushes synchronously before process exit so
   // short-lived scripts don't drop their tail of spans.
+  const otlpHeaders = parseOtlpHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS);
   const traceExporter = process.env.OTEL_EXPORTER_OTLP_ENDPOINT
     ? new OTLPTraceExporter({
         url: `${process.env.OTEL_EXPORTER_OTLP_ENDPOINT.replace(/\/$/, "")}/v1/traces`,
+        headers: otlpHeaders, // OpenObserve Basic auth (Authorization=Basic …)
       })
     : undefined;
 
@@ -133,6 +130,8 @@ export function registerIedoraOtelNode(opts: RegisterNodeOptions): void {
   });
   trace.setGlobalTracerProvider(tp);
 
+  context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
+
   // Propagator — make traceparent/tracestate work both ways. The
   // orchestrator sets TRACEPARENT in the migrate container's env; the
   // first span we open extracts it as the parent so the trace
@@ -147,6 +146,8 @@ export function registerIedoraOtelNode(opts: RegisterNodeOptions): void {
       readers: [
         new PeriodicExportingMetricReader({
           exporter: new OTLPMetricExporter({
+            url: `${process.env.OTEL_EXPORTER_OTLP_ENDPOINT.replace(/\/$/, "")}/v1/metrics`,
+            headers: otlpHeaders,
             temporalityPreference: AggregationTemporalityPreference.DELTA,
           }),
           exportIntervalMillis:

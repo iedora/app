@@ -4,6 +4,8 @@ import { SQL } from "bun";
 import { Kysely, sql, type Transaction } from "kysely";
 import { PostgresJSDialect } from "kysely-postgres-js";
 
+import { recordQuerySpan } from "./otel"; // one CLIENT span per query (no-op when OTel is off)
+
 // Transaction-in-context: the active transaction is carried implicitly so
 // repositories transparently join the caller's unit of work and nested runInTx
 // reuses it. Stored as Kysely<any> because Kysely is invariant in its DB param
@@ -29,6 +31,7 @@ export class Database<DB> {
   // maxLifetime caps connection age — both bound the live-connection count.
   constructor(url: string, opts: { poolMax?: number } = {}) {
     this.root = new Kysely<DB>({
+      log: recordQuerySpan, // one CLIENT span per query (no-op when OTel is off)
       dialect: new PostgresJSDialect({
         postgres: new SQL(url, {
           // Modest pool: short-lived OLTP queries don't need a deep pool, and on

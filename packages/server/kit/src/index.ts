@@ -9,6 +9,7 @@ export * from "./http";
 export * from "./jwt";
 export * from "./mailer";
 export * from "./migrate";
+export * from "./otel";
 export * from "./outbox";
 export * from "./password";
 export * from "./pgerror";

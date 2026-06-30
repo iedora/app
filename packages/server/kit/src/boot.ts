@@ -1,5 +1,7 @@
 import type { Hono } from "hono";
 
+import { initOtel, shutdownOtel } from "./otel";
+
 export interface ServeOptions {
   name: string;
   port: number;
@@ -21,6 +23,8 @@ function log(msg: string, extra: Record<string, unknown> = {}): void {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function serve(app: Hono<any, any, any>, opts: ServeOptions) {
+  initOtel(opts.name); // OTel for this service; no-ops in tests / when unconfigured
+
   const server = Bun.serve({ port: opts.port, fetch: app.fetch });
   log("listening", { service: opts.name, port: opts.port });
 
@@ -33,6 +37,7 @@ export function serve(app: Hono<any, any, any>, opts: ServeOptions) {
     try {
       await server.stop();
       await opts.onShutdown?.();
+      await shutdownOtel(); // flush any buffered spans/metrics before exit
     } finally {
       clearTimeout(timer);
       process.exit(0);
